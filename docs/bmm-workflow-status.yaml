@@ -1,0 +1,18 @@
+generated: "2025-12-15"
+project: "CDM-17-cc"
+project_type: "Software"
+selected_track: "bmad-method"
+field_type: "greenfield"
+workflow_path: ".bmad/bmm/workflows/workflow-status/paths/method-greenfield.yaml"
+workflow_status:
+  brainstorm-project: skipped
+  research: docs/research-milanote.md
+  product-brief: docs/project-brief.md
+  prd: docs/prd.md
+  create-ux-design: docs/ux-design-specification.md
+  create-architecture: docs/architecture.md
+  create-epics-and-stories: required
+  test-design: recommended
+  validate-architecture: optional
+  implementation-readiness: required
+  sprint-planning: required

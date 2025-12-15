@@ -1,0 +1,1 @@
+export { GraphComponent } from './GraphComponent';

@@ -1,0 +1,91 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Core Models for CDM Mindmap Application
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects Project[]
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String   @default("未命名项目")
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id])
+
+  graphs Graph[]
+}
+
+model Graph {
+  id        String   @id @default(cuid())
+  name      String   @default("新脑图")
+  data      Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  nodes Node[]
+  edges Edge[]
+}
+
+model Node {
+  id       String  @id @default(cuid())
+  label    String
+  type     String  @default("topic")
+  x        Float   @default(0)
+  y        Float   @default(0)
+  width    Float   @default(120)
+  height   Float   @default(40)
+  metadata Json    @default("{}")
+
+  graphId String
+  graph   Graph  @relation(fields: [graphId], references: [id], onDelete: Cascade)
+
+  parentId String?
+  parent   Node?   @relation("NodeHierarchy", fields: [parentId], references: [id])
+  children Node[]  @relation("NodeHierarchy")
+
+  sourceEdges Edge[] @relation("SourceNode")
+  targetEdges Edge[] @relation("TargetNode")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Edge {
+  id   String @id @default(cuid())
+  type String @default("hierarchical")
+
+  graphId String
+  graph   Graph  @relation(fields: [graphId], references: [id], onDelete: Cascade)
+
+  sourceId String
+  source   Node   @relation("SourceNode", fields: [sourceId], references: [id], onDelete: Cascade)
+
+  targetId String
+  target   Node   @relation("TargetNode", fields: [targetId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

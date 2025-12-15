@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --version:*)",
+      "Bash(npx --version:*)",
+      "Bash(npm view:*)",
+      "Bash(npx:*)",
+      "Bash(pip --version:*)",
+      "Bash(where:*)",
+      "Bash(claude plugin search:*)",
+      "Bash(claude plugin --help:*)",
+      "Bash(claude plugin install:*)",
+      "Bash(claude plugin marketplace show claude-code-plugins)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "agentvibes"
+  ]
+}

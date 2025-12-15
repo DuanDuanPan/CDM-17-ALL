@@ -1,0 +1,84 @@
+# generated: 2025-12-15
+# project: CDM-17-cc
+# project_key: CDM-17-cc
+# tracking_system: file-system
+# story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - drafted: Story file created in stories folder
+#   - ready-for-dev: Draft approved and story context created
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - completed: Retrospective has been done
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically drafts next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2025-12-15
+project: CDM-17-cc
+project_key: CDM-17-cc
+tracking_system: file-system
+story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
+
+development_status:
+  epic-1: in-progress
+  1-1-environment-init-basic-canvas: review
+  1-2-node-operations-shortcuts: backlog
+  1-3-advanced-layout-control: backlog
+  1-4-real-time-collaboration-engine: backlog
+  1-5-performance-optimization: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-task-conversion-properties: backlog
+  2-2-task-dependency-network: backlog
+  2-3-multi-view-synchronization: backlog
+  2-4-task-dispatch-feedback: backlog
+  2-5-data-organization-search: backlog
+  epic-2-retrospective: optional
+
+  epic-4: backlog
+  4-1-approval-driven-workflow: backlog
+  4-2-smart-notification-center: backlog
+  4-3-contextual-comments-mentions: backlog
+  4-4-watch-subscription: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-template-library: backlog
+  5-2-subtree-fragments: backlog
+  5-3-cross-graph-linking: backlog
+  5-4-ai-generation: backlog
+  epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-task-performance-statistics: backlog
+  6-2-performance-report-export: backlog
+  epic-6-retrospective: optional
+
+  epic-3: backlog
+  3-1-granular-access-watermark: backlog
+  3-2-comprehensive-audit-log: backlog
+  3-3-secure-version-history: backlog
+  3-4-secure-export-share: backlog
+  epic-3-retrospective: optional
