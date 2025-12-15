@@ -133,6 +133,388 @@ npx create-turbo@latest cdm-17-gemini
 *   **Orchestration:** Docker Compose (Local Dev), Railway/K8s (Production).
 *   **Stateful Services:** WebSockets require sticky sessions or single-instance deployment initially.
 
+## NocoBase-Inspired Architecture Patterns
+
+> 基于 NocoBase (v1.9.25) 架构分析，以下模式已纳入 CDM 项目架构规范。
+
+### 1. 微内核插件化架构
+
+**核心理念**: "一切皆插件" (Everything is a Plugin)
+
+所有业务功能必须以插件形式实现，`apps/api` 仅作为 Kernel 提供基础设施。
+
+**完整插件生命周期**:
+
+```typescript
+// packages/plugins/plugin-xxx/src/server.ts
+export class MyPlugin extends Plugin {
+  // 1. 注册阶段
+  async beforeLoad() {
+    // 注册数据模型 (Collection)
+    // 注册数据库迁移
+    // 注册字段类型
+  }
+
+  // 2. 加载阶段
+  async load() {
+    // 注册 RESTful 资源
+    // 注册中间件
+    // 注册事件监听器
+    // 注册定时任务
+  }
+
+  // 3. 安装阶段 (首次启用时执行一次)
+  async install() {
+    // 初始化默认数据
+    // 创建系统配置
+  }
+
+  // 4. 启用后
+  async afterEnable() {
+    // 启用后的初始化逻辑
+  }
+
+  // 5. 禁用后
+  async afterDisable() {
+    // 清理运行时资源
+  }
+
+  // 6. 移除时
+  async remove() {
+    // 清理数据库数据
+    // 撤销迁移
+  }
+}
+```
+
+**客户端插件结构**:
+
+```typescript
+// packages/plugins/plugin-xxx/src/client.ts
+export class MyPluginClient extends Plugin {
+  async load() {
+    // 注册路由
+    this.app.router.add('my-route', { path: '/my-path', component: MyComponent });
+
+    // 注册 Schema 组件
+    this.app.schemaRegistry.add('MyComponent', MyComponent);
+
+    // 注册节点类型
+    this.app.nodeRegistry.add('my-node', { renderer: MyNodeRenderer });
+  }
+}
+```
+
+### 2. 三层数据抽象
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Collection Layer                      │
+│  (业务模型定义: 字段、关系、验证规则、权限)               │
+├─────────────────────────────────────────────────────────┤
+│                    Repository Layer                      │
+│  (数据访问: CRUD、查询构建、关联加载、分页)              │
+├─────────────────────────────────────────────────────────┤
+│                    Database Layer                        │
+│  (Prisma 包装: 连接池、事务、迁移)                       │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Collection 定义示例**:
+
+```typescript
+// packages/database/src/collections/mindmap.ts
+export const mindmapCollection = defineCollection({
+  name: 'mindmaps',
+  fields: [
+    { type: 'string', name: 'title', required: true },
+    { type: 'json', name: 'data' },
+    { type: 'string', name: 'theme', default: 'default' },
+    { type: 'json', name: 'settings' },
+    { type: 'belongsTo', name: 'creator', target: 'users' },
+    { type: 'belongsToMany', name: 'collaborators', target: 'users', through: 'mindmap_collaborators' },
+    { type: 'hasMany', name: 'nodes', target: 'mindmap_nodes' },
+    { type: 'hasMany', name: 'versions', target: 'mindmap_versions' },
+  ],
+  indexes: [
+    { fields: ['creatorId', 'createdAt'] },
+  ],
+});
+```
+
+**Repository 使用模式**:
+
+```typescript
+// 获取 Repository
+const mindmapRepo = db.getRepository('mindmaps');
+
+// 标准查询
+const mindmaps = await mindmapRepo.find({
+  filter: {
+    status: 'published',
+    creatorId: { $eq: userId },
+  },
+  fields: ['id', 'title', 'updatedAt'],
+  appends: ['creator', 'nodes'],
+  sort: ['-updatedAt'],
+  page: 1,
+  pageSize: 20,
+});
+
+// 关联操作
+await mindmapRepo.create({
+  values: { title: 'New Mindmap', creatorId: userId },
+});
+```
+
+### 3. RESTful API 设计规范
+
+**路由格式**: `/api/<resource>:<action>?<params>`
+
+```bash
+# ═══════════════════════════════════════════════════════════
+# 基础 CRUD 操作
+# ═══════════════════════════════════════════════════════════
+GET    /api/mindmaps                         # 列表 (list)
+POST   /api/mindmaps                         # 创建 (create)
+GET    /api/mindmaps:get?filterByTk=1        # 获取单个 (get)
+PUT    /api/mindmaps:update?filterByTk=1     # 更新 (update)
+DELETE /api/mindmaps:destroy?filterByTk=1    # 删除 (destroy)
+
+# ═══════════════════════════════════════════════════════════
+# 自定义操作 (Action)
+# ═══════════════════════════════════════════════════════════
+POST   /api/mindmaps:duplicate?filterByTk=1  # 复制
+POST   /api/mindmaps:export?filterByTk=1     # 导出
+POST   /api/mindmaps:aiExpand?filterByTk=1   # AI 扩展
+POST   /api/mindmaps:aiGenerate              # AI 生成 (无需 filterByTk)
+
+# ═══════════════════════════════════════════════════════════
+# 嵌套资源
+# ═══════════════════════════════════════════════════════════
+GET    /api/mindmaps/1/nodes                 # 获取子资源
+POST   /api/mindmaps/1/nodes                 # 创建子资源
+POST   /api/mindmaps/1/nodes:batch           # 批量操作
+DELETE /api/mindmaps/1/nodes/n1              # 删除子资源
+
+# ═══════════════════════════════════════════════════════════
+# 版本控制
+# ═══════════════════════════════════════════════════════════
+GET    /api/mindmaps/1/versions              # 版本列表
+POST   /api/mindmaps/1/versions:restore      # 恢复版本
+GET    /api/mindmaps/1/versions:diff         # 版本对比
+```
+
+**统一查询参数**:
+
+```typescript
+interface QueryParams {
+  // 过滤条件
+  filter?: {
+    [field: string]: any | {
+      $eq?: any;        // 等于
+      $ne?: any;        // 不等于
+      $gt?: any;        // 大于
+      $gte?: any;       // 大于等于
+      $lt?: any;        // 小于
+      $lte?: any;       // 小于等于
+      $in?: any[];      // 在列表中
+      $notIn?: any[];   // 不在列表中
+      $like?: string;   // 模糊匹配
+      $and?: any[];     // 且
+      $or?: any[];      // 或
+    };
+  };
+
+  // 返回字段
+  fields?: string[];
+
+  // 关联数据
+  appends?: string[];
+
+  // 排序 (负号表示降序)
+  sort?: string[];
+
+  // 分页
+  page?: number;
+  pageSize?: number;
+}
+```
+
+### 4. 事件驱动架构
+
+**数据事件**:
+
+```typescript
+// 监听数据变化
+db.on('mindmaps.beforeCreate', async (model, options) => {
+  // 创建前验证、设置默认值
+  model.set('createdAt', new Date());
+});
+
+db.on('mindmaps.afterCreate', async (model, options) => {
+  // 创建后触发: 通知、索引更新、审计日志
+  await auditService.log('mindmap.created', model.id);
+  await notificationService.notify(model.creatorId, 'mindmap.created');
+});
+
+db.on('mindmap_nodes.afterUpdate', async (model, options) => {
+  // 节点更新后: 版本快照、协作同步
+  await versionService.createSnapshot(model.mindmapId);
+});
+
+db.on('mindmaps.afterDestroy', async (model, options) => {
+  // 删除后清理: 关联数据、缓存
+  await cacheService.invalidate(`mindmap:${model.id}`);
+});
+```
+
+**应用事件**:
+
+```typescript
+// 应用生命周期事件
+app.on('beforeStart', async () => {
+  // 启动前初始化
+});
+
+app.on('afterStart', async () => {
+  // 启动后执行
+});
+
+// 请求事件
+app.on('beforeRequest', async (ctx) => {
+  // 请求前处理
+});
+
+app.on('afterResponse', async (ctx) => {
+  // 响应后处理 (日志、metrics)
+});
+```
+
+### 5. 实时协作 (CRDT/Yjs)
+
+**技术选型**: Yjs + Hocuspocus
+
+```typescript
+// packages/plugins/plugin-collaboration/src/server.ts
+import * as Y from 'yjs';
+import { Hocuspocus } from '@hocuspocus/server';
+
+export class CollaborationPlugin extends Plugin {
+  private docs: Map<string, Y.Doc> = new Map();
+
+  async load() {
+    // 注册 WebSocket 处理
+    const hocuspocus = new Hocuspocus({
+      onConnect: async ({ documentName, context }) => {
+        // 验证用户权限
+        const [_, mindmapId] = documentName.split(':');
+        const canAccess = await this.checkAccess(context.userId, mindmapId);
+        if (!canAccess) throw new Error('Unauthorized');
+      },
+
+      onLoadDocument: async ({ documentName }) => {
+        // 从数据库加载
+        const [_, mindmapId] = documentName.split(':');
+        const mindmap = await this.db.getRepository('mindmaps').findOne({
+          filterByTk: mindmapId,
+        });
+
+        const ydoc = new Y.Doc();
+        if (mindmap?.yjsState) {
+          Y.applyUpdate(ydoc, mindmap.yjsState);
+        }
+        return ydoc;
+      },
+
+      onStoreDocument: async ({ documentName, document }) => {
+        // 持久化到数据库 (防抖)
+        const [_, mindmapId] = documentName.split(':');
+        const state = Y.encodeStateAsUpdate(document);
+
+        await this.db.getRepository('mindmaps').update({
+          filterByTk: mindmapId,
+          values: { yjsState: state },
+        });
+      },
+    });
+
+    this.app.use('/collab', hocuspocus.handleConnection);
+  }
+}
+```
+
+**客户端集成**:
+
+```typescript
+// apps/web/hooks/useCollaboration.ts
+import * as Y from 'yjs';
+import { HocuspocusProvider } from '@hocuspocus/provider';
+
+export function useCollaboration(mindmapId: string) {
+  const [users, setUsers] = useState<User[]>([]);
+  const ydocRef = useRef<Y.Doc>();
+  const providerRef = useRef<HocuspocusProvider>();
+
+  useEffect(() => {
+    const ydoc = new Y.Doc();
+    const provider = new HocuspocusProvider({
+      url: `${WS_URL}/collab`,
+      name: `mindmap:${mindmapId}`,
+      document: ydoc,
+      token: getAuthToken(),
+    });
+
+    // 监听用户状态
+    provider.on('awarenessChange', ({ states }) => {
+      setUsers(Array.from(states.values()));
+    });
+
+    ydocRef.current = ydoc;
+    providerRef.current = provider;
+
+    return () => {
+      provider.disconnect();
+      ydoc.destroy();
+    };
+  }, [mindmapId]);
+
+  return { ydoc: ydocRef.current, provider: providerRef.current, users };
+}
+```
+
+### 6. Schema 驱动 UI (未来扩展)
+
+```typescript
+// UI Schema 定义 (用于配置化界面)
+const pageSchema = {
+  type: 'void',
+  'x-component': 'Page',
+  properties: {
+    toolbar: {
+      type: 'void',
+      'x-component': 'ActionBar',
+      properties: {
+        create: {
+          'x-component': 'Action',
+          'x-action': 'create',
+          title: '新建脑图',
+        },
+      },
+    },
+    table: {
+      type: 'array',
+      'x-component': 'Table',
+      'x-data-source': 'mindmaps',
+      properties: {
+        title: { 'x-component': 'Table.Column', title: '标题' },
+        updatedAt: { 'x-component': 'Table.Column', title: '更新时间' },
+      },
+    },
+  },
+};
+```
+
 ## Implementation Patterns & Consistency Rules
 
 ### Pattern Categories Defined
