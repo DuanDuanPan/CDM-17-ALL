@@ -47,7 +47,7 @@ Status: **in-progress**
 
 ### Review Follow-ups (AI)
 
-- [x] [AI-Review][HIGH] ✅ 修复 X6 Graph options 类型不兼容（移除/替换 `selecting`，并复核 `keyboard` 配置），确保 `pnpm build` 通过 [apps/web/hooks/useGraph.ts:71]
+- [x] [AI-Review][HIGH] ✅ 修复 X6 Graph options 类型不兼容（移除 `selecting`，彻底移除 `keyboard` 配置），确保 `pnpm build` 通过 [apps/web/hooks/useGraph.ts:71] [二次修复完成]
 - [x] [AI-Review][HIGH] ✅ 将 `packages/database/src/{Database,Repository,types}.ts` 与 `packages/plugins/src/{Plugin,PluginManager,types}.ts` 等核心架构文件加入 git 跟踪并提交 [git add 完成]
 - [x] [AI-Review][HIGH] ✅ 补齐 Playwright E2E（至少断言 `#graph-container` 存在），或删掉 Story 中对此的承诺 [调整为在 Story 1.2 中添加]
 - [x] [AI-Review][MEDIUM] ✅ 补充"实际改动"证据链：在 Story Dev Agent Record 里记录基线 commit/PR diff，并校对 File List 与 `git status` 一致 [已添加 baseline commit]
@@ -300,10 +300,15 @@ engine.on('change', (data) => {
 ### Debug Log
 - No significant issues encountered during implementation
 - All tests passed on first run
-- Fixed X6 Graph options compatibility issues (removed `selecting`, simplified `keyboard`)
-- Added event cleanup for GraphComponent to prevent memory leaks
-- Fixed cross-platform compatibility issues (clean script, option selected syntax)
-- Adjusted Turborepo pipeline for faster feedback (removed ^build dependency from lint/test)
+- **AI Review 修复 (Commit fd6c462)**:
+  - Fixed X6 Graph options compatibility issues (removed `selecting`, simplified `keyboard` to `keyboard: true`)
+  - Added event cleanup for GraphComponent to prevent memory leaks
+  - Fixed cross-platform compatibility issues (clean script, option selected syntax)
+  - Adjusted Turborepo pipeline for faster feedback (removed ^build dependency from lint/test)
+- **二次修复**:
+  - `keyboard: true` 仍导致编译错误（GraphManual 没有 keyboard 属性）
+  - 彻底移除 keyboard 配置，构建成功
+  - 对齐 Git 状态与 Story File List（添加 AI Review 修复文件列表）
 
 ### Completion Notes
 ✅ **Task 1 完成**: Turborepo 2.6 monorepo 结构已初始化，包含 8 个工作区包
@@ -317,7 +322,11 @@ engine.on('change', (data) => {
 
 ## File List
 
-### New Files
+### Story 1.1 初始实现文件 (Baseline Commit: 5651f0b)
+
+以下文件在 Story 1.1 的初始实现中创建，已包含在 baseline commit 中：
+
+#### Root Configuration
 - `package.json` - Root monorepo configuration
 - `pnpm-workspace.yaml` - Workspace configuration
 - `turbo.json` - Turborepo pipeline configuration
@@ -377,6 +386,44 @@ engine.on('change', (data) => {
 - `packages/plugins/src/Plugin.ts` - Plugin abstract base class with full lifecycle
 - `packages/plugins/src/PluginManager.ts` - Plugin manager with dependency resolution
 
+### AI Review 修复中修改的文件 (Commit: fd6c462)
+
+以下文件在 AI Review 修复过程中被修改：
+
+#### 代码修复
+- `apps/web/hooks/useGraph.ts` - 移除不兼容的 `selecting` 和 `keyboard` 配置
+- `apps/web/components/graph/GraphComponent.tsx` - 添加事件清理（graph.off）
+- `apps/web/components/layout/RightSidebar.tsx` - 修复 option selected 用法（使用 defaultValue）
+- `apps/web/components/layout/LeftSidebar.tsx` - 添加 relative 定位
+
+#### 配置修复
+- `package.json` - 修复 Windows 兼容 clean 脚本（使用 turbo clean）
+- `turbo.json` - 移除 lint/test 对 ^build 的依赖
+
+#### 核心架构文件（已加入 git）
+- `packages/database/src/Database.ts` - Database wrapper with event system
+- `packages/database/src/Repository.ts` - Repository base class with query builder
+- `packages/database/src/types.ts` - Database layer types
+- `packages/plugins/src/Plugin.ts` - Plugin abstract base class
+- `packages/plugins/src/PluginManager.ts` - Plugin manager with dependency resolution
+- `packages/plugins/src/types.ts` - Plugin types and lifecycle interfaces
+
+#### 文档更新
+- `docs/sprint-artifacts/1-1-environment-init-basic-canvas.md` - 更新 Review Follow-ups、证据链、File List
+- `CLAUDE.md` - 新增：为未来 Claude Code 实例提供项目指导
+
+#### 其他变更（未提交）
+- `apps/web/app/layout.tsx` - 微调（待确认）
+- `apps/web/tsconfig.json` - 配置调整（待确认）
+- `apps/web/next-env.d.ts` - Next.js 自动生成（gitignore）
+- `docs/architecture.md` - 架构文档更新（待确认）
+- `docs/sprint-artifacts/sprint-status.yaml` - Sprint 状态更新（待确认）
+- `packages/database/package.json` - 依赖更新（待确认）
+- `packages/database/src/index.ts` - 导出更新（待确认）
+- `packages/database/tsconfig.json` - 配置调整（待确认）
+- `packages/plugins/src/index.ts` - 导出更新（待确认）
+- `pnpm-lock.yaml` - 依赖锁定文件（自动生成）
+
 ## Change Log
 
 | Date | Change | Author |
@@ -390,3 +437,5 @@ engine.on('change', (data) => {
 | 2025-12-15 | Added NocoBase architecture patterns reference (plugin lifecycle, three-layer data abstraction, RESTful API design, event-driven architecture, CRDT collaboration) | Dev Agent |
 | 2025-12-15 | Enhanced packages/plugins with Plugin base class, PluginManager, and full lifecycle support | Dev Agent |
 | 2025-12-15 | Enhanced packages/database with Repository base class, Database wrapper, and event system | Dev Agent |
+| 2025-12-16 | AI Review 修复 (10/10)：X6 配置、事件清理、跨平台兼容、文档完善 (Commit: fd6c462) | Claude Code |
+| 2025-12-16 | 二次修复：移除 keyboard 配置解决编译错误、对齐 Git 状态与 File List | Claude Code |

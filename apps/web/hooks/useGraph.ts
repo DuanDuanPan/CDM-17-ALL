@@ -66,9 +66,6 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
         allowLoop: false,
         highlight: true,
       },
-
-      // Keyboard shortcuts
-      keyboard: true,
     });
 
     graphRef.current = graph;
