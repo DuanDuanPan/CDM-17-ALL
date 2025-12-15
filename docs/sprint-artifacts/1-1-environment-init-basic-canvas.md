@@ -1,6 +1,6 @@
 # Story 1.1: Environment Init & Basic Canvas
 
-Status: **in-progress**
+Status: **completed** ✅
 
 ## Story
 

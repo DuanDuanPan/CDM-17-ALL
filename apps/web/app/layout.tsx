@@ -12,8 +12,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
-      <body className="antialiased h-screen overflow-hidden">{children}</body>
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body className="antialiased h-screen overflow-hidden" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }

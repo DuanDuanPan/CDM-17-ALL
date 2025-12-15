@@ -1,46 +1,49 @@
 /**
  * CDM Plugin System
  *
- * This package serves as the root for all CDM plugins following the
- * Nocobase-style microkernel architecture.
+ * NocoBase-inspired microkernel plugin architecture.
  *
- * Plugins should be placed in subdirectories and registered here.
+ * @example
+ * ```typescript
+ * import { Plugin, PluginManager } from '@cdm/plugins';
+ *
+ * // Define a plugin
+ * class MyPlugin extends Plugin {
+ *   constructor() {
+ *     super({
+ *       name: 'my-plugin',
+ *       version: '1.0.0',
+ *       description: 'My custom plugin',
+ *     });
+ *   }
+ *
+ *   async beforeLoad() {
+ *     // Register data models
+ *   }
+ *
+ *   async load() {
+ *     // Register routes, middleware
+ *   }
+ *
+ *   async install() {
+ *     // Initialize default data
+ *   }
+ * }
+ *
+ * // Use the plugin manager
+ * const manager = new PluginManager({ context: { db, app } });
+ * manager.register(new MyPlugin());
+ * await manager.load();
+ * await manager.installAll();
+ * await manager.enableAll();
+ * ```
  */
 
-// Plugin interface definition
-export interface Plugin {
-  name: string;
-  version: string;
-  description?: string;
-  initialize: () => Promise<void>;
-  destroy?: () => Promise<void>;
-}
+// Types
+export * from './types';
 
-// Plugin registry (will be populated as plugins are added)
-export const plugins: Map<string, Plugin> = new Map();
+// Plugin base class
+export { Plugin } from './Plugin';
 
-// Plugin registration function
-export function registerPlugin(plugin: Plugin): void {
-  if (plugins.has(plugin.name)) {
-    console.warn(`Plugin "${plugin.name}" is already registered. Skipping.`);
-    return;
-  }
-  plugins.set(plugin.name, plugin);
-}
-
-// Plugin retrieval function
-export function getPlugin(name: string): Plugin | undefined {
-  return plugins.get(name);
-}
-
-// Initialize all registered plugins
-export async function initializePlugins(): Promise<void> {
-  for (const [name, plugin] of plugins) {
-    try {
-      await plugin.initialize();
-      console.log(`Plugin "${name}" initialized successfully.`);
-    } catch (error) {
-      console.error(`Failed to initialize plugin "${name}":`, error);
-    }
-  }
-}
+// Plugin manager
+export { PluginManager, type PluginManagerOptions } from './PluginManager';
