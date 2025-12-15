@@ -30,7 +30,7 @@ export function LeftSidebar() {
   const [activeNav, setActiveNav] = useState('components');
 
   return (
-    <aside className="flex h-full bg-white/80 backdrop-blur-md border-r border-gray-200/50">
+    <aside className="relative flex h-full bg-white/80 backdrop-blur-md border-r border-gray-200/50">
       {/* Icon strip navigation */}
       <nav className="w-14 flex flex-col items-center py-4 border-r border-gray-100">
         {navItems.map((item) => (

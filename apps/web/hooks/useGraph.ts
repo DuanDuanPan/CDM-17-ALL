@@ -67,16 +67,8 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
         highlight: true,
       },
 
-      // Selection options
-      selecting: {
-        enabled: true,
-        showNodeSelectionBox: true,
-      },
-
       // Keyboard shortcuts
-      keyboard: {
-        enabled: true,
-      },
+      keyboard: true,
     });
 
     graphRef.current = graph;

@@ -1,6 +1,6 @@
 # Story 1.1: Environment Init & Basic Canvas
 
-Status: **Ready for Review**
+Status: **in-progress**
 
 ## Story
 
@@ -45,6 +45,19 @@ Status: **Ready for Review**
     - [x] Setup CORS to allow `localhost:3000`.
     - [x] **Setup `.env` Configuration**: Implement `@nestjs/config` for robust environment variable management (Port, DB_URL) - *Nocobase Ref: Environment-driven config*.
 
+### Review Follow-ups (AI)
+
+- [x] [AI-Review][HIGH] ✅ 修复 X6 Graph options 类型不兼容（移除/替换 `selecting`，并复核 `keyboard` 配置），确保 `pnpm build` 通过 [apps/web/hooks/useGraph.ts:71]
+- [x] [AI-Review][HIGH] ✅ 将 `packages/database/src/{Database,Repository,types}.ts` 与 `packages/plugins/src/{Plugin,PluginManager,types}.ts` 等核心架构文件加入 git 跟踪并提交 [git add 完成]
+- [x] [AI-Review][HIGH] ✅ 补齐 Playwright E2E（至少断言 `#graph-container` 存在），或删掉 Story 中对此的承诺 [调整为在 Story 1.2 中添加]
+- [x] [AI-Review][MEDIUM] ✅ 补充"实际改动"证据链：在 Story Dev Agent Record 里记录基线 commit/PR diff，并校对 File List 与 `git status` 一致 [已添加 baseline commit]
+- [x] [AI-Review][MEDIUM] ✅ `.env` 不应出现在 Story "New Files"列表：改为只提交 `.env.example` 并在 Story 里说明 `.env` 被 `.gitignore` 忽略/本地创建 [已修正]
+- [x] [AI-Review][MEDIUM] ✅ 为 GraphComponent 的 X6 事件监听添加清理（`graph.off`）并避免 `blank:click`/`node:unselected` 重复触发同一逻辑 [已添加清理函数]
+- [x] [AI-Review][MEDIUM] ✅ 修复 Windows 兼容 `clean` 脚本（替换 `rm -rf` 为跨平台方案） [使用 turbo clean]
+- [x] [AI-Review][MEDIUM] ✅ 调整 Turborepo pipeline：`lint/test` 不应依赖 `^build`（应先 lint/test 再 build），避免反馈慢且与架构约定冲突 [已移除依赖]
+- [x] [AI-Review][LOW] ✅ 修复 RightSidebar 的 `<option selected>` 用法（改用 `defaultValue/value`）避免 React warning/潜在 hydration 差异 [已使用 defaultValue]
+- [x] [AI-Review][LOW] ✅ LeftSidebar 展开按钮的绝对定位应绑定到容器（给 `<aside>` 加 `relative` 或调整结构）避免布局跑偏 [已添加 relative]
+
 ## Dev Notes
 
 ### Technical Requirements
@@ -59,6 +72,152 @@ Status: **Ready for Review**
 *   **Nocobase Alignment:**
     *   **Plugins:** All future features must go into `packages/plugins`. `apps/api` should be treated as the "Kernel".
     *   **Database:** Schema source of truth resides in `packages/database`, referenced by `apps/api`.
+
+### NocoBase 架构借鉴要点
+
+基于对 NocoBase (v1.9.25) 的深度分析，以下架构模式值得在后续 Stories 中采用：
+
+#### 1. 微内核插件化架构
+
+**核心理念**: "一切皆插件" (Everything is a Plugin)
+
+```typescript
+// 服务端插件结构 (packages/plugins/plugin-xxx/src/server.ts)
+export class MyPlugin extends Plugin {
+  async beforeLoad() { /* 注册模型、迁移 */ }
+  async load() { /* 注册资源、中间件、事件 */ }
+  async install() { /* 初始化数据 */ }
+  async afterEnable() { /* 启用后执行 */ }
+  async afterDisable() { /* 禁用后清理 */ }
+  async remove() { /* 移除时清理数据 */ }
+}
+
+// 客户端插件结构 (packages/plugins/plugin-xxx/src/client.ts)
+export class MyPluginClient extends Plugin {
+  async load() { /* 注册路由、组件、Schema */ }
+}
+```
+
+**实施建议**:
+- `apps/api` 只保留 Kernel 功能（启动、插件管理、全局中间件）
+- 所有业务功能必须以插件形式实现
+- 插件支持热插拔（运行时启用/禁用）
+
+#### 2. 三层数据抽象
+
+```
+┌─────────────────┐
+│   Collection    │ ← 业务模型层 (定义结构、关系)
+├─────────────────┤
+│   Repository    │ ← 仓储层 (CRUD、查询构建)
+├─────────────────┤
+│   Database      │ ← 数据库抽象层 (Prisma 包装)
+└─────────────────┘
+```
+
+**示例**:
+```typescript
+// packages/database 扩展
+db.collection({
+  name: 'mindmaps',
+  fields: [
+    { type: 'string', name: 'title', required: true },
+    { type: 'json', name: 'data' },
+    { type: 'belongsTo', name: 'creator', target: 'users' },
+    { type: 'hasMany', name: 'nodes', target: 'mindmap_nodes' },
+  ]
+});
+
+const repo = db.getRepository('mindmaps');
+const mindmaps = await repo.find({
+  filter: { status: 'published' },
+  appends: ['creator', 'nodes'],
+  sort: ['-createdAt'],
+});
+```
+
+#### 3. RESTful API 设计规范
+
+采用 NocoBase 风格的 API 路由:
+```bash
+# 基础 CRUD
+GET    /api/<resource>                      # 列表
+POST   /api/<resource>                      # 创建
+GET    /api/<resource>:get?filterByTk=1     # 获取单个
+PUT    /api/<resource>:update?filterByTk=1  # 更新
+DELETE /api/<resource>:destroy?filterByTk=1 # 删除
+
+# 自定义操作
+POST   /api/mindmaps:duplicate?filterByTk=1   # 复制
+POST   /api/mindmaps:aiExpand?filterByTk=1    # AI 扩展
+POST   /api/mindmaps:export?filterByTk=1      # 导出
+
+# 嵌套资源
+GET    /api/mindmaps/1/nodes                  # 获取节点
+POST   /api/mindmaps/1/nodes:batch            # 批量操作
+```
+
+**统一查询参数**:
+```typescript
+{
+  filter: { field: { $op: value } },  // 过滤条件
+  fields: ['field1', 'field2'],       // 返回字段
+  appends: ['relation1'],             // 关联数据
+  sort: ['-createdAt'],               // 排序
+  page: 1,                            // 分页
+  pageSize: 20
+}
+```
+
+#### 4. 事件驱动架构
+
+```typescript
+// 监听数据变化
+db.on('mindmap_nodes.afterCreate', async (model, options) => {
+  // 触发其他逻辑（通知、缓存更新等）
+});
+
+db.on('mindmaps.afterUpdate', async (model, options) => {
+  // 版本快照、协作同步等
+});
+```
+
+#### 5. 实时协作 (CRDT/Yjs)
+
+```typescript
+// packages/plugins/plugin-collaboration
+import * as Y from 'yjs';
+
+// 使用 Yjs 实现无冲突同步
+const ydoc = new Y.Doc();
+const ymap = ydoc.getMap('mindmap');
+
+// 监听远程变化
+ymap.observe((event) => {
+  const data = ymap.get('data');
+  engine.load(data);
+});
+
+// 同步本地变化
+engine.on('change', (data) => {
+  ymap.set('data', data);
+});
+```
+
+#### 6. 后续 Story 架构对齐清单
+
+| Story | NocoBase 借鉴 |
+|-------|--------------|
+| **1.4 实时协作** | Yjs CRDT + WebSocket |
+| **2.x 任务管理** | Collection-Repository 模式 |
+| **3.x 安全合规** | ACL 插件架构 |
+| **4.x 审批协作** | 工作流插件模式 |
+| **5.x 模板复用** | Schema 驱动 UI |
+| **6.x 数据报表** | 统一查询参数 + 导出插件 |
+
+**参考文档**:
+- `nocobase-key-takeaways-zh.md` - NocoBase 架构分析报告
+- `nocobase-architecture-analysis.md` - 详细架构分析 (1385 行)
 
 ### Architecture Compliance
 
@@ -87,7 +246,7 @@ Status: **Ready for Review**
 
 *   **Unit Tests:** Vitest for `packages/types`.
 *   **Component Tests:** Ensure `GraphComponent` mounts sans errors.
-*   **E2E Tests:** Playwright - Verify `#graph-container` exists.
+*   **E2E Tests:** Playwright E2E tests will be added in Story 1.2 (Node CRUD operations).
 
 ### Latest Tech Information (Dec 2025)
 
@@ -127,6 +286,10 @@ Status: **Ready for Review**
 
 ## Dev Agent Record
 
+### Implementation Evidence
+**Baseline Commit**: `5651f0b` - Initial commit: Project scaffold for CDM-17-cc
+**Story Implementation**: All changes made in this session build upon the baseline commit
+
 ### Implementation Plan
 - Initialized Turborepo monorepo with pnpm workspaces
 - Created Next.js 16 frontend with AntV X6 graph visualization
@@ -137,6 +300,10 @@ Status: **Ready for Review**
 ### Debug Log
 - No significant issues encountered during implementation
 - All tests passed on first run
+- Fixed X6 Graph options compatibility issues (removed `selecting`, simplified `keyboard`)
+- Added event cleanup for GraphComponent to prevent memory leaks
+- Fixed cross-platform compatibility issues (clean script, option selected syntax)
+- Adjusted Turborepo pipeline for faster feedback (removed ^build dependency from lint/test)
 
 ### Completion Notes
 ✅ **Task 1 完成**: Turborepo 2.6 monorepo 结构已初始化，包含 8 个工作区包
@@ -176,8 +343,7 @@ Status: **Ready for Review**
 - `apps/api/tsconfig.json` - TypeScript configuration
 - `apps/api/nest-cli.json` - NestJS CLI configuration
 - `apps/api/jest.config.js` - Jest test configuration
-- `apps/api/.env` - Environment variables
-- `apps/api/.env.example` - Environment variables template
+- `apps/api/.env.example` - Environment variables template (`.env` is gitignored, copy from this template)
 - `apps/api/src/main.ts` - Application entry point
 - `apps/api/src/app.module.ts` - Root module with ConfigModule
 - `apps/api/src/app.controller.ts` - Root controller
@@ -201,9 +367,15 @@ Status: **Ready for Review**
 - `packages/database/prisma/schema.prisma` - Prisma schema
 - `packages/database/src/index.ts` - Database exports
 - `packages/database/src/client.ts` - Prisma client singleton
+- `packages/database/src/types.ts` - Database layer types (NocoBase-style)
+- `packages/database/src/Repository.ts` - Repository base class with query builder
+- `packages/database/src/Database.ts` - Database wrapper with event system
 - `packages/plugins/package.json` - Plugins package configuration
 - `packages/plugins/tsconfig.json` - TypeScript configuration
 - `packages/plugins/src/index.ts` - Plugin system foundation
+- `packages/plugins/src/types.ts` - Plugin types and lifecycle interfaces
+- `packages/plugins/src/Plugin.ts` - Plugin abstract base class with full lifecycle
+- `packages/plugins/src/PluginManager.ts` - Plugin manager with dependency resolution
 
 ## Change Log
 
@@ -215,3 +387,6 @@ Status: **Ready for Review**
 | 2025-12-15 | Created three-column layout with glassmorphism styling | Dev Agent |
 | 2025-12-15 | Added NestJS backend with ConfigModule for .env support | Dev Agent |
 | 2025-12-15 | All 8 tests passing | Dev Agent |
+| 2025-12-15 | Added NocoBase architecture patterns reference (plugin lifecycle, three-layer data abstraction, RESTful API design, event-driven architecture, CRDT collaboration) | Dev Agent |
+| 2025-12-15 | Enhanced packages/plugins with Plugin base class, PluginManager, and full lifecycle support | Dev Agent |
+| 2025-12-15 | Enhanced packages/database with Repository base class, Database wrapper, and event system | Dev Agent |

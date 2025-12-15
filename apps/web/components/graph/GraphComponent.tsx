@@ -26,18 +26,26 @@ export function GraphComponent({ onNodeSelect }: GraphComponentProps) {
       // Add the default center node
       addCenterNode(graph);
 
-      // Setup node selection event
-      graph.on('node:selected', ({ node }) => {
+      // Event handlers
+      const handleNodeSelected = ({ node }: { node: any }) => {
         onNodeSelect?.(node.id);
-      });
+      };
 
-      graph.on('blank:click', () => {
+      const handleBlankClick = () => {
         onNodeSelect?.(null);
-      });
+      };
 
-      graph.on('node:unselected', () => {
-        onNodeSelect?.(null);
-      });
+      // Setup node selection events
+      graph.on('node:selected', handleNodeSelected);
+      graph.on('blank:click', handleBlankClick);
+
+      // Cleanup function to remove event listeners
+      return () => {
+        if (graph && typeof graph.off === 'function') {
+          graph.off('node:selected', handleNodeSelected);
+          graph.off('blank:click', handleBlankClick);
+        }
+      };
     }
   }, [graph, isReady, onNodeSelect]);
 

@@ -75,10 +75,10 @@ export function RightSidebar({ selectedNodeId, onClose }: RightSidebarProps) {
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">字体大小</label>
-              <select className="w-full text-sm border border-gray-200 rounded px-2 py-1.5">
+              <select className="w-full text-sm border border-gray-200 rounded px-2 py-1.5" defaultValue="16px">
                 <option>12px</option>
                 <option>14px</option>
-                <option selected>16px</option>
+                <option>16px</option>
                 <option>18px</option>
                 <option>24px</option>
               </select>
