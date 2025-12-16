@@ -34,7 +34,7 @@ export class MindmapCorePlugin extends Plugin {
   }
 
   /**
-   * Load lifecycle: Register shape and keyboard shortcuts
+   * Load lifecycle: Initialize plugin
    */
   async load(): Promise<void> {
     this.logger.info('MindmapCorePlugin: Loading...');
