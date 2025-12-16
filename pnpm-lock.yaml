@@ -87,6 +87,9 @@ importers:
       '@antv/x6':
         specifier: ^3.1.2
         version: 3.1.2
+      '@antv/x6-plugin-scroller':
+        specifier: ^2.0.10
+        version: 2.0.10(@antv/x6@3.1.2)
       '@antv/x6-react-shape':
         specifier: ^3.0.1
         version: 3.0.1(@antv/x6@3.1.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -108,6 +111,12 @@ importers:
       '@hocuspocus/provider':
         specifier: ^3.4.3
         version: 3.4.3(y-protocols@1.0.6(yjs@13.6.27))(yjs@13.6.27)
+      '@types/lodash':
+        specifier: ^4.17.21
+        version: 4.17.21
+      lodash:
+        specifier: ^4.17.21
+        version: 4.17.21
       lucide-react:
         specifier: ^0.511.0
         version: 0.511.0(react@19.2.3)
@@ -337,6 +346,11 @@ packages:
 
   '@antv/hierarchy@0.6.14':
     resolution: {integrity: sha512-V3uknf7bhynOqQDw2sg+9r9DwZ9pc6k/EcqyTFdfXB1+ydr7urisP0MipIuimucvQKN+Qkd+d6w601r1UIroqQ==}
+
+  '@antv/x6-plugin-scroller@2.0.10':
+    resolution: {integrity: sha512-CrC5zCbtPe7LJEKK8ucLcDN+9lMtTJNApFmFObAiR/y2LO1QFCHz8GGLVeNOZaIEmJbR/Z/etpJkvc1LE7WhTg==}
+    peerDependencies:
+      '@antv/x6': ^2.x
 
   '@antv/x6-react-shape@3.0.1':
     resolution: {integrity: sha512-zLIJ0NMO6R3sXZGKQJKMUEZmaVwNDBxx3jYUMSXE9cZhKsvWV+P8WuiUCtJYNSVTezBLbxYLzrukA/QdQa/sKg==}
@@ -1734,6 +1748,9 @@ packages:
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
+
+  '@types/lodash@4.17.21':
+    resolution: {integrity: sha512-FOvQ0YPD5NOfPgMzJihoT+Za5pdkDJWcbpuj1DjaKZIr/gxodQjY/uWEFlTNqW2ugXHUiL8lRQgw63dzKHZdeQ==}
 
   '@types/node@20.19.27':
     resolution: {integrity: sha512-N2clP5pJhB2YnZJ3PIHFk5RkygRX5WO/5f0WC08tp0wd+sv0rsJk3MqWn3CbNmT2J505a5336jaQj4ph1AdMug==}
@@ -4695,6 +4712,10 @@ snapshots:
 
   '@antv/hierarchy@0.6.14': {}
 
+  '@antv/x6-plugin-scroller@2.0.10(@antv/x6@3.1.2)':
+    dependencies:
+      '@antv/x6': 3.1.2
+
   '@antv/x6-react-shape@3.0.1(@antv/x6@3.1.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       '@antv/x6': 3.1.2
@@ -6014,6 +6035,8 @@ snapshots:
       pretty-format: 29.7.0
 
   '@types/json-schema@7.0.15': {}
+
+  '@types/lodash@4.17.21': {}
 
   '@types/node@20.19.27':
     dependencies:
