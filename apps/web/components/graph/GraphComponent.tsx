@@ -9,9 +9,13 @@ import { AddChildCommand, AddSiblingCommand, RemoveNodeCommand } from '@cdm/plug
 import { LayoutMode } from '@cdm/types';
 
 // Story 1.4: Collaboration imports
-import { useCollaboration, CollabUser, AwarenessUser } from '@/hooks/useCollaboration';
+import { useCollaboration, CollabUser } from '@/hooks/useCollaboration';
 import { graphSyncManager } from '@/features/collab/GraphSyncManager';
 import { RemoteCursorsOverlay } from '@/components/collab/RemoteCursor';
+// Story 1.4 MED-12: Use Context to report remote users
+import { useCollaborationUIOptional } from '@/contexts';
+// Story 1.4 LOW-1: Use centralized constants
+import { CURSOR_UPDATE_THROTTLE_MS } from '@/lib/constants';
 
 export interface GraphComponentProps {
     onNodeSelect?: (nodeId: string | null) => void;
@@ -24,8 +28,6 @@ export interface GraphComponentProps {
     graphId?: string;
     /** Current user info for collaboration */
     user?: CollabUser;
-    /** Callback when remote users change (for TopBar display) */
-    onRemoteUsersChange?: (users: AwarenessUser[]) => void;
 }
 
 export function GraphComponent({
@@ -36,8 +38,9 @@ export function GraphComponent({
     // Story 1.4: Collaboration props with defaults
     graphId = 'default-graph',
     user = { id: 'anonymous', name: '匿名用户', color: '#6366f1' },
-    onRemoteUsersChange,
 }: GraphComponentProps) {
+    // Story 1.4 MED-12: Get context to report remote users
+    const collabUIContext = useCollaborationUIOptional();
     const containerRef = useRef<HTMLDivElement>(null);
     const [container, setContainer] = useState<HTMLElement | null>(null);
 
@@ -45,6 +48,9 @@ export function GraphComponent({
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
     const [scale, setScale] = useState(1);
     const [hasInitializedGraphState, setHasInitializedGraphState] = useState(false);
+
+    // Story 1.4 HIGH-3: Throttle cursor updates to prevent WebSocket flooding
+    const lastCursorUpdateTime = useRef<number>(0);
 
     // Set container after mount
     useEffect(() => {
@@ -73,6 +79,7 @@ export function GraphComponent({
         updateCursor,
         updateSelectedNode,
         isSynced,
+        syncStatus,
     } = useCollaboration({
         graphId,
         user,
@@ -84,12 +91,12 @@ export function GraphComponent({
         setHasInitializedGraphState(false);
     }, [graphId]);
 
-    // Story 1.4: Report remote users to parent (for TopBar)
+    // Story 1.4 MED-12: Report remote users to context (for TopBar)
     useEffect(() => {
-        if (onRemoteUsersChange) {
-            onRemoteUsersChange(remoteUsers);
+        if (collabUIContext?.setRemoteUsers) {
+            collabUIContext.setRemoteUsers(remoteUsers);
         }
-    }, [remoteUsers, onRemoteUsersChange]);
+    }, [remoteUsers, collabUIContext]);
 
     // Story 1.4: Initialize GraphSyncManager when yDoc is available
     useEffect(() => {
@@ -124,10 +131,17 @@ export function GraphComponent({
         };
     }, [graph, isReady]);
 
-    // Story 1.4: Track mouse movement for cursor awareness
+    // Story 1.4: Track mouse movement for cursor awareness (with HIGH-3 throttling)
     const handleMouseMove = useCallback(
         (e: React.MouseEvent<HTMLDivElement>) => {
             if (!graph || !isConnected) return;
+
+            // HIGH-3: Throttle cursor updates to 50ms to prevent WebSocket flooding
+            const now = Date.now();
+            if (now - lastCursorUpdateTime.current < CURSOR_UPDATE_THROTTLE_MS) {
+                return;
+            }
+            lastCursorUpdateTime.current = now;
 
             const point = graph.clientToLocal(e.clientX, e.clientY);
             updateCursor(point.x, point.y);
@@ -157,34 +171,38 @@ export function GraphComponent({
     }, [graph, isReady, isConnected, updateSelectedNode]);
 
     // Initialize graph content after collaboration sync (or fallback to local)
+    // MED-1: Simplified with early returns for clarity
     useEffect(() => {
+        // Guard: wait for graph to be ready
         if (!graph || !isReady) return;
 
-        // Reset initialization state when graph changes
-        if (!hasInitializedGraphState && graph.getNodes().length > 0) {
+        // Guard: skip if already initialized
+        if (hasInitializedGraphState) return;
+
+        // Guard: if graph already has nodes (e.g., restored from state), mark as initialized
+        if (graph.getNodes().length > 0) {
             setHasInitializedGraphState(true);
             return;
         }
 
-        // Collaboration path: wait until document is fully synced to avoid coordinate mismatch
-        if (graphId && yDoc) {
-            if (!isSynced || hasInitializedGraphState) return;
+        // Collaboration mode: wait for Yjs sync before initializing
+        const isCollabMode = Boolean(graphId && yDoc);
+        if (isCollabMode && !isSynced) return;
 
+        // Initialize content
+        if (isCollabMode && yDoc) {
             const yNodes = yDoc.getMap('nodes');
-            if (yNodes.size === 0) {
-                addCenterNode(graph);
-            } else {
+            if (yNodes.size > 0) {
                 graphSyncManager.loadInitialState();
+            } else {
+                addCenterNode(graph);
             }
-            setHasInitializedGraphState(true);
-            return;
+        } else {
+            // Non-collaboration mode: add default center node
+            addCenterNode(graph);
         }
 
-        // Fallback: non-collaboration mode
-        if (!hasInitializedGraphState && graph.getNodes().length === 0) {
-            addCenterNode(graph);
-            setHasInitializedGraphState(true);
-        }
+        setHasInitializedGraphState(true);
     }, [graph, isReady, graphId, yDoc, isSynced, hasInitializedGraphState]);
 
     // Story 1.4: Sync layout mode changes to Yjs for collaboration
@@ -363,19 +381,28 @@ export function GraphComponent({
                 />
             )}
 
-            {/* Story 1.4: Connection Status Indicator */}
+            {/* Story 1.4 + MED-6: Connection Status Indicator with sync feedback */}
             <div
-                className={`absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${isConnected
-                    ? 'bg-green-100 text-green-700'
+                className={`absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    syncStatus === 'synced' ? 'bg-green-100 text-green-700'
+                    : syncStatus === 'syncing' ? 'bg-blue-100 text-blue-700'
+                    : syncStatus === 'offline' ? 'bg-yellow-100 text-yellow-700'
                     : 'bg-gray-100 text-gray-500'
-                    }`}
+                }`}
                 data-testid="collab-status"
             >
                 <span
-                    className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
-                        }`}
+                    className={`w-2 h-2 rounded-full ${
+                        syncStatus === 'synced' ? 'bg-green-500'
+                        : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse'
+                        : syncStatus === 'offline' ? 'bg-yellow-500'
+                        : 'bg-gray-400'
+                    }`}
                 />
-                {isConnected ? '协作已连接' : '离线模式'}
+                {syncStatus === 'synced' && '✓ 已与远程同步'}
+                {syncStatus === 'syncing' && '正在同步...'}
+                {syncStatus === 'offline' && '离线模式'}
+                {syncStatus === 'idle' && '未连接'}
             </div>
         </div>
     );

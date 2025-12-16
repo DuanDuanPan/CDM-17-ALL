@@ -231,8 +231,8 @@ describe('GraphSyncManager', () => {
             // Wait for observer to fire
             await new Promise(resolve => setTimeout(resolve, 0));
 
-            // Check setPosition was called
-            expect(existingNode.setPosition).toHaveBeenCalledWith(500, 600, { silent: true });
+            // Check setPosition was called (without silent:true - loop prevention is handled by isRemoteUpdate flag)
+            expect(existingNode.setPosition).toHaveBeenCalledWith(500, 600);
         });
     });
 

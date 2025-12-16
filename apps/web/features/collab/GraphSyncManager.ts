@@ -1,6 +1,7 @@
 import { Graph, Node, Edge, Cell } from '@antv/x6';
 import * as Y from 'yjs';
 import { LayoutMode, NodeData, EdgeData } from '@cdm/types';
+import { syncLogger as logger } from '@/lib/logger';
 
 /**
  * Node data structure stored in Yjs
@@ -93,7 +94,7 @@ export class GraphSyncManager {
         this.setupLocalToRemoteSync();
         this.setupRemoteToLocalSync();
 
-        console.log('[GraphSyncManager] Initialized');
+        logger.info('Initialized');
     }
 
     /**
@@ -109,7 +110,7 @@ export class GraphSyncManager {
         this.yEdges = null;
         this.yMeta = null;
 
-        console.log('[GraphSyncManager] Destroyed');
+        logger.info('Destroyed');
     }
 
     /**
@@ -341,7 +342,7 @@ export class GraphSyncManager {
         this.yDoc.transact(() => {
             this.yNodes?.delete(nodeId);
         });
-        console.log('[GraphSyncManager] Removed node from Yjs:', nodeId);
+        logger.debug('Removed node from Yjs', { nodeId });
     }
 
     /**
@@ -376,7 +377,7 @@ export class GraphSyncManager {
         this.yDoc.transact(() => {
             this.yEdges?.delete(edgeId);
         });
-        console.log('[GraphSyncManager] Removed edge from Yjs:', edgeId);
+        logger.debug('Removed edge from Yjs', { edgeId });
     }
 
     // ========== Remote → Local Sync Methods ==========
@@ -402,7 +403,7 @@ export class GraphSyncManager {
                 order: data.order,
                 metadata: data.metadata,
             });
-            console.log('[GraphSyncManager] Updated existing node:', data.id, 'label:', data.label);
+            logger.debug('Updated existing node', { id: data.id, type: data.type });
         } else if (!existingCell) {
             // Add new node with mind-node shape for proper rendering
             this.graph.addNode({
@@ -421,7 +422,7 @@ export class GraphSyncManager {
                     metadata: data.metadata,
                 },
             });
-            console.log('[GraphSyncManager] Added new node:', data.id, 'label:', data.label);
+            logger.debug('Added new node', { id: data.id, type: data.type });
         }
     }
 
@@ -434,7 +435,7 @@ export class GraphSyncManager {
         const node = this.graph.getCellById(nodeId);
         if (node) {
             this.graph.removeCell(node);
-            console.log('[GraphSyncManager] Removed node from graph:', nodeId);
+            logger.debug('Removed node from graph', { nodeId });
         }
     }
 
@@ -461,7 +462,7 @@ export class GraphSyncManager {
                     },
                 },
             });
-            console.log('[GraphSyncManager] Added edge:', data.id, 'from', data.source, 'to', data.target);
+            logger.debug('Added edge', { id: data.id, source: data.source, target: data.target });
         }
     }
 
@@ -474,7 +475,7 @@ export class GraphSyncManager {
         const edge = this.graph.getCellById(edgeId);
         if (edge) {
             this.graph.removeCell(edge);
-            console.log('[GraphSyncManager] Removed edge from graph:', edgeId);
+            logger.debug('Removed edge from graph', { edgeId });
         }
     }
 

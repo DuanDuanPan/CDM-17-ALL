@@ -40,10 +40,13 @@ export function RemoteCursor({
             data-testid="remote-cursor"
             data-user-id={user.id}
             style={{
-                left: screenX,
-                top: screenY,
-                transform: 'translate(0, 0)',
-                transition: 'left 100ms linear, top 100ms linear',
+                // MED-5: Use transform instead of left/top for better performance
+                // Transform triggers composite-only updates, avoiding layout recalculation
+                left: 0,
+                top: 0,
+                transform: `translate3d(${screenX}px, ${screenY}px, 0)`,
+                transition: 'transform 100ms linear',
+                willChange: 'transform', // Hint to browser for optimization
             }}
         >
             {/* Cursor Arrow - SVG */}

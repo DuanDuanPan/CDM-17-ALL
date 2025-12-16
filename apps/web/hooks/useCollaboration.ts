@@ -4,6 +4,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { HocuspocusProvider } from '@hocuspocus/provider';
 import * as Y from 'yjs';
 import { LayoutMode } from '@cdm/types';
+import { collabLogger as logger } from '@/lib/logger';
+// Story 1.4 LOW-1: Use centralized constants
+import { CURSOR_UPDATE_THROTTLE_MS } from '@/lib/constants';
 
 /**
  * User presence information for Awareness
@@ -24,6 +27,11 @@ export interface AwarenessUser extends CollabUser {
 }
 
 /**
+ * Sync status for UI feedback (MED-6)
+ */
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline';
+
+/**
  * Collaboration hook return type
  */
 export interface UseCollaborationReturn {
@@ -37,6 +45,8 @@ export interface UseCollaborationReturn {
     isConnected: boolean;
     /** Whether initial document sync is completed */
     isSynced: boolean;
+    /** MED-6: Detailed sync status for UI feedback */
+    syncStatus: SyncStatus;
     /** Connection error if any */
     error: Error | null;
     /** Remote users currently in the document */
@@ -109,10 +119,13 @@ export function useCollaboration(config: CollaborationConfig): UseCollaborationR
     const yDocRef = useRef<Y.Doc | null>(null);
     const providerRef = useRef<HocuspocusProvider | null>(null);
     const prevRemoteUsersRef = useRef<AwarenessUser[]>([]);
+    const lastCursorUpdateRef = useRef<number>(0);
+    // MED-3: Throttle cursor updates on receive side (using centralized constant)
 
     // State
     const [isConnected, setIsConnected] = useState(false);
     const [isSynced, setIsSynced] = useState(false);
+    const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
     const [error, setError] = useState<Error | null>(null);
     const [remoteUsers, setRemoteUsers] = useState<AwarenessUser[]>([]);
 
@@ -138,24 +151,28 @@ export function useCollaboration(config: CollaborationConfig): UseCollaborationR
             document: yDoc,
             // Connection lifecycle handlers
             onConnect: () => {
-                console.log('[Collab] Connected to collaboration server');
+                logger.info('Connected to collaboration server');
                 setIsConnected(true);
                 setIsSynced(false);
+                setSyncStatus('syncing'); // MED-6: Start syncing
                 setError(null);
             },
             onClose: () => {
-                console.log('[Collab] Disconnected from collaboration server');
+                logger.info('Disconnected from collaboration server');
                 setIsConnected(false);
                 setIsSynced(false);
+                setSyncStatus('offline'); // MED-6: Mark as offline
             },
             onDisconnect: () => {
-                console.log('[Collab] WebSocket disconnected');
+                logger.info('WebSocket disconnected');
                 setIsConnected(false);
                 setIsSynced(false);
+                setSyncStatus('offline'); // MED-6: Mark as offline
             },
             onSynced: () => {
-                console.log('[Collab] Document synced');
+                logger.debug('Document synced');
                 setIsSynced(true);
+                setSyncStatus('synced'); // MED-6: Sync complete
             },
         });
 
@@ -193,26 +210,36 @@ export function useCollaboration(config: CollaborationConfig): UseCollaborationR
                 }
             });
 
-            // Avoid unnecessary state updates that can cause render loops under rapid cursor/move events
+            // MED-3: Optimized comparison - user identity changes trigger immediate update,
+            // cursor position changes are throttled to reduce re-renders
             const prev = prevRemoteUsersRef.current;
-            const isSame =
-                prev.length === users.length &&
-                prev.every((u, idx) => {
+            const hasUserListChanged =
+                prev.length !== users.length ||
+                !prev.every((u, idx) => {
                     const v = users[idx];
                     return (
                         u.id === v.id &&
                         u.name === v.name &&
                         u.color === v.color &&
                         u.avatar === v.avatar &&
-                        u.cursor?.x === v.cursor?.x &&
-                        u.cursor?.y === v.cursor?.y &&
                         u.selectedNodeId === v.selectedNodeId
                     );
                 });
 
-            if (!isSame) {
-                prevRemoteUsersRef.current = users;
+            prevRemoteUsersRef.current = users;
+
+            // User list changed: update immediately
+            if (hasUserListChanged) {
+                lastCursorUpdateRef.current = Date.now();
                 setRemoteUsers(users);
+                return;
+            }
+
+            // Cursor-only change: throttle updates
+            const now = Date.now();
+            if (now - lastCursorUpdateRef.current >= CURSOR_UPDATE_THROTTLE_MS) {
+                lastCursorUpdateRef.current = now;
+                setRemoteUsers([...users]);
             }
         };
 
@@ -266,6 +293,7 @@ export function useCollaboration(config: CollaborationConfig): UseCollaborationR
         awareness: providerRef.current?.awareness ?? null,
         isConnected,
         isSynced,
+        syncStatus,
         error,
         remoteUsers,
         updateCursor,

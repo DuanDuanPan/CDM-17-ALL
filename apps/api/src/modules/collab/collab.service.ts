@@ -84,15 +84,20 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                     // const prisma = new PrismaClient();
                     // const graph = await prisma.graph.findUnique({ where: { id: graphId } });
                     //
+                    // MED-7: Explicitly handle null yjsState (new document scenario)
                     // if (graph?.yjsState) {
                     //   const update = new Uint8Array(graph.yjsState);
                     //   Y.applyUpdate(document, update);
+                    //   Logger.log(`Document ${documentName} loaded from DB (graphId: ${graphId})`, 'CollabService');
+                    // } else {
+                    //   // New document or no persisted state - Yjs starts with empty state
+                    //   Logger.log(`New document ${documentName}, starting with empty state`, 'CollabService');
                     // }
 
                     Logger.log(`Document ${documentName} loaded (graphId: ${graphId})`, 'CollabService');
                 } catch (error) {
                     Logger.error(`Failed to load document ${documentName}:`, error, 'CollabService');
-                    // Continue with empty document on error
+                    // Continue with empty document on error - Yjs handles this gracefully
                 }
             },
 

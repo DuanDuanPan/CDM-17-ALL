@@ -4,7 +4,10 @@ import { Menu, Share2, Settings } from 'lucide-react';
 import { LayoutSwitcher } from '../toolbar/LayoutSwitcher';
 import { ActiveUsersAvatarStack } from '../collab/ActiveUsersAvatarStack';
 import { LayoutMode } from '@cdm/types';
-import type { AwarenessUser } from '../../hooks/useCollaboration';
+// Story 1.4 MED-12: Use Context instead of props drilling
+import { useCollaborationUIOptional } from '@/contexts';
+// Story 1.4 LOW-1: Use centralized constants
+import { MAX_VISIBLE_AVATARS } from '@/lib/constants';
 
 export interface TopBarProps {
   projectName?: string;
@@ -13,14 +16,14 @@ export interface TopBarProps {
   onGridToggle?: (enabled: boolean) => void;
   gridEnabled?: boolean;
   isLoading?: boolean;
-  /** Remote collaborating users for presence display */
-  remoteUsers?: AwarenessUser[];
-  /** Callback when hovering over user avatar to highlight on canvas */
-  onUserHover?: (userId: string | null) => void;
-  /** Callback when clicking user avatar to find them on canvas */
-  onUserClick?: (userId: string) => void;
 }
 
+/**
+ * TopBar - Application header with layout controls and user presence
+ *
+ * Story 1.4 MED-12: Remote users are now consumed from CollaborationUIContext
+ * instead of being passed via props.
+ */
 export function TopBar({
   projectName = '未命名项目',
   currentLayout = 'mindmap',
@@ -28,10 +31,13 @@ export function TopBar({
   onGridToggle,
   gridEnabled = false,
   isLoading = false,
-  remoteUsers = [],
-  onUserHover,
-  onUserClick,
 }: TopBarProps) {
+  // Story 1.4 MED-12: Get collaboration state from context (optional for standalone usage)
+  const collabContext = useCollaborationUIOptional();
+  const remoteUsers = collabContext?.remoteUsers ?? [];
+  const onUserHover = collabContext?.onUserHover;
+  const onUserClick = collabContext?.onUserClick;
+
   return (
     <header className="h-12 border-b border-gray-200/50 bg-white/70 backdrop-blur-md flex items-center justify-between px-4">
       {/* Left section */}
@@ -55,11 +61,11 @@ export function TopBar({
 
       {/* Right section - Active Users + Actions */}
       <div className="flex items-center gap-4">
-        {/* Active Users Avatar Stack (Story 1.4) */}
+        {/* Active Users Avatar Stack (Story 1.4) - Now from Context */}
         {remoteUsers.length > 0 && (
           <ActiveUsersAvatarStack
             users={remoteUsers}
-            maxVisible={3}
+            maxVisible={MAX_VISIBLE_AVATARS}
             onUserHover={onUserHover}
             onUserClick={onUserClick}
           />
