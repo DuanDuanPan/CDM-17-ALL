@@ -39,6 +39,7 @@ model Graph {
   id        String   @id @default(cuid())
   name      String   @default("新脑图")
   data      Json     @default("{}")
+  yjsState  Bytes?   // Yjs CRDT state for real-time collaboration (Story 1.4)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

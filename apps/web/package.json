@@ -18,10 +18,12 @@
     "@cdm/plugins": "workspace:*",
     "@cdm/types": "workspace:*",
     "@cdm/ui": "workspace:*",
+    "@hocuspocus/provider": "^3.4.3",
     "lucide-react": "^0.511.0",
     "next": "16.0.7",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "yjs": "^13.6.27"
   },
   "devDependencies": {
     "@cdm/config": "workspace:*",

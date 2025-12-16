@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
+import { ToastProvider } from '@cdm/ui';
 import { GraphComponent } from '@/components/graph/GraphComponent';
 
 vi.mock('@/hooks/useGraph', () => ({
@@ -13,12 +14,30 @@ vi.mock('@/hooks/useMindmapPlugin', () => ({
   useMindmapPlugin: vi.fn(),
 }));
 
+vi.mock('@/hooks/useCollaboration', () => ({
+  useCollaboration: vi.fn(() => ({
+    yDoc: null,
+    provider: null,
+    awareness: null,
+    isConnected: false,
+    isSynced: false,
+    error: null,
+    remoteUsers: [],
+    updateCursor: vi.fn(),
+    updateSelectedNode: vi.fn(),
+    disconnect: vi.fn(),
+  })),
+}));
+
 describe('GraphComponent', () => {
   it('renders a focusable graph container', () => {
-    render(<GraphComponent />);
+    render(
+      <ToastProvider>
+        <GraphComponent />
+      </ToastProvider>
+    );
     const container = document.getElementById('graph-container');
     expect(container).toBeTruthy();
     expect(container?.getAttribute('tabIndex')).toBe('0');
   });
 });
-

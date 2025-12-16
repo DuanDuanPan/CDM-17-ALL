@@ -101,14 +101,12 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
 
 // Helper to add a center node (using mind-node shape)
 export function addCenterNode(graph: Graph): void {
-  const containerWidth = graph.container.clientWidth;
-  const containerHeight = graph.container.clientHeight;
-
   graph.addNode({
     shape: 'mind-node',
     id: 'center-node',
-    x: containerWidth / 2 - 80,
-    y: containerHeight / 2 - 25,
+    // Use fixed document coordinates so all collaborators share the same origin.
+    x: 0,
+    y: 0,
     width: 160,
     height: 50,
     data: {
