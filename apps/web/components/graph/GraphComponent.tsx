@@ -3,14 +3,25 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useGraph, addCenterNode } from '@/hooks/useGraph';
 import { useMindmapPlugin } from '@/hooks/useMindmapPlugin';
+import { useLayoutPlugin } from '@/hooks/useLayoutPlugin';
 import { Graph, Node } from '@antv/x6';
 import { AddChildCommand, AddSiblingCommand, RemoveNodeCommand } from '@cdm/plugin-mindmap-core';
+import { LayoutMode } from '@cdm/types';
 
 export interface GraphComponentProps {
   onNodeSelect?: (nodeId: string | null) => void;
+  onLayoutChange?: (mode: LayoutMode) => void;
+  onGridToggle?: (enabled: boolean) => void;
+  currentLayout?: LayoutMode;
+  gridEnabled?: boolean;
 }
 
-export function GraphComponent({ onNodeSelect }: GraphComponentProps) {
+export function GraphComponent({
+  onNodeSelect,
+  onLayoutChange,
+  onGridToggle,
+  currentLayout = 'mindmap',
+}: GraphComponentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [container, setContainer] = useState<HTMLElement | null>(null);
 
@@ -25,6 +36,13 @@ export function GraphComponent({ onNodeSelect }: GraphComponentProps) {
 
   // Initialize mindmap plugin (registers React shape)
   useMindmapPlugin(graph, isReady);
+
+  // Initialize layout plugin
+  const { gridEnabled } = useLayoutPlugin(graph, isReady, currentLayout ?? 'mindmap');
+
+  useEffect(() => {
+    onGridToggle?.(gridEnabled);
+  }, [gridEnabled, onGridToggle]);
 
   // Keyboard event handler - must be at container level to intercept Tab
   const handleKeyDown = useCallback(

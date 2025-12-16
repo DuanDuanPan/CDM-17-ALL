@@ -8,6 +8,9 @@ export interface NodeData {
   metadata?: Record<string, unknown>;
 }
 
+// Layout mode type for the mindmap
+export type LayoutMode = 'mindmap' | 'logic' | 'free';
+
 // Enhanced node data for MindNode component (supports editing)
 export interface MindNodeData extends NodeData {
   isEditing?: boolean;   // Whether node is in edit mode
@@ -16,6 +19,7 @@ export interface MindNodeData extends NodeData {
   y?: number;            // Node position Y
   width?: number;        // Node width (auto-resize)
   height?: number;       // Node height (auto-resize)
+  layoutMode?: LayoutMode; // Layout mode for the mindmap (default: 'mindmap')
 }
 
 // Edge types for connections between nodes

@@ -1,0 +1,24 @@
+{
+  "name": "@cdm/plugin-layout",
+  "version": "0.0.1",
+  "description": "Advanced layout control plugin for CDM-17-cc mindmap",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
+  },
+  "dependencies": {
+    "@cdm/plugins": "workspace:*",
+    "@cdm/types": "workspace:*",
+    "@antv/x6": "^3.1.2",
+    "@antv/hierarchy": "^0.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  }
+}

@@ -49,6 +49,7 @@ export class AddSiblingCommand {
         label: '',
         isEditing: true,
         type: 'topic',
+        parentId: parentNode.id, // Set parent ID for layout algorithm
       } as MindNodeData,
     });
 
@@ -85,6 +86,7 @@ export class AddSiblingCommand {
         label: '',
         isEditing: true,
         type: 'topic',
+        parentId: parentNode.id, // Set parent ID for layout algorithm
       } as MindNodeData,
     });
 

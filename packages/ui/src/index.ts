@@ -1,4 +1,6 @@
 // Utility functions
 export { cn } from './utils';
 
-// Components will be added as needed
+// Toast notifications
+export { ToastProvider, useToast } from './toast';
+export type { Toast, ToastType } from './toast';

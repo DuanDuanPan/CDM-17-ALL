@@ -13,6 +13,7 @@
   "dependencies": {
     "@antv/x6": "^3.1.2",
     "@antv/x6-react-shape": "^3.0.1",
+    "@cdm/plugin-layout": "workspace:*",
     "@cdm/plugin-mindmap-core": "workspace:*",
     "@cdm/plugins": "workspace:*",
     "@cdm/types": "workspace:*",

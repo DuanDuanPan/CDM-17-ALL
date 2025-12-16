@@ -26,6 +26,7 @@ export class AddChildCommand {
         label: '',
         isEditing: true,
         type: 'subtopic',
+        parentId: selectedNode.id, // Set parent ID for layout algorithm
       } as MindNodeData,
     });
 
