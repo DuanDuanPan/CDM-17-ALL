@@ -8,6 +8,16 @@ export interface NodeData {
   metadata?: Record<string, unknown>;
 }
 
+// Enhanced node data for MindNode component (supports editing)
+export interface MindNodeData extends NodeData {
+  isEditing?: boolean;   // Whether node is in edit mode
+  isSelected?: boolean;  // Whether node is selected
+  x?: number;            // Node position X
+  y?: number;            // Node position Y
+  width?: number;        // Node width (auto-resize)
+  height?: number;       // Node height (auto-resize)
+}
+
 // Edge types for connections between nodes
 export interface EdgeData {
   id: string;

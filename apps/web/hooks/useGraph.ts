@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Graph } from '@antv/x6';
+import { useEffect, useRef, useState } from 'react';
+import { Graph, Selection } from '@antv/x6';
 
 export interface UseGraphOptions {
   container: HTMLElement | null;
@@ -68,6 +68,18 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
       },
     });
 
+    // Enable selection plugin so graph emits `node:selected`/`node:unselected`
+    // and `graph.getSelectedCells()` works for keyboard operations.
+    graph.use(
+      new Selection({
+        enabled: true,
+        multiple: false,
+        rubberband: false,
+        showNodeSelectionBox: false, // We handle selection UI in MindNode
+        showEdgeSelectionBox: false,
+      })
+    );
+
     graphRef.current = graph;
     setIsReady(true);
 
@@ -87,31 +99,23 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
   };
 }
 
-// Helper to add a center node
+// Helper to add a center node (using mind-node shape)
 export function addCenterNode(graph: Graph): void {
   const containerWidth = graph.container.clientWidth;
   const containerHeight = graph.container.clientHeight;
 
   graph.addNode({
+    shape: 'mind-node',
     id: 'center-node',
     x: containerWidth / 2 - 80,
     y: containerHeight / 2 - 25,
     width: 160,
     height: 50,
-    label: '中心主题',
-    attrs: {
-      body: {
-        fill: '#3b82f6',
-        stroke: '#2563eb',
-        strokeWidth: 2,
-        rx: 8,
-        ry: 8,
-      },
-      label: {
-        fill: '#ffffff',
-        fontSize: 16,
-        fontWeight: 'bold',
-      },
+    data: {
+      id: 'center-node',
+      label: '中心主题',
+      type: 'root',
+      isEditing: false,
     },
   });
 

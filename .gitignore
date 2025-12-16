@@ -41,3 +41,7 @@ next-env.d.ts
 
 # BMAD temporary files
 .bmad/**/checkpoint.txt
+
+# Playwright artifacts
+apps/web/playwright-report
+apps/web/test-results

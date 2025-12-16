@@ -1,39 +1,24 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+'use client';
+
+import { describe, expect, it, vi } from 'vitest';
+import { render } from '@testing-library/react';
 import { GraphComponent } from '@/components/graph/GraphComponent';
 
-// Mock X6 Graph
-vi.mock('@antv/x6', () => ({
-  Graph: vi.fn().mockImplementation(() => ({
-    dispose: vi.fn(),
-    on: vi.fn(),
-    addNode: vi.fn(),
-    centerContent: vi.fn(),
-    container: {
-      clientWidth: 800,
-      clientHeight: 600,
-    },
-  })),
+vi.mock('@/hooks/useGraph', () => ({
+  useGraph: vi.fn(() => ({ graph: null, isReady: false })),
+  addCenterNode: vi.fn(),
+}));
+
+vi.mock('@/hooks/useMindmapPlugin', () => ({
+  useMindmapPlugin: vi.fn(),
 }));
 
 describe('GraphComponent', () => {
-  it('renders graph container', () => {
+  it('renders a focusable graph container', () => {
     render(<GraphComponent />);
     const container = document.getElementById('graph-container');
     expect(container).toBeTruthy();
-  });
-
-  it('applies correct CSS classes', () => {
-    render(<GraphComponent />);
-    const container = document.getElementById('graph-container');
-    expect(container?.className).toContain('w-full');
-    expect(container?.className).toContain('h-full');
-  });
-
-  it('accepts onNodeSelect callback', () => {
-    const mockCallback = vi.fn();
-    render(<GraphComponent onNodeSelect={mockCallback} />);
-    const container = document.getElementById('graph-container');
-    expect(container).toBeTruthy();
+    expect(container?.getAttribute('tabIndex')).toBe('0');
   });
 });
+

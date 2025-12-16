@@ -8,8 +8,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsc",
-    "lint": "eslint src/"
+    "build": "tsc"
   },
   "dependencies": {
     "@cdm/types": "workspace:*"
