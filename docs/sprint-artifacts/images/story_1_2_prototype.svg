@@ -1,0 +1,42 @@
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="600" fill="#f8f9fa" />
+  
+  <!-- Styles -->
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+
+  <!-- Edges -->
+  <path d="M400,300 C400,300 200,300 200,450" stroke="#cbd5e1" stroke-width="2" fill="none"/>
+  <path d="M400,300 C400,300 600,300 600,450" stroke="#cbd5e1" stroke-width="2" fill="none"/>
+  <path d="M400,300 C400,300 600,300 600,150" stroke="#cbd5e1" stroke-width="2" fill="none"/>
+
+  <!-- Root Node -->
+  <g transform="translate(325, 275)">
+    <rect width="150" height="50" rx="10" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>
+    <text x="75" y="30" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#1e293b">Project Plan</text>
+  </g>
+
+  <!-- Child Node 1 (Research) - Selected -->
+  <g transform="translate(525, 425)">
+    <rect width="150" height="50" rx="10" fill="white" stroke="#3b82f6" stroke-width="2" filter="url(#shadow)"/>
+    <text x="75" y="30" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#1e293b">Research</text>
+  </g>
+
+  <!-- Child Node 2 (Development) -->
+  <g transform="translate(125, 425)">
+    <rect width="150" height="50" rx="10" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>
+    <text x="75" y="30" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#1e293b">Development</text>
+  </g>
+
+  <!-- Child Node 3 (Design) - Editing -->
+  <g transform="translate(525, 125)">
+    <rect width="150" height="50" rx="10" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>
+    <rect x="-5" y="-5" width="160" height="60" rx="12" fill="none" stroke="#2563eb" stroke-opacity="0.2" stroke-width="2"/>
+    <text x="75" y="30" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#1e293b">User Test|</text>
+  </g>
+
+</svg>

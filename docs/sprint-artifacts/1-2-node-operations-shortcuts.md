@@ -99,7 +99,9 @@ Status: **done**
 
 **Visual Guide for MindNode Component States:**
 
-*(Image generation temporarily unavailable. Please refer to Magic UI / Glassmorphism standard: translucent white bg, soft shadow, blue ring for selection, white input overlay for editing.)*
+![MindNode Implemented Styles](images/story_1_2_existing_ui.svg)
+
+*Fig 1. Actual Implemented UI Styles: Normal (Glassy), Selected (Blue Ring/Border), and Editing (Solid White).*
 
 ## Dev Agent Record
 

@@ -1,4 +1,5 @@
 import { Graph, Node } from '@antv/x6';
+import { sortNodesRightToLeftTopToBottom } from '../utils/sortNodes';
 
 // Animation constants
 const LAYOUT_TRANSITION_DURATION = 500; // milliseconds
@@ -139,13 +140,8 @@ export abstract class BaseLayout {
 
 
 
-      // Sort children by explicit order (stable), fallback to id for determinism
-      children.sort((a, b) => {
-        const ao = a.getData()?.order ?? 0;
-        const bo = b.getData()?.order ?? 0;
-        if (ao === bo) return a.id.localeCompare(b.id);
-        return ao - bo;
-      });
+      // Sort children: right-to-left (X descending), top-to-bottom (Y ascending)
+      children.sort(sortNodesRightToLeftTopToBottom);
 
       return {
         id,

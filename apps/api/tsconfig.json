@@ -18,7 +18,8 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@cdm/types": ["../../packages/types/src"]
+      "@cdm/types": ["../../packages/types/src"],
+      "@cdm/database": ["../../packages/database/src"]
     }
   }
 }

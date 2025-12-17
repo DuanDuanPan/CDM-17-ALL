@@ -12,6 +12,15 @@ datasource db {
 
 // Core Models for CDM Mindmap Application
 
+// Node Type Enum - Story 2.1
+enum NodeType {
+  ORDINARY
+  TASK
+  REQUIREMENT
+  PBS
+  DATA
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -51,14 +60,14 @@ model Graph {
 }
 
 model Node {
-  id       String  @id @default(cuid())
+  id       String   @id @default(cuid())
   label    String
-  type     String  @default("topic")
-  x        Float   @default(0)
-  y        Float   @default(0)
-  width    Float   @default(120)
-  height   Float   @default(40)
-  metadata Json    @default("{}")
+  type     NodeType @default(ORDINARY) // Story 2.1: Changed from String to NodeType enum
+  x        Float    @default(0)
+  y        Float    @default(0)
+  width    Float    @default(120)
+  height   Float    @default(40)
+  metadata Json     @default("{}")
 
   graphId String
   graph   Graph  @relation(fields: [graphId], references: [id], onDelete: Cascade)
@@ -69,6 +78,63 @@ model Node {
 
   sourceEdges Edge[] @relation("SourceNode")
   targetEdges Edge[] @relation("TargetNode")
+
+  // Story 2.1: Polymorphic Extension Tables (1:1 relations)
+  taskProps        NodeTask?
+  requirementProps NodeRequirement?
+  pbsProps         NodePBS?
+  dataProps        NodeData?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Story 2.1: Extension Tables for Polymorphic Node Properties
+model NodeTask {
+  nodeId   String   @id
+  node     Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  status     String   @default("todo") // todo, in-progress, done
+  assigneeId String?
+  dueDate    DateTime?
+  priority   String?  @default("medium") // low, medium, high
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model NodeRequirement {
+  nodeId   String   @id
+  node     Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  reqType            String? // functional, non-functional, etc.
+  acceptanceCriteria String?
+  priority           String? @default("medium") // MoSCoW: must, should, could, wont
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NodePBS {
+  nodeId  String   @id
+  node    Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  code     String? // e.g., "PBS-001"
+  version  String? @default("v1.0.0")
+  ownerId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NodeData {
+  nodeId  String   @id
+  node    Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  dataType     String? // document, model, drawing
+  version      String? @default("v1.0.0") // semantic version
+  secretLevel  String? @default("public") // public, internal, secret
+  storagePath  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

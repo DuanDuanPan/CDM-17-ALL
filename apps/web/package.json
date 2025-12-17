@@ -23,6 +23,7 @@
     "@cdm/ui": "workspace:*",
     "@hocuspocus/provider": "^3.4.3",
     "@types/lodash": "^4.17.21",
+    "date-fns": "^4.1.0",
     "lodash": "^4.17.21",
     "lucide-react": "^0.511.0",
     "next": "16.0.7",

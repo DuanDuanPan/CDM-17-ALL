@@ -1,5 +1,5 @@
 import { Graph, Node } from '@antv/x6';
-import { MindNodeData } from '@cdm/types';
+import { MindNodeData, NodeType } from '@cdm/types';
 
 /**
  * AddSiblingCommand - Create a sibling node
@@ -9,6 +9,7 @@ import { MindNodeData } from '@cdm/types';
  * - Create new node at same level
  * - Connect to same parent
  * - Auto-enter edit mode
+ * - Inherit nodeType from nearest sibling (or selected node if no other siblings)
  */
 export class AddSiblingCommand {
   execute(graph: Graph, selectedNode: Node): Node | null {
@@ -37,6 +38,13 @@ export class AddSiblingCommand {
       selectedNode
     );
 
+    // Get nodeType from nearest sibling (selected node is the reference)
+    const inheritedNodeType = this.getNearestSiblingNodeType(
+      graph,
+      parentNode,
+      selectedNode
+    );
+
     // Create new sibling node
     const newNode = graph.addNode({
       shape: 'mind-node',
@@ -49,6 +57,7 @@ export class AddSiblingCommand {
         label: '',
         isEditing: true,
         type: 'topic',
+        nodeType: inheritedNodeType, // Inherit from nearest sibling
         parentId: parentNode.id, // Set parent ID for layout algorithm
       } as MindNodeData,
     });
@@ -71,9 +80,17 @@ export class AddSiblingCommand {
 
   /**
    * Create child node (fallback for root)
+   * When root node presses Enter, create a child node that inherits type from siblings
    */
   private createChild(graph: Graph, parentNode: Node): Node {
     const position = this.calculateChildPosition(graph, parentNode);
+
+    // Get nodeType from nearest sibling (existing children of parentNode)
+    const inheritedNodeType = this.getNearestSiblingNodeType(
+      graph,
+      parentNode,
+      null // No selected sibling reference, will use last child if exists
+    );
 
     const newNode = graph.addNode({
       shape: 'mind-node',
@@ -86,6 +103,7 @@ export class AddSiblingCommand {
         label: '',
         isEditing: true,
         type: 'topic',
+        nodeType: inheritedNodeType, // Inherit from nearest sibling
         parentId: parentNode.id, // Set parent ID for layout algorithm
       } as MindNodeData,
     });
@@ -161,5 +179,54 @@ export class AddSiblingCommand {
     return outgoingEdges
       .map((edge) => graph.getCellById(edge.getTargetCellId()) as Node)
       .filter((child) => child != null);
+  }
+
+  /**
+   * Get nodeType from nearest sibling node
+   * Strategy:
+   * - If selectedNode is provided, use its nodeType (current selection is the "nearest")
+   * - Otherwise, get the last child (most recently positioned) of the parent
+   * - Default to ORDINARY if no siblings have nodeType set
+   *
+   * @param graph - The graph instance
+   * @param parentNode - The parent node whose children are the siblings
+   * @param selectedNode - The currently selected node (optional, null for root Enter)
+   * @returns The nodeType to inherit
+   */
+  private getNearestSiblingNodeType(
+    graph: Graph,
+    parentNode: Node,
+    selectedNode: Node | null
+  ): NodeType {
+    // If selectedNode is provided, use its nodeType as the reference
+    if (selectedNode) {
+      const selectedData = selectedNode.getData() as MindNodeData | undefined;
+      if (selectedData?.nodeType) {
+        return selectedData.nodeType;
+      }
+    }
+
+    // Fall back to checking other siblings
+    const siblings = this.getDirectChildren(graph, parentNode);
+    if (siblings.length === 0) {
+      return NodeType.ORDINARY; // No siblings, default to ORDINARY
+    }
+
+    // Get the last sibling (most recently added, positioned at bottom)
+    // Exclude selectedNode if it exists in siblings
+    const otherSiblings = selectedNode
+      ? siblings.filter((s) => s.id !== selectedNode.id)
+      : siblings;
+
+    if (otherSiblings.length > 0) {
+      const lastSibling = otherSiblings[otherSiblings.length - 1];
+      const siblingData = lastSibling.getData() as MindNodeData | undefined;
+      if (siblingData?.nodeType) {
+        return siblingData.nodeType;
+      }
+    }
+
+    // If no sibling has nodeType, default to ORDINARY
+    return NodeType.ORDINARY;
   }
 }

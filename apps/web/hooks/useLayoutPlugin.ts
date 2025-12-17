@@ -197,6 +197,10 @@ function findTargetNode(graph: Graph, draggedId: string, x: number, y: number) {
   });
 }
 
+/**
+ * Normalize sibling order based on position: right-to-left (X desc), top-to-bottom (Y asc)
+ * This ensures consistent ordering after drag-drop operations
+ */
 function normalizeSiblingOrder(graph: Graph, parentId?: string) {
   const siblings = graph.getNodes().filter((n) => {
     const data = n.getData() || {};
@@ -204,8 +208,22 @@ function normalizeSiblingOrder(graph: Graph, parentId?: string) {
     return pid === parentId;
   });
 
+  // Sort by position: right-to-left (X descending), top-to-bottom (Y ascending)
   siblings
-    .sort((a, b) => (a.getData()?.order ?? 0) - (b.getData()?.order ?? 0))
+    .sort((a, b) => {
+      const posA = a.getPosition();
+      const posB = b.getPosition();
+      // Primary: X descending (right to left)
+      if (posA.x !== posB.x) {
+        return posB.x - posA.x;
+      }
+      // Secondary: Y ascending (top to bottom)
+      if (posA.y !== posB.y) {
+        return posA.y - posB.y;
+      }
+      // Tertiary: ID for stable sort
+      return a.id.localeCompare(b.id);
+    })
     .forEach((n, idx) => {
       const data = n.getData() || {};
       n.setData({ ...data, order: idx });

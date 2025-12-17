@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -8,6 +9,16 @@ async function bootstrap() {
 
   // Configure global prefix
   app.setGlobalPrefix('api');
+
+  // Global request validation
+  // [AI-Review-2][HIGH-1] Fixed: Added forbidNonWhitelisted for stricter validation
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    })
+  );
 
   // Setup CORS using environment variable
   const corsOrigin = configService.get<string>('CORS_ORIGIN', 'http://localhost:3000');

@@ -5,7 +5,7 @@ import { useGraph, addCenterNode } from '@/hooks/useGraph';
 import { useMindmapPlugin } from '@/hooks/useMindmapPlugin';
 import { useLayoutPlugin } from '@/hooks/useLayoutPlugin';
 import { Graph, Node } from '@antv/x6';
-import { AddChildCommand, AddSiblingCommand, RemoveNodeCommand } from '@cdm/plugin-mindmap-core';
+import { AddChildCommand, AddSiblingCommand, RemoveNodeCommand, NavigationCommand } from '@cdm/plugin-mindmap-core';
 import { LayoutMode } from '@cdm/types';
 
 // Story 1.4: Collaboration imports
@@ -23,6 +23,7 @@ export interface GraphComponentProps {
     onGridToggle?: (enabled: boolean) => void;
     currentLayout?: LayoutMode;
     gridEnabled?: boolean;
+    onGraphReady?: (graph: Graph | null) => void;
     // Story 1.4: Collaboration props
     /** Graph ID for collaboration (enables collab if provided) */
     graphId?: string;
@@ -35,6 +36,7 @@ export function GraphComponent({
     onLayoutChange,
     onGridToggle,
     currentLayout = 'mindmap',
+    onGraphReady,
     // Story 1.4: Collaboration props with defaults
     graphId = 'default-graph',
     user = { id: 'anonymous', name: '匿名用户', color: '#6366f1' },
@@ -60,6 +62,14 @@ export function GraphComponent({
     }, []);
 
     const { graph, isReady } = useGraph({ container });
+
+    useEffect(() => {
+        if (!onGraphReady) return;
+        onGraphReady(graph);
+        return () => {
+            onGraphReady(null);
+        };
+    }, [graph, onGraphReady]);
 
     // Initialize mindmap plugin (registers React shape)
     useMindmapPlugin(graph, isReady);
@@ -261,6 +271,31 @@ export function GraphComponent({
                     e.stopPropagation();
                     node.setData({ ...nodeData, isEditing: true });
                     break;
+
+                // Arrow key navigation
+                case 'ArrowUp':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigateToPrevSibling(graph, node);
+                    break;
+
+                case 'ArrowDown':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigateToNextSibling(graph, node);
+                    break;
+
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigateToParent(graph, node);
+                    break;
+
+                case 'ArrowRight':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigateToFirstChild(graph, node);
+                    break;
             }
         },
         [graph, isReady]
@@ -383,21 +418,19 @@ export function GraphComponent({
 
             {/* Story 1.4 + MED-6: Connection Status Indicator with sync feedback */}
             <div
-                className={`absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    syncStatus === 'synced' ? 'bg-green-100 text-green-700'
+                className={`absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${syncStatus === 'synced' ? 'bg-green-100 text-green-700'
                     : syncStatus === 'syncing' ? 'bg-blue-100 text-blue-700'
-                    : syncStatus === 'offline' ? 'bg-yellow-100 text-yellow-700'
-                    : 'bg-gray-100 text-gray-500'
-                }`}
+                        : syncStatus === 'offline' ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-gray-100 text-gray-500'
+                    }`}
                 data-testid="collab-status"
             >
                 <span
-                    className={`w-2 h-2 rounded-full ${
-                        syncStatus === 'synced' ? 'bg-green-500'
+                    className={`w-2 h-2 rounded-full ${syncStatus === 'synced' ? 'bg-green-500'
                         : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse'
-                        : syncStatus === 'offline' ? 'bg-yellow-500'
-                        : 'bg-gray-400'
-                    }`}
+                            : syncStatus === 'offline' ? 'bg-yellow-500'
+                                : 'bg-gray-400'
+                        }`}
                 />
                 {syncStatus === 'synced' && '✓ 已与远程同步'}
                 {syncStatus === 'syncing' && '正在同步...'}
@@ -411,11 +444,13 @@ export function GraphComponent({
 const addChildCommand = new AddChildCommand();
 const addSiblingCommand = new AddSiblingCommand();
 const removeNodeCommand = new RemoveNodeCommand();
+const navigationCommand = new NavigationCommand();
 
 // Helper: Create child node
 function createChildNode(graph: Graph, parentNode: Node): void {
     const newNode = addChildCommand.execute(graph, parentNode);
     if (newNode) {
+        ensureNodeTimestamps(newNode);
         graph.select(newNode);
     }
 }
@@ -424,6 +459,7 @@ function createChildNode(graph: Graph, parentNode: Node): void {
 function createSiblingOrChildNode(graph: Graph, selectedNode: Node): void {
     const newNode = addSiblingCommand.execute(graph, selectedNode);
     if (newNode) {
+        ensureNodeTimestamps(newNode);
         graph.select(newNode);
     }
 }
@@ -432,3 +468,46 @@ function createSiblingOrChildNode(graph: Graph, selectedNode: Node): void {
 function removeNode(graph: Graph, node: Node): void {
     removeNodeCommand.execute(graph, node);
 }
+
+function ensureNodeTimestamps(node: Node): void {
+    const data = node.getData() || {};
+    if (data.createdAt && data.updatedAt) return;
+
+    const now = new Date().toISOString();
+    const createdAt = data.createdAt ?? now;
+    const updatedAt = data.updatedAt ?? createdAt;
+    node.setData({ ...data, createdAt, updatedAt });
+}
+
+// Helper: Navigate to previous sibling (Arrow Up)
+function navigateToPrevSibling(graph: Graph, currentNode: Node): void {
+    const prevSibling = navigationCommand.navigateUp(graph, currentNode);
+    if (prevSibling) {
+        graph.select(prevSibling);
+    }
+}
+
+// Helper: Navigate to next sibling (Arrow Down)
+function navigateToNextSibling(graph: Graph, currentNode: Node): void {
+    const nextSibling = navigationCommand.navigateDown(graph, currentNode);
+    if (nextSibling) {
+        graph.select(nextSibling);
+    }
+}
+
+// Helper: Navigate to parent node (Arrow Left)
+function navigateToParent(graph: Graph, currentNode: Node): void {
+    const parent = navigationCommand.navigateLeft(graph, currentNode);
+    if (parent) {
+        graph.select(parent);
+    }
+}
+
+// Helper: Navigate to first child node (Arrow Right)
+function navigateToFirstChild(graph: Graph, currentNode: Node): void {
+    const firstChild = navigationCommand.navigateRight(graph, currentNode);
+    if (firstChild) {
+        graph.select(firstChild);
+    }
+}
+

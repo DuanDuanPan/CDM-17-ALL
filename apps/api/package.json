@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "dev": "nest start --watch",
+    "dev": "node -r ts-node/register -r tsconfig-paths/register src/main.ts",
+    "dev:nest": "nest start --watch",
     "start": "nest start",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
@@ -12,12 +13,15 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@cdm/database": "workspace:*",
     "@cdm/types": "workspace:*",
     "@hocuspocus/server": "^3.4.3",
     "@nestjs/common": "^11.1.9",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.9",
     "@nestjs/platform-express": "^11.1.9",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "yjs": "^13.6.27"

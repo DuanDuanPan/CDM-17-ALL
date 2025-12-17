@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Graph } from '@antv/x6';
+import { NodeType } from '@cdm/types';
 import { AddChildCommand } from './AddChildCommand';
 import { AddSiblingCommand } from './AddSiblingCommand';
 import { RemoveNodeCommand } from './RemoveNodeCommand';
@@ -97,6 +98,65 @@ describe('Mindmap Commands', () => {
       expect(rootEdges.length).toBe(2);
       const targets = rootEdges.map((e) => e.getTargetCellId()).sort();
       expect(targets).toEqual([first.id, sibling.id].sort());
+    });
+
+    it('inherits nodeType from selected sibling node (TASK)', () => {
+      const { graph } = createGraph();
+      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+
+      const addChild = new AddChildCommand();
+      const first = addChild.execute(graph, root)!;
+      // Set first child as TASK type
+      first.setData({ ...first.getData(), nodeType: NodeType.TASK });
+
+      const addSibling = new AddSiblingCommand();
+      const sibling = addSibling.execute(graph, first)!;
+
+      expect((sibling.getData() as any).nodeType).toBe(NodeType.TASK);
+    });
+
+    it('inherits nodeType from selected sibling node (REQUIREMENT)', () => {
+      const { graph } = createGraph();
+      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+
+      const addChild = new AddChildCommand();
+      const first = addChild.execute(graph, root)!;
+      // Set first child as REQUIREMENT type
+      first.setData({ ...first.getData(), nodeType: NodeType.REQUIREMENT });
+
+      const addSibling = new AddSiblingCommand();
+      const sibling = addSibling.execute(graph, first)!;
+
+      expect((sibling.getData() as any).nodeType).toBe(NodeType.REQUIREMENT);
+    });
+
+    it('defaults to ORDINARY when no nodeType is set on siblings', () => {
+      const { graph } = createGraph();
+      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+
+      const addChild = new AddChildCommand();
+      const first = addChild.execute(graph, root)!;
+      // first has no nodeType set (default behavior)
+
+      const addSibling = new AddSiblingCommand();
+      const sibling = addSibling.execute(graph, first)!;
+
+      expect((sibling.getData() as any).nodeType).toBe(NodeType.ORDINARY);
+    });
+
+    it('inherits nodeType from last sibling when creating child from root', () => {
+      const { graph } = createGraph();
+      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+
+      // Create first child from root (Enter on root)
+      const addSibling = new AddSiblingCommand();
+      const first = addSibling.execute(graph, root)!;
+      first.setData({ ...first.getData(), nodeType: NodeType.PBS });
+
+      // Create second child from root (Enter on root again)
+      const second = addSibling.execute(graph, root)!;
+
+      expect((second.getData() as any).nodeType).toBe(NodeType.PBS);
     });
   });
 

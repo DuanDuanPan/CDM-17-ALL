@@ -142,7 +142,7 @@ describe('GraphSyncManager', () => {
             expect(yjsNode?.x).toBe(100);
             expect(yjsNode?.y).toBe(200);
             expect(yjsNode?.label).toBe('Test Node');
-            expect(yjsNode?.type).toBe('topic');
+            expect(yjsNode?.mindmapType).toBe('topic');
         });
 
         it('should remove node from yjs when removed locally', () => {
@@ -157,7 +157,7 @@ describe('GraphSyncManager', () => {
                     x: 100,
                     y: 200,
                     label: 'Test',
-                    type: 'topic',
+                    mindmapType: 'topic',
                 });
             });
 
@@ -187,7 +187,7 @@ describe('GraphSyncManager', () => {
                     x: 300,
                     y: 400,
                     label: 'Remote Node',
-                    type: 'subtopic',
+                    mindmapType: 'subtopic',
                 });
             });
 
@@ -224,7 +224,7 @@ describe('GraphSyncManager', () => {
                     x: 500,
                     y: 600,
                     label: 'Updated',
-                    type: 'topic',
+                    mindmapType: 'topic',
                 });
             });
 

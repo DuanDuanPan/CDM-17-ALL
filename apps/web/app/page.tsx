@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { TopBar, LeftSidebar, RightSidebar } from '@/components/layout';
 import { GraphComponent } from '@/components/graph';
+import type { Graph } from '@antv/x6';
 import { LayoutMode } from '@cdm/types';
 // Story 1.4 MED-12: Use Context for collaboration UI state
 import { CollaborationUIProvider } from '@/contexts';
@@ -26,6 +27,7 @@ const DEMO_GRAPH_ID = 'demo-graph-1';
 
 export default function Home() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [graph, setGraph] = useState<Graph | null>(null);
   const [isLayoutLoading, setIsLayoutLoading] = useState(false);
 
   // Initialize layout state (will be updated from localStorage on client mount)
@@ -114,11 +116,12 @@ export default function Home() {
               gridEnabled={gridEnabled}
               graphId={DEMO_GRAPH_ID}
               user={DEMO_USER}
+              onGraphReady={setGraph}
             />
           </main>
 
           {/* Right Sidebar - Property Panel */}
-          <RightSidebar selectedNodeId={selectedNodeId} onClose={handleClosePanel} />
+          <RightSidebar selectedNodeId={selectedNodeId} graph={graph} onClose={handleClosePanel} />
         </div>
       </div>
     </CollaborationUIProvider>

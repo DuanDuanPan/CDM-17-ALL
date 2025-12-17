@@ -1,22 +1,32 @@
 import { Graph, Node, Edge, Cell } from '@antv/x6';
 import * as Y from 'yjs';
-import { LayoutMode, NodeData, EdgeData } from '@cdm/types';
+import { LayoutMode, NodeData, EdgeData, NodeType, TaskProps, RequirementProps, PBSProps, DataProps } from '@cdm/types';
 import { syncLogger as logger } from '@/lib/logger';
 
 /**
  * Node data structure stored in Yjs
  * Synced coordinates and business data
+ * Story 2.1: Extended with type-specific properties
  */
 export interface YjsNodeData {
     id: string;
     x: number;
     y: number;
     label: string;
-    type: 'root' | 'topic' | 'subtopic';
+    createdAt?: string;
+    updatedAt?: string;
+    // Mindmap structure type (root/topic/subtopic)
+    mindmapType?: 'root' | 'topic' | 'subtopic';
+    /** @deprecated legacy field - use mindmapType */
+    type?: 'root' | 'topic' | 'subtopic';
     parentId?: string;
     collapsed?: boolean;
     order?: number;
     metadata?: Record<string, unknown>;
+
+    // Story 2.1: Type-specific properties (Full Sync Strategy - 方案A)
+    nodeType?: NodeType;  // Semantic node type (TASK, REQUIREMENT, PBS, DATA, ORDINARY)
+    props?: TaskProps | RequirementProps | PBSProps | DataProps | Record<string, never>;
 }
 
 /**
@@ -289,23 +299,30 @@ export class GraphSyncManager {
 
     /**
      * Sync a node to Yjs
+     * Story 2.1: Now includes type-specific properties
      */
     private syncNodeToYjs(node: Node): void {
         if (!this.yNodes || !this.yDoc) return;
 
         const position = node.getPosition();
         const data = node.getData() || {};
+        const mindmapType = (data.type as 'root' | 'topic' | 'subtopic') || 'topic';
 
         const yjsNodeData: YjsNodeData = {
             id: node.id,
             x: position.x,
             y: position.y,
             label: data.label || '',
-            type: data.type || 'topic',
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt,
+            mindmapType,
             parentId: data.parentId,
             collapsed: data.collapsed,
             order: data.order,
             metadata: data.metadata,
+            // Story 2.1: Sync semantic node type and properties
+            nodeType: data.nodeType as NodeType,
+            props: data.props,
         };
 
         this.yDoc.transact(() => {
@@ -315,6 +332,7 @@ export class GraphSyncManager {
 
     /**
      * Sync node position only (optimized for drag)
+     * [AI-Review-2][MEDIUM-4] Fixed: Only use mindmapType, remove deprecated type field
      */
     private syncNodePositionToYjs(node: Node): void {
         if (!this.yNodes || !this.yDoc) return;
@@ -323,12 +341,15 @@ export class GraphSyncManager {
         if (!existing) return;
 
         const position = node.getPosition();
+        // Use mindmapType only, fallback to existing value or 'topic'
+        const mindmapType = existing.mindmapType ?? 'topic';
 
         this.yDoc.transact(() => {
             this.yNodes?.set(node.id, {
                 ...existing,
                 x: position.x,
                 y: position.y,
+                mindmapType,
             });
         });
     }
@@ -384,11 +405,14 @@ export class GraphSyncManager {
 
     /**
      * Apply node data from Yjs to X6 graph
+     * Story 2.1: Now applies type-specific properties
      */
     private applyNodeToGraph(data: YjsNodeData): void {
         if (!this.graph) return;
 
         const existingCell = this.graph.getCellById(data.id);
+        // [AI-Review-2][MEDIUM-4] Fixed: Only use mindmapType, remove deprecated type fallback
+        const mindmapType = data.mindmapType ?? 'topic';
 
         if (existingCell && existingCell.isNode()) {
             // Update existing node - now we know it's a Node
@@ -397,13 +421,18 @@ export class GraphSyncManager {
             existingNode.setPosition(data.x, data.y);
             existingNode.setData({
                 label: data.label,
-                type: data.type,
+                type: mindmapType,
                 parentId: data.parentId,
                 collapsed: data.collapsed,
                 order: data.order,
                 metadata: data.metadata,
+                createdAt: data.createdAt,
+                updatedAt: data.updatedAt,
+                // Story 2.1: Apply semantic node type and properties
+                nodeType: data.nodeType,
+                props: data.props,
             });
-            logger.debug('Updated existing node', { id: data.id, type: data.type });
+            logger.debug('Updated existing node', { id: data.id, mindmapType, nodeType: data.nodeType });
         } else if (!existingCell) {
             // Add new node with mind-node shape for proper rendering
             this.graph.addNode({
@@ -415,14 +444,19 @@ export class GraphSyncManager {
                 height: 50,
                 data: {
                     label: data.label,
-                    type: data.type,
+                    type: mindmapType,
                     parentId: data.parentId,
                     collapsed: data.collapsed,
                     order: data.order,
                     metadata: data.metadata,
+                    createdAt: data.createdAt,
+                    updatedAt: data.updatedAt,
+                    // Story 2.1: Apply semantic node type and properties
+                    nodeType: data.nodeType,
+                    props: data.props,
                 },
             });
-            logger.debug('Added new node', { id: data.id, type: data.type });
+            logger.debug('Added new node', { id: data.id, mindmapType, nodeType: data.nodeType });
         }
     }
 
@@ -504,6 +538,7 @@ export class GraphSyncManager {
     /**
      * Sync all nodes from X6 to Yjs (for layout recalculation)
      * Used when the initiating client calculates new layout positions
+     * Story 2.1: Now includes type-specific properties
      */
     syncAllNodesToYjs(): void {
         if (!this.graph || !this.yNodes || !this.yDoc) return;
@@ -514,17 +549,23 @@ export class GraphSyncManager {
             nodes.forEach((node) => {
                 const position = node.getPosition();
                 const data = node.getData() || {};
+                const mindmapType = (data.type as 'root' | 'topic' | 'subtopic') || 'topic';
 
                 const yjsNodeData: YjsNodeData = {
                     id: node.id,
                     x: position.x,
                     y: position.y,
                     label: data.label || '',
-                    type: data.type || 'topic',
+                    createdAt: data.createdAt,
+                    updatedAt: data.updatedAt,
+                    mindmapType,
                     parentId: data.parentId,
                     collapsed: data.collapsed,
                     order: data.order,
                     metadata: data.metadata,
+                    // Story 2.1: Sync semantic node type and properties
+                    nodeType: data.nodeType as NodeType,
+                    props: data.props,
                 };
 
                 this.yNodes?.set(node.id, yjsNodeData);

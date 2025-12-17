@@ -103,3 +103,5 @@ export * from './LayoutManager';
 export * from './strategies/BaseLayout';
 export * from './strategies/MindmapLayout';
 export * from './strategies/LogicLayout';
+export * from './utils/sortNodes';
+

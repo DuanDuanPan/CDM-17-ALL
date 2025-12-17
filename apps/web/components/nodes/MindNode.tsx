@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Node } from '@antv/x6';
+import { CheckCircle, FileText, Box, Database } from 'lucide-react';
+import { NodeType } from '@cdm/types';
 import type { MindNodeData } from '@cdm/types';
 
 type MindNodeOperation = 'addChild' | 'addSibling';
@@ -140,18 +142,84 @@ export function MindNode({ node }: MindNodeProps) {
     }
   };
 
+  // Get node type and props from data (Story 2.1)
+  // [AI-Review-2][MEDIUM-3] Fixed: Use MindNodeData type instead of 'as any'
+  const data = getData();
+  const nodeType = data.nodeType || NodeType.ORDINARY;
+  const taskStatus = (data.props as { status?: string } | undefined)?.status;
+  const isTaskDone = nodeType === NodeType.TASK && taskStatus === 'done';
+
+  // Visual differentiation by type (Story 2.1)
+  // [AI-Review][HIGH-3] Added: Task 'done' status shows gray/strikethrough
+  const getTypeStyles = () => {
+    // Special case: completed task
+    if (isTaskDone) {
+      return {
+        borderColor: 'border-gray-400',
+        bgColor: 'bg-gray-100/90',
+        icon: <CheckCircle className="w-4 h-4 text-gray-500" />,
+        textClass: 'text-gray-500 line-through',
+      };
+    }
+
+    switch (nodeType) {
+      case NodeType.TASK:
+        return {
+          borderColor: 'border-green-400',
+          bgColor: 'bg-green-50/90',
+          icon: <CheckCircle className="w-4 h-4 text-green-600" />,
+          textClass: 'text-gray-900',
+        };
+      case NodeType.REQUIREMENT:
+        return {
+          borderColor: 'border-purple-400',
+          bgColor: 'bg-purple-50/90',
+          icon: <FileText className="w-4 h-4 text-purple-600" />,
+          textClass: 'text-gray-900',
+        };
+      case NodeType.PBS:
+        return {
+          borderColor: 'border-blue-400',
+          bgColor: 'bg-blue-50/90',
+          icon: <Box className="w-4 h-4 text-blue-600" />,
+          textClass: 'text-gray-900',
+        };
+      case NodeType.DATA:
+        return {
+          borderColor: 'border-orange-400',
+          bgColor: 'bg-orange-50/90',
+          icon: <Database className="w-4 h-4 text-orange-600" />,
+          textClass: 'text-gray-900',
+        };
+      default:
+        return {
+          borderColor: 'border-gray-300',
+          bgColor: 'bg-white/90',
+          icon: null,
+          textClass: 'text-gray-900',
+        };
+    }
+  };
+
+  const typeStyles = getTypeStyles();
   const borderClass = isSelected
     ? 'border-2 border-blue-500 ring-2 ring-blue-200'
-    : 'border border-gray-300';
-  const bgClass = isEditing ? 'bg-white' : 'bg-white/90 backdrop-blur-sm';
+    : `border ${typeStyles.borderColor}`;
+  const bgClass = isEditing ? 'bg-white' : `${typeStyles.bgColor} backdrop-blur-sm`;
+  const textClass = typeStyles.textClass || 'text-gray-900';
 
   return (
     <div
       ref={containerRef}
-      className={`w-full h-full relative flex items-center justify-center px-4 py-3 ${bgClass} rounded-lg shadow-md ${borderClass} transition-all`}
+      className={`w-full h-full relative flex items-center justify-center gap-2 px-4 py-3 ${bgClass} rounded-lg shadow-md ${borderClass} transition-all`}
       onDoubleClick={enterEditMode}
       style={{ cursor: isEditing ? 'text' : 'pointer' }}
     >
+      {/* Type Icon (Story 2.1) */}
+      {!isEditing && typeStyles.icon && (
+        <div className="flex-shrink-0">{typeStyles.icon}</div>
+      )}
+
       <div
         ref={measureRef}
         aria-hidden="true"
@@ -171,7 +239,7 @@ export function MindNode({ node }: MindNodeProps) {
           onClick={(event) => event.stopPropagation()}
         />
       ) : (
-        <div className="text-sm font-medium text-gray-900 text-center break-words">
+        <div className={`flex-1 text-sm font-medium ${textClass} text-center break-words`}>
           {text || '新主题'}
         </div>
       )}
