@@ -121,7 +121,13 @@ export default function Home() {
           </main>
 
           {/* Right Sidebar - Property Panel */}
-          <RightSidebar selectedNodeId={selectedNodeId} graph={graph} onClose={handleClosePanel} />
+          <RightSidebar
+            selectedNodeId={selectedNodeId}
+            graph={graph}
+            graphId={DEMO_GRAPH_ID}
+            creatorName={DEMO_USER.name}
+            onClose={handleClosePanel}
+          />
         </div>
       </div>
     </CollaborationUIProvider>

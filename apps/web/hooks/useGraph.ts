@@ -100,7 +100,7 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
 }
 
 // Helper to add a center node (using mind-node shape)
-export function addCenterNode(graph: Graph): void {
+export function addCenterNode(graph: Graph, creatorName?: string): void {
   const now = new Date().toISOString();
   graph.addNode({
     shape: 'mind-node',
@@ -115,6 +115,7 @@ export function addCenterNode(graph: Graph): void {
       label: '中心主题',
       type: 'root',
       isEditing: false,
+      creator: creatorName,
       createdAt: now,
       updatedAt: now,
     },

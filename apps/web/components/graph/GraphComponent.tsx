@@ -15,7 +15,7 @@ import { RemoteCursorsOverlay } from '@/components/collab/RemoteCursor';
 // Story 1.4 MED-12: Use Context to report remote users
 import { useCollaborationUIOptional } from '@/contexts';
 // Story 1.4 LOW-1: Use centralized constants
-import { CURSOR_UPDATE_THROTTLE_MS } from '@/lib/constants';
+import { CURSOR_UPDATE_THROTTLE_MS, DEFAULT_CREATOR_NAME } from '@/lib/constants';
 
 export interface GraphComponentProps {
     onNodeSelect?: (nodeId: string | null) => void;
@@ -62,6 +62,7 @@ export function GraphComponent({
     }, []);
 
     const { graph, isReady } = useGraph({ container });
+    const creatorName = user?.name || DEFAULT_CREATOR_NAME;
 
     useEffect(() => {
         if (!onGraphReady) return;
@@ -205,11 +206,11 @@ export function GraphComponent({
             if (yNodes.size > 0) {
                 graphSyncManager.loadInitialState();
             } else {
-                addCenterNode(graph);
+                addCenterNode(graph, creatorName);
             }
         } else {
             // Non-collaboration mode: add default center node
-            addCenterNode(graph);
+            addCenterNode(graph, creatorName);
         }
 
         setHasInitializedGraphState(true);

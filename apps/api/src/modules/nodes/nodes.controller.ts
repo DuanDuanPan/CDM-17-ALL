@@ -4,15 +4,16 @@
  * [AI-Review][MEDIUM-2] Fixed: Added explicit return types
  */
 
-import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus, UsePipes } from '@nestjs/common';
 import { NodesService } from './nodes.service';
-import { NodeResponse, NodeTypeChangeResponse } from '@cdm/types';
+import { NodeResponse, NodeTypeChangeResponse, UpdateNodePropsSchema } from '@cdm/types';
 import {
   CreateNodeDto,
   UpdateNodeDto,
   UpdateNodeTypeDto,
   UpdateNodePropsDto,
 } from './nodes.request.dto';
+import { ZodValidationPipe } from '../../pipes/zod-validation.pipe';
 
 // [AI-Review-2][HIGH-2] Fixed: Removed 'api/' prefix (global prefix already set in main.ts)
 @Controller('nodes')
@@ -64,6 +65,7 @@ export class NodesController {
    * Story 2.1 AC#8
    */
   @Patch(':id/properties')
+  @UsePipes(new ZodValidationPipe(UpdateNodePropsSchema))
   async updateNodeProperties(@Param('id') id: string, @Body() dto: UpdateNodePropsDto): Promise<NodeResponse> {
     return this.nodesService.updateNodeProps(id, dto);
   }

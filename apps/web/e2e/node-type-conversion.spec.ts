@@ -3,7 +3,16 @@
  * Tests for semantic node types and dynamic property panel
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+const waitForApi = (page: Page, method: string, path: string) =>
+  page.waitForResponse((res) => res.url().includes(path) && res.request().method() === method && res.ok());
+
+const waitForNodeReady = (page: Page) =>
+  Promise.race([
+    page.waitForResponse((res) => res.url().includes('/api/nodes/') && res.request().method() === 'GET' && res.status() === 200),
+    page.waitForResponse((res) => res.url().includes('/api/nodes') && res.request().method() === 'POST' && res.status() < 300),
+  ]);
 
 test.describe('Node Type Conversion', () => {
   test.beforeEach(async ({ page }) => {
@@ -18,6 +27,7 @@ test.describe('Node Type Conversion', () => {
 
     // When: User clicks the node to select it
     await rootNode.click();
+    await waitForNodeReady(page);
     await page.waitForTimeout(100);
 
     // Then: Property panel should open
@@ -30,6 +40,7 @@ test.describe('Node Type Conversion', () => {
     const typeSelect = propertyPanel.locator('select').first();
     await expect(typeSelect).toBeVisible();
     await typeSelect.selectOption('PBS');
+    await waitForApi(page, 'PATCH', '/type');
     await page.waitForTimeout(200);
 
     // Then: Property panel should render PBS-specific fields
@@ -51,11 +62,13 @@ test.describe('Node Type Conversion', () => {
     // Given: A node is converted to PBS type
     const rootNode = page.locator('.x6-node').first();
     await rootNode.click();
+    await waitForNodeReady(page);
     await page.waitForTimeout(100);
 
     const propertyPanel = page.locator('aside:has-text("属性面板")');
     const typeSelect = propertyPanel.locator('select').first();
     await typeSelect.selectOption('PBS');
+    await waitForApi(page, 'PATCH', '/type');
     await page.waitForTimeout(200);
 
     // When: Enter PBS code
@@ -65,6 +78,7 @@ test.describe('Node Type Conversion', () => {
 
     // When: Switch type to Task
     await typeSelect.selectOption('TASK');
+    await waitForApi(page, 'PATCH', '/type');
     await page.waitForTimeout(200);
 
     // Then: Panel should now show Task-specific fields
@@ -88,6 +102,7 @@ test.describe('Node Type Conversion', () => {
   test('TC-2.1-3: All node types render correctly', async ({ page }) => {
     const rootNode = page.locator('.x6-node').first();
     await rootNode.click();
+    await waitForNodeReady(page);
     await page.waitForTimeout(100);
 
     const propertyPanel = page.locator('aside:has-text("属性面板")');
@@ -95,22 +110,26 @@ test.describe('Node Type Conversion', () => {
 
     // Test Task type
     await typeSelect.selectOption('TASK');
+    await waitForApi(page, 'PATCH', '/type');
     await page.waitForTimeout(200);
     await expect(propertyPanel.locator('label:has-text("状态")')).toBeVisible();
 
     // Test Requirement type
     await typeSelect.selectOption('REQUIREMENT');
+    await waitForApi(page, 'PATCH', '/type');
     await page.waitForTimeout(200);
     await expect(propertyPanel.locator('label:has-text("需求类型")')).toBeVisible();
     await expect(propertyPanel.locator('label:has-text("验收标准")')).toBeVisible();
 
     // Test PBS type
     await typeSelect.selectOption('PBS');
+    await waitForApi(page, 'PATCH', '/type');
     await page.waitForTimeout(200);
     await expect(propertyPanel.locator('label:has-text("PBS 编码")')).toBeVisible();
 
     // Test Data type
     await typeSelect.selectOption('DATA');
+    await waitForApi(page, 'PATCH', '/type');
     await page.waitForTimeout(200);
     await expect(propertyPanel.locator('label:has-text("数据类型")')).toBeVisible();
     await expect(propertyPanel.locator('label:has-text("版本号")')).toBeVisible();
@@ -118,6 +137,7 @@ test.describe('Node Type Conversion', () => {
 
     // Test Ordinary type
     await typeSelect.selectOption('ORDINARY');
+    await waitForApi(page, 'PATCH', '/type');
     await page.waitForTimeout(200);
     await expect(propertyPanel.locator('label:has-text("描述")')).toBeVisible();
   });
@@ -125,6 +145,7 @@ test.describe('Node Type Conversion', () => {
   test('TC-2.1-4: Task checkbox updates status visually', async ({ page }) => {
     const rootNode = page.locator('.x6-node').first();
     await rootNode.click();
+    await waitForNodeReady(page);
     await page.waitForTimeout(100);
 
     const propertyPanel = page.locator('aside:has-text("属性面板")');
@@ -132,21 +153,24 @@ test.describe('Node Type Conversion', () => {
 
     // Convert to Task type
     await typeSelect.selectOption('TASK');
+    await waitForApi(page, 'PATCH', '/type');
     await page.waitForTimeout(200);
 
-    // Change status to "done"
-    const statusSelect = propertyPanel.locator('select').nth(1); // Second select is status
-    await statusSelect.selectOption('done');
+    // Toggle task checkbox on node
+    const taskCheckbox = rootNode.locator("button[aria-label='Toggle task done']");
+    await expect(taskCheckbox).toBeVisible();
+    await taskCheckbox.click();
+    await waitForApi(page, 'PATCH', '/properties');
     await page.waitForTimeout(200);
 
-    // Verify status badge shows "已完成" (with checkmark)
-    const statusBadge = propertyPanel.locator('span.bg-green-100:has-text("已完成")');
-    await expect(statusBadge).toBeVisible();
+    // Verify checkbox shows check icon on node
+    await expect(taskCheckbox.locator('svg')).toBeVisible();
   });
 
   test('TC-2.1-5: Requirement priority badges display correctly', async ({ page }) => {
     const rootNode = page.locator('.x6-node').first();
     await rootNode.click();
+    await waitForNodeReady(page);
     await page.waitForTimeout(100);
 
     const propertyPanel = page.locator('aside:has-text("属性面板")');
@@ -154,21 +178,25 @@ test.describe('Node Type Conversion', () => {
 
     // Convert to Requirement type
     await typeSelect.selectOption('REQUIREMENT');
+    await waitForApi(page, 'PATCH', '/type');
     await page.waitForTimeout(200);
 
     // Test "Must Have" priority
     const prioritySelect = propertyPanel.locator('select').nth(1);
     await prioritySelect.selectOption('must');
+    await waitForApi(page, 'PATCH', '/properties');
     await page.waitForTimeout(100);
     await expect(propertyPanel.locator('span.bg-red-100:has-text("Must Have")')).toBeVisible();
 
     // Test "Should Have" priority
     await prioritySelect.selectOption('should');
+    await waitForApi(page, 'PATCH', '/properties');
     await page.waitForTimeout(100);
     await expect(propertyPanel.locator('span.bg-orange-100:has-text("Should Have")')).toBeVisible();
 
     // Test "Could Have" priority
     await prioritySelect.selectOption('could');
+    await waitForApi(page, 'PATCH', '/properties');
     await page.waitForTimeout(100);
     await expect(propertyPanel.locator('span.bg-yellow-100:has-text("Could Have")')).toBeVisible();
   });
@@ -176,6 +204,7 @@ test.describe('Node Type Conversion', () => {
   test('TC-2.1-6: Data node secret level badges display correctly', async ({ page }) => {
     const rootNode = page.locator('.x6-node').first();
     await rootNode.click();
+    await waitForNodeReady(page);
     await page.waitForTimeout(100);
 
     const propertyPanel = page.locator('aside:has-text("属性面板")');
@@ -183,21 +212,25 @@ test.describe('Node Type Conversion', () => {
 
     // Convert to Data type
     await typeSelect.selectOption('DATA');
+    await waitForApi(page, 'PATCH', '/type');
     await page.waitForTimeout(200);
 
     // Test "secret" level - use span selector to avoid matching option element
     const secretLevelSelect = propertyPanel.locator('select').nth(2); // Third select is secret level
     await secretLevelSelect.selectOption('secret');
+    await waitForApi(page, 'PATCH', '/properties');
     await page.waitForTimeout(100);
     await expect(propertyPanel.locator('span.bg-red-100:has-text("机密")')).toBeVisible();
 
     // Test "internal" level
     await secretLevelSelect.selectOption('internal');
+    await waitForApi(page, 'PATCH', '/properties');
     await page.waitForTimeout(100);
     await expect(propertyPanel.locator('span.bg-yellow-100:has-text("内部")')).toBeVisible();
 
     // Test "public" level
     await secretLevelSelect.selectOption('public');
+    await waitForApi(page, 'PATCH', '/properties');
     await page.waitForTimeout(100);
     await expect(propertyPanel.locator('span.bg-green-100:has-text("公开")')).toBeVisible();
   });
@@ -205,6 +238,7 @@ test.describe('Node Type Conversion', () => {
   test('TC-2.1-7: Common header displays for all node types', async ({ page }) => {
     const rootNode = page.locator('.x6-node').first();
     await rootNode.click();
+    await waitForNodeReady(page);
     await page.waitForTimeout(100);
 
     const propertyPanel = page.locator('aside:has-text("属性面板")');
@@ -224,6 +258,7 @@ test.describe('Node Type Conversion', () => {
     const nodeTypes = ['TASK', 'REQUIREMENT', 'PBS', 'DATA', 'ORDINARY'];
     for (const type of nodeTypes) {
       await typeSelect.selectOption(type);
+      await waitForApi(page, 'PATCH', '/type');
       await page.waitForTimeout(100);
       await expect(nodeTitle).toBeVisible();
       await expect(createdAt).toBeVisible();

@@ -13,6 +13,7 @@ import { MindNodeData } from '@cdm/types';
 export class AddChildCommand {
   execute(graph: Graph, selectedNode: Node): Node | null {
     const position = this.calculateChildPosition(graph, selectedNode);
+    const parentData = selectedNode.getData() || {};
 
     // Create new child node
     const newNode = graph.addNode({
@@ -27,6 +28,7 @@ export class AddChildCommand {
         isEditing: true,
         type: 'subtopic',
         parentId: selectedNode.id, // Set parent ID for layout algorithm
+        creator: parentData.creator,
       } as MindNodeData,
     });
 

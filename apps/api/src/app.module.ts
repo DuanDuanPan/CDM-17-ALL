@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CollabModule } from './modules/collab';
 import { NodesModule } from './modules/nodes'; // Story 2.1
+import { DemoSeedService } from './demo/demo-seed.service';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { NodesModule } from './modules/nodes'; // Story 2.1
     NodesModule, // Story 2.1: Node type management
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, DemoSeedService],
 })
 export class AppModule { }
 

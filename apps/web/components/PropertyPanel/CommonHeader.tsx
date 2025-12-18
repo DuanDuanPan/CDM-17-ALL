@@ -7,6 +7,7 @@
 
 import { Calendar, User } from 'lucide-react';
 import { format } from 'date-fns';
+import { DEFAULT_CREATOR_NAME } from '@/lib/constants';
 
 export interface CommonHeaderProps {
   title: string;
@@ -16,6 +17,7 @@ export interface CommonHeaderProps {
 }
 
 export function CommonHeader({ title, createdAt, updatedAt, creator }: CommonHeaderProps) {
+  const displayCreator = creator || DEFAULT_CREATOR_NAME;
   return (
     <div className="space-y-3 pb-4 border-b border-gray-200">
       {/* Title */}
@@ -25,15 +27,13 @@ export function CommonHeader({ title, createdAt, updatedAt, creator }: CommonHea
       </div>
 
       {/* Creator */}
-      {creator && (
-        <div>
-          <label className="text-xs text-gray-500 flex items-center gap-1 mb-1">
-            <User className="w-3 h-3" />
-            创建人
-          </label>
-          <div className="text-sm text-gray-700">{creator}</div>
-        </div>
-      )}
+      <div>
+        <label className="text-xs text-gray-500 flex items-center gap-1 mb-1">
+          <User className="w-3 h-3" />
+          Creator
+        </label>
+        <div className="text-sm text-gray-700">{displayCreator}</div>
+      </div>
 
       {/* Timestamps */}
       <div className="grid grid-cols-2 gap-3">

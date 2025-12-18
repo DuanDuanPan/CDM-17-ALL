@@ -5,89 +5,69 @@
  * [AI-Review][HIGH-1,HIGH-2,LOW-1] Fixed: Integrated real API + Yjs sync + removed console.log
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { PropertyPanel } from '@/components/PropertyPanel';
 import { NodeType, type EnhancedNodeData, type NodeProps } from '@cdm/types';
 import type { Graph, Node } from '@antv/x6';
 import { syncLogger as logger } from '@/lib/logger';
+import { createNode, fetchNode, updateNodeProps, updateNodeType } from '@/lib/api/nodes';
+import { DEFAULT_CREATOR_NAME, PROPS_UPDATE_DEBOUNCE_MS } from '@/lib/constants';
 
 export interface RightSidebarProps {
   selectedNodeId: string | null;
   graph: Graph | null;  // X6 Graph reference for Yjs sync
+  graphId: string;
+  creatorName?: string;
   onClose?: () => void;
 }
 
-/**
- * API helper to fetch node data from backend
- */
-async function fetchNodeData(nodeId: string): Promise<EnhancedNodeData | null> {
-  try {
-    const response = await fetch(`/api/nodes/${nodeId}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch node: ${response.status}`);
-    }
-    return await response.json();
-  } catch (error) {
-    logger.error('Failed to fetch node data', { nodeId, error });
-    return null;
-  }
-}
-
-/**
- * API helper to update node type
- */
-async function updateNodeTypeApi(nodeId: string, type: NodeType): Promise<boolean> {
-  try {
-    const response = await fetch(`/api/nodes/${nodeId}/type`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type }),
-    });
-    return response.ok;
-  } catch (error) {
-    logger.error('Failed to update node type', { nodeId, type, error });
-    return false;
-  }
-}
-
-/**
- * API helper to update node properties
- */
-async function updateNodePropsApi(
+function buildCreatePayload(
   nodeId: string,
-  type: NodeType,
-  props: NodeProps
-): Promise<boolean> {
-  try {
-    const response = await fetch(`/api/nodes/${nodeId}/properties`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, props }),
-    });
-    return response.ok;
-  } catch (error) {
-    logger.error('Failed to update node properties', { nodeId, type, error });
-    return false;
-  }
+  graphId: string,
+  creatorName: string,
+  node: Node
+) {
+  const data = node.getData() || {};
+  const position = node.getPosition();
+  return {
+    id: nodeId,
+    label: data.label || '未命名节点',
+    type: data.nodeType || NodeType.ORDINARY,
+    graphId,
+    parentId: data.parentId,
+    x: position.x,
+    y: position.y,
+    creatorName,
+  };
 }
 
-function ensureNodeTimestamps(node: Node): { createdAt: string; updatedAt: string } {
+function ensureNodeTimestamps(
+  node: Node,
+  creatorName: string
+): { createdAt: string; updatedAt: string; creator: string } {
   const data = node.getData() || {};
   if (data.createdAt && data.updatedAt) {
-    return { createdAt: data.createdAt, updatedAt: data.updatedAt };
+    const creator = data.creator || creatorName;
+    if (!data.creator && creator) {
+      node.setData({ ...data, creator });
+    }
+    return { createdAt: data.createdAt, updatedAt: data.updatedAt, creator };
   }
 
   const now = new Date().toISOString();
   const createdAt = data.createdAt ?? now;
   const updatedAt = data.updatedAt ?? createdAt;
-  node.setData({ ...data, createdAt, updatedAt });
-  return { createdAt, updatedAt };
+  const creator = data.creator || creatorName;
+  node.setData({ ...data, createdAt, updatedAt, creator });
+  return { createdAt, updatedAt, creator };
 }
 
-export function RightSidebar({ selectedNodeId, graph, onClose }: RightSidebarProps) {
+export function RightSidebar({ selectedNodeId, graph, graphId, creatorName, onClose }: RightSidebarProps) {
+  const resolvedCreatorName = creatorName || DEFAULT_CREATOR_NAME;
   const [nodeData, setNodeData] = useState<EnhancedNodeData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const propsUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get X6 Node reference from graph
   const getX6Node = useCallback((nodeId: string): Node | null => {
@@ -98,6 +78,26 @@ export function RightSidebar({ selectedNodeId, graph, onClose }: RightSidebarPro
     }
     return null;
   }, [graph]);
+
+  const ensureNodeExists = useCallback(async (nodeId: string, node: Node) => {
+    try {
+      const existing = await fetchNode(nodeId);
+      if (existing) {
+        setNodeData((prev) => (prev ? { ...prev, ...existing } : existing));
+        return;
+      }
+
+      const created = await createNode(
+        buildCreatePayload(nodeId, graphId, resolvedCreatorName, node)
+      );
+      setNodeData((prev) => (prev ? { ...prev, ...created } : created));
+    } catch (error) {
+      const errorInfo = error instanceof Error
+        ? { message: error.message, stack: error.stack }
+        : { error };
+      logger.error('Failed to ensure node exists', { nodeId, graphId, error: errorInfo });
+    }
+  }, [graphId, resolvedCreatorName]);
 
   // Sync node data changes to X6 Graph (triggers Yjs sync via GraphSyncManager)
   const syncToGraph = useCallback((nodeId: string, data: Partial<EnhancedNodeData>) => {
@@ -120,6 +120,31 @@ export function RightSidebar({ selectedNodeId, graph, onClose }: RightSidebarPro
     }
   }, [getX6Node]);
 
+  const schedulePropsPersist = useCallback((nodeId: string, nodeType: NodeType, props: NodeProps) => {
+    if (propsUpdateTimer.current) {
+      clearTimeout(propsUpdateTimer.current);
+    }
+    propsUpdateTimer.current = setTimeout(() => {
+      updateNodeProps(nodeId, nodeType, props)
+        .then((success) => {
+          if (!success) {
+            logger.warn('Backend props update failed, but local/Yjs state updated', { nodeId, nodeType });
+          }
+        })
+        .catch((error) => {
+          logger.error('Failed to update node properties', { nodeId, nodeType, error });
+        });
+    }, PROPS_UPDATE_DEBOUNCE_MS);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (propsUpdateTimer.current) {
+        clearTimeout(propsUpdateTimer.current);
+      }
+    };
+  }, []);
+
   // Fetch node data when selectedNodeId changes
   useEffect(() => {
     if (!selectedNodeId) {
@@ -132,7 +157,7 @@ export function RightSidebar({ selectedNodeId, graph, onClose }: RightSidebarPro
     const x6Node = getX6Node(selectedNodeId);
     if (x6Node) {
       const graphData = x6Node.getData() || {};
-      const { createdAt, updatedAt } = ensureNodeTimestamps(x6Node);
+      const { createdAt, updatedAt, creator } = ensureNodeTimestamps(x6Node, resolvedCreatorName);
       // Create EnhancedNodeData from X6 node data
       setNodeData({
         id: selectedNodeId,
@@ -141,8 +166,10 @@ export function RightSidebar({ selectedNodeId, graph, onClose }: RightSidebarPro
         props: graphData.props || {},
         createdAt,
         updatedAt,
+        creator,
       });
       setFetchError(null);
+      void ensureNodeExists(selectedNodeId, x6Node);
       return;
     }
 
@@ -150,7 +177,7 @@ export function RightSidebar({ selectedNodeId, graph, onClose }: RightSidebarPro
     setIsLoading(true);
     setFetchError(null);
 
-    fetchNodeData(selectedNodeId)
+    fetchNode(selectedNodeId)
       .then((data) => {
         if (data) {
           setNodeData(data);
@@ -161,6 +188,7 @@ export function RightSidebar({ selectedNodeId, graph, onClose }: RightSidebarPro
             label: '新节点',
             type: NodeType.ORDINARY,
             props: {},
+            creator: resolvedCreatorName,
           });
         }
       })
@@ -171,7 +199,7 @@ export function RightSidebar({ selectedNodeId, graph, onClose }: RightSidebarPro
       .finally(() => {
         setIsLoading(false);
       });
-  }, [selectedNodeId, getX6Node]);
+  }, [selectedNodeId, getX6Node, ensureNodeExists, resolvedCreatorName]);
 
   // Handle type change - sync to both API and X6/Yjs
   const handleTypeChange = useCallback(async (nodeId: string, newType: NodeType) => {
@@ -190,8 +218,13 @@ export function RightSidebar({ selectedNodeId, graph, onClose }: RightSidebarPro
     // Sync to X6 Graph → triggers Yjs sync via GraphSyncManager
     syncToGraph(nodeId, { type: newType, props: {} });
 
+    if (propsUpdateTimer.current) {
+      clearTimeout(propsUpdateTimer.current);
+      propsUpdateTimer.current = null;
+    }
+
     // Persist to backend API (background, non-blocking)
-    updateNodeTypeApi(nodeId, newType).then((success) => {
+    updateNodeType(nodeId, newType).then((success) => {
       if (!success) {
         logger.warn('Backend type update failed, but local/Yjs state updated', { nodeId, newType });
       }
@@ -214,13 +247,9 @@ export function RightSidebar({ selectedNodeId, graph, onClose }: RightSidebarPro
     // Sync to X6 Graph → triggers Yjs sync via GraphSyncManager
     syncToGraph(nodeId, { type: nodeType, props });
 
-    // Persist to backend API (background, non-blocking)
-    updateNodePropsApi(nodeId, nodeType, props).then((success) => {
-      if (!success) {
-        logger.warn('Backend props update failed, but local/Yjs state updated', { nodeId, nodeType });
-      }
-    });
-  }, [nodeData, syncToGraph]);
+    // Persist to backend API (debounced)
+    schedulePropsPersist(nodeId, nodeType, props);
+  }, [nodeData, syncToGraph, schedulePropsPersist]);
 
   if (!selectedNodeId) {
     return null;

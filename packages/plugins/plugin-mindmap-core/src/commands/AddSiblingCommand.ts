@@ -15,6 +15,7 @@ export class AddSiblingCommand {
   execute(graph: Graph, selectedNode: Node): Node | null {
     // Get incoming edges to find parent
     const incomingEdges = graph.getIncomingEdges(selectedNode);
+    const selectedData = selectedNode.getData() || {};
 
     // If root node (no parent), treat as AddChild
     if (!incomingEdges || incomingEdges.length === 0) {
@@ -27,7 +28,6 @@ export class AddSiblingCommand {
     const parentNode = graph.getCellById(parentEdge.getSourceCellId()) as Node;
 
     if (!parentNode) {
-      console.warn('Parent node not found');
       return null;
     }
 
@@ -59,6 +59,7 @@ export class AddSiblingCommand {
         type: 'topic',
         nodeType: inheritedNodeType, // Inherit from nearest sibling
         parentId: parentNode.id, // Set parent ID for layout algorithm
+        creator: selectedData.creator,
       } as MindNodeData,
     });
 
@@ -84,6 +85,7 @@ export class AddSiblingCommand {
    */
   private createChild(graph: Graph, parentNode: Node): Node {
     const position = this.calculateChildPosition(graph, parentNode);
+    const parentData = parentNode.getData() || {};
 
     // Get nodeType from nearest sibling (existing children of parentNode)
     const inheritedNodeType = this.getNearestSiblingNodeType(
@@ -105,6 +107,7 @@ export class AddSiblingCommand {
         type: 'topic',
         nodeType: inheritedNodeType, // Inherit from nearest sibling
         parentId: parentNode.id, // Set parent ID for layout algorithm
+        creator: parentData.creator,
       } as MindNodeData,
     });
 

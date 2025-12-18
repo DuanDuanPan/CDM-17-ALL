@@ -62,6 +62,7 @@ model Graph {
 model Node {
   id       String   @id @default(cuid())
   label    String
+  creatorName String @default("Mock User")
   type     NodeType @default(ORDINARY) // Story 2.1: Changed from String to NodeType enum
   x        Float    @default(0)
   y        Float    @default(0)
@@ -109,7 +110,7 @@ model NodeRequirement {
 
   reqType            String? // functional, non-functional, etc.
   acceptanceCriteria String?
-  priority           String? @default("medium") // MoSCoW: must, should, could, wont
+  priority           String? @default("must") // MoSCoW: must, should, could, wont
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

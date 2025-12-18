@@ -59,6 +59,10 @@ class NodePropsValidator implements ValidatorConstraintInterface {
 
 export class CreateNodeDto {
   @IsString()
+  @IsOptional()
+  id?: string;
+
+  @IsString()
   @IsNotEmpty()
   label!: string;
 
@@ -81,6 +85,10 @@ export class CreateNodeDto {
   @IsNumber()
   @IsOptional()
   y?: number;
+
+  @IsString()
+  @IsOptional()
+  creatorName?: string;
 }
 
 export class UpdateNodeDto {

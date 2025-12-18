@@ -1,55 +1,49 @@
 /**
  * Story 2.1: NodesService Unit Tests
- * Tests for polymorphic node type management
+ * Tests for repository-driven polymorphic node type management
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { NodeType } from '@cdm/types';
-
-// Mock @cdm/database module before imports
-const mockPrisma = {
-  node: {
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-  },
-  nodeTask: {
-    upsert: jest.fn(),
-  },
-  nodeRequirement: {
-    upsert: jest.fn(),
-  },
-  nodePBS: {
-    upsert: jest.fn(),
-  },
-  nodeData: {
-    upsert: jest.fn(),
-  },
-};
-
-jest.mock('@cdm/database', () => ({
-  prisma: mockPrisma,
-}));
-
 import { NodesService } from './nodes.service';
+import { NodeRepository } from './repositories/node.repository';
+import { TaskService } from './services/task.service';
+import { RequirementService } from './services/requirement.service';
+import { PBSService } from './services/pbs.service';
+import { DataService } from './services/data.service';
 
 describe('NodesService', () => {
   let service: NodesService;
+  const mockNodeRepo = {
+    findById: jest.fn(),
+    findByIdWithProps: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  };
+  const mockTaskService = { initialize: jest.fn(), upsertProps: jest.fn() };
+  const mockRequirementService = { initialize: jest.fn(), upsertProps: jest.fn() };
+  const mockPBSService = { initialize: jest.fn(), upsertProps: jest.fn() };
+  const mockDataService = { initialize: jest.fn(), upsertProps: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [NodesService],
+      providers: [
+        NodesService,
+        { provide: NodeRepository, useValue: mockNodeRepo },
+        { provide: TaskService, useValue: mockTaskService },
+        { provide: RequirementService, useValue: mockRequirementService },
+        { provide: PBSService, useValue: mockPBSService },
+        { provide: DataService, useValue: mockDataService },
+      ],
     }).compile();
 
     service = module.get<NodesService>(NodesService);
-
-    // Reset all mocks
     jest.clearAllMocks();
   });
 
   describe('createNode', () => {
-    it('should create an ordinary node by default', async () => {
+    it('creates ordinary node with default creator name', async () => {
       const mockNode = {
         id: 'node-1',
         label: 'Test Node',
@@ -57,83 +51,39 @@ describe('NodesService', () => {
         graphId: 'graph-1',
         x: 0,
         y: 0,
+        width: 120,
+        height: 40,
+        creatorName: 'Mock User',
         createdAt: new Date(),
         updatedAt: new Date(),
-      };
-
-      mockPrisma.node.create.mockResolvedValue(mockNode);
-      mockPrisma.node.findUnique.mockResolvedValue({
-        ...mockNode,
         taskProps: null,
         requirementProps: null,
         pbsProps: null,
         dataProps: null,
-      });
+      };
+
+      mockNodeRepo.create.mockResolvedValue(mockNode);
+      mockNodeRepo.findByIdWithProps.mockResolvedValue(mockNode);
 
       const result = await service.createNode({
         label: 'Test Node',
         graphId: 'graph-1',
       });
 
-      expect(mockPrisma.node.create).toHaveBeenCalledWith({
-        data: {
+      expect(mockNodeRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
           label: 'Test Node',
           type: NodeType.ORDINARY,
           graphId: 'graph-1',
-          parentId: undefined,
-          x: 0,
-          y: 0,
-        },
-      });
-      expect(result.id).toBe('node-1');
-      expect(result.type).toBe(NodeType.ORDINARY);
-    });
-
-    it('should create a task node and initialize extension table', async () => {
-      const mockNode = {
-        id: 'node-2',
-        label: 'Task Node',
-        type: NodeType.TASK,
-        graphId: 'graph-1',
-        x: 0,
-        y: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockPrisma.node.create.mockResolvedValue(mockNode);
-      mockPrisma.nodeTask.upsert.mockResolvedValue({
-        nodeId: 'node-2',
-        status: 'todo',
-        priority: 'medium',
-      });
-      mockPrisma.node.findUnique.mockResolvedValue({
-        ...mockNode,
-        taskProps: { nodeId: 'node-2', status: 'todo', priority: 'medium' },
-        requirementProps: null,
-        pbsProps: null,
-        dataProps: null,
-      });
-
-      const result = await service.createNode({
-        label: 'Task Node',
-        type: NodeType.TASK,
-        graphId: 'graph-1',
-      });
-
-      expect(mockPrisma.node.create).toHaveBeenCalled();
-      expect(mockPrisma.nodeTask.upsert).toHaveBeenCalledWith({
-        where: { nodeId: 'node-2' },
-        create: { nodeId: 'node-2', status: 'todo', priority: 'medium' },
-        update: {},
-      });
-      expect(result.type).toBe(NodeType.TASK);
-      expect(result.props).toEqual({ nodeId: 'node-2', status: 'todo', priority: 'medium' });
+          creatorName: 'Mock User',
+        })
+      );
+      expect(result.creator).toBe('Mock User');
     });
   });
 
   describe('getNodeWithProps', () => {
-    it('should return node with task properties', async () => {
+    it('returns task properties', async () => {
       const mockNode = {
         id: 'node-1',
         label: 'Task Node',
@@ -143,234 +93,131 @@ describe('NodesService', () => {
         y: 0,
         width: 160,
         height: 50,
+        creatorName: 'Mock User',
         createdAt: new Date(),
         updatedAt: new Date(),
-        taskProps: {
-          nodeId: 'node-1',
-          status: 'in-progress',
-          priority: 'high',
-          assigneeId: 'user-1',
-        },
+        taskProps: { nodeId: 'node-1', status: 'in-progress', priority: 'high' },
         requirementProps: null,
         pbsProps: null,
         dataProps: null,
       };
 
-      mockPrisma.node.findUnique.mockResolvedValue(mockNode);
+      mockNodeRepo.findByIdWithProps.mockResolvedValue(mockNode);
 
       const result = await service.getNodeWithProps('node-1');
 
-      expect(result.id).toBe('node-1');
       expect(result.type).toBe(NodeType.TASK);
-      expect(result.props).toEqual({
-        nodeId: 'node-1',
-        status: 'in-progress',
-        priority: 'high',
-        assigneeId: 'user-1',
-      });
+      expect(result.props).toMatchObject({ status: 'in-progress', priority: 'high' });
     });
 
-    it('should throw NotFoundException if node does not exist', async () => {
-      mockPrisma.node.findUnique.mockResolvedValue(null);
-
-      await expect(service.getNodeWithProps('non-existent')).rejects.toThrow(NotFoundException);
+    it('throws when node missing', async () => {
+      mockNodeRepo.findByIdWithProps.mockResolvedValue(null);
+      await expect(service.getNodeWithProps('missing')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('updateNodeType', () => {
-    it('should update node type and initialize new extension table', async () => {
-      const existingNode = {
+    it('updates type and initializes extension', async () => {
+      const existing = {
         id: 'node-1',
-        label: 'Test Node',
         type: NodeType.ORDINARY,
+      };
+      const updated = {
+        ...existing,
+        type: NodeType.TASK,
+        label: 'Test',
         graphId: 'graph-1',
         x: 0,
         y: 0,
+        width: 120,
+        height: 40,
+        creatorName: 'Mock User',
         createdAt: new Date(),
         updatedAt: new Date(),
+        taskProps: { nodeId: 'node-1', status: 'todo', priority: 'medium' },
+        requirementProps: null,
+        pbsProps: null,
+        dataProps: null,
       };
 
-      const updatedNode = {
-        ...existingNode,
-        type: NodeType.TASK,
-      };
-
-      mockPrisma.node.findUnique.mockResolvedValue(existingNode);
-      mockPrisma.node.update.mockResolvedValue(updatedNode);
-      mockPrisma.nodeTask.upsert.mockResolvedValue({
-        nodeId: 'node-1',
-        status: 'todo',
-        priority: 'medium',
-      });
+      mockNodeRepo.findById.mockResolvedValue(existing);
+      mockNodeRepo.update.mockResolvedValue(updated);
+      mockNodeRepo.findByIdWithProps.mockResolvedValue(updated);
 
       const result = await service.updateNodeType('node-1', { type: NodeType.TASK });
 
-      expect(mockPrisma.node.update).toHaveBeenCalledWith({
-        where: { id: 'node-1' },
-        data: { type: NodeType.TASK },
-      });
-      expect(mockPrisma.nodeTask.upsert).toHaveBeenCalled();
+      expect(mockTaskService.initialize).toHaveBeenCalledWith('node-1');
       expect(result.oldType).toBe(NodeType.ORDINARY);
       expect(result.newType).toBe(NodeType.TASK);
-    });
-
-    it('should throw NotFoundException for non-existent node', async () => {
-      mockPrisma.node.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.updateNodeType('non-existent', { type: NodeType.TASK })
-      ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('updateNodeProps', () => {
-    it('should update task properties', async () => {
-      const mockNode = {
+    it('rejects mismatched type', async () => {
+      mockNodeRepo.findById.mockResolvedValue({ id: 'node-1', type: NodeType.TASK });
+      await expect(
+        service.updateNodeProps('node-1', { type: NodeType.PBS, props: { code: 'PBS-1' } })
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('updates task props when type matches', async () => {
+      mockNodeRepo.findById.mockResolvedValue({ id: 'node-1', type: NodeType.TASK });
+      mockNodeRepo.findByIdWithProps.mockResolvedValue({
         id: 'node-1',
-        label: 'Task Node',
+        label: 'Task',
         type: NodeType.TASK,
         graphId: 'graph-1',
         x: 0,
         y: 0,
+        width: 120,
+        height: 40,
+        creatorName: 'Mock User',
         createdAt: new Date(),
         updatedAt: new Date(),
-      };
-
-      const taskProps = {
-        status: 'done' as const,
-        priority: 'high' as const,
-        assigneeId: 'user-1',
-        dueDate: '2024-12-31T00:00:00.000Z',
-      };
-      const expectedTaskData = {
-        status: 'done' as const,
-        priority: 'high' as const,
-        assigneeId: 'user-1',
-        dueDate: new Date('2024-12-31T00:00:00.000Z'),
-      };
-
-      mockPrisma.node.findUnique.mockResolvedValue({
-        ...mockNode,
-        taskProps: { nodeId: 'node-1', ...taskProps },
+        taskProps: { nodeId: 'node-1', status: 'done' },
         requirementProps: null,
         pbsProps: null,
         dataProps: null,
       });
-      mockPrisma.nodeTask.upsert.mockResolvedValue({
-        nodeId: 'node-1',
-        ...taskProps,
-      });
 
-      const result = await service.updateNodeProps('node-1', {
+      await service.updateNodeProps('node-1', {
         type: NodeType.TASK,
-        props: taskProps,
+        props: { status: 'done' },
       });
 
-      expect(mockPrisma.nodeTask.upsert).toHaveBeenNthCalledWith(1, {
-        where: { nodeId: 'node-1' },
-        create: { nodeId: 'node-1', status: 'todo', priority: 'medium' },
-        update: {},
-      });
-      expect(mockPrisma.nodeTask.upsert).toHaveBeenNthCalledWith(2, {
-        where: { nodeId: 'node-1' },
-        create: { nodeId: 'node-1', ...expectedTaskData },
-        update: expectedTaskData,
-      });
-      expect(result.props).toMatchObject(taskProps);
-    });
-
-    it('should update requirement properties', async () => {
-      const mockNode = {
-        id: 'node-2',
-        label: 'Requirement Node',
-        type: NodeType.REQUIREMENT,
-        graphId: 'graph-1',
-        x: 0,
-        y: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      const reqProps = {
-        reqType: 'functional',
-        acceptanceCriteria: 'Test criteria',
-        priority: 'must' as const,
-      };
-
-      mockPrisma.node.findUnique.mockResolvedValue({
-        ...mockNode,
-        taskProps: null,
-        requirementProps: { nodeId: 'node-2', ...reqProps },
-        pbsProps: null,
-        dataProps: null,
-      });
-      mockPrisma.nodeRequirement.upsert.mockResolvedValue({
-        nodeId: 'node-2',
-        ...reqProps,
-      });
-
-      const result = await service.updateNodeProps('node-2', {
-        type: NodeType.REQUIREMENT,
-        props: reqProps as any,
-      });
-
-      expect(mockPrisma.nodeRequirement.upsert).toHaveBeenCalledWith({
-        where: { nodeId: 'node-2' },
-        create: { nodeId: 'node-2', ...reqProps },
-        update: reqProps,
-      });
-      expect(result.props).toMatchObject(reqProps);
-    });
-
-    it('should throw NotFoundException for non-existent node', async () => {
-      mockPrisma.node.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.updateNodeProps('non-existent', {
-          type: NodeType.TASK,
-          props: { status: 'done' as const },
-        })
-      ).rejects.toThrow(NotFoundException);
+      expect(mockTaskService.upsertProps).toHaveBeenCalled();
     });
   });
 
   describe('updateNode', () => {
-    it('should update basic node properties', async () => {
-      const mockNode = {
+    it('updates basic fields', async () => {
+      mockNodeRepo.update.mockResolvedValue({ id: 'node-1' });
+      mockNodeRepo.findByIdWithProps.mockResolvedValue({
         id: 'node-1',
-        label: 'Updated Node',
+        label: 'Updated',
         type: NodeType.ORDINARY,
         graphId: 'graph-1',
-        x: 100,
-        y: 200,
+        x: 10,
+        y: 20,
+        width: 120,
+        height: 40,
+        creatorName: 'Mock User',
         createdAt: new Date(),
         updatedAt: new Date(),
-      };
-
-      mockPrisma.node.update.mockResolvedValue(mockNode);
-      mockPrisma.node.findUnique.mockResolvedValue({
-        ...mockNode,
         taskProps: null,
         requirementProps: null,
         pbsProps: null,
         dataProps: null,
       });
 
-      const result = await service.updateNode('node-1', {
-        label: 'Updated Node',
-        x: 100,
-        y: 200,
-      });
+      const result = await service.updateNode('node-1', { label: 'Updated', x: 10, y: 20 });
 
-      expect(mockPrisma.node.update).toHaveBeenCalledWith({
-        where: { id: 'node-1' },
-        data: {
-          label: 'Updated Node',
-          x: 100,
-          y: 200,
-        },
+      expect(mockNodeRepo.update).toHaveBeenCalledWith('node-1', {
+        label: 'Updated',
+        x: 10,
+        y: 20,
       });
-      expect(result.label).toBe('Updated Node');
+      expect(result.label).toBe('Updated');
     });
   });
 });

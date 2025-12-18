@@ -6,10 +6,30 @@
 import { Module } from '@nestjs/common';
 import { NodesController } from './nodes.controller';
 import { NodesService } from './nodes.service';
+import { NodeRepository } from './repositories/node.repository';
+import { NodeTaskRepository } from './repositories/node-task.repository';
+import { NodeRequirementRepository } from './repositories/node-requirement.repository';
+import { NodePBSRepository } from './repositories/node-pbs.repository';
+import { NodeDataRepository } from './repositories/node-data.repository';
+import { TaskService } from './services/task.service';
+import { RequirementService } from './services/requirement.service';
+import { PBSService } from './services/pbs.service';
+import { DataService } from './services/data.service';
 
 @Module({
   controllers: [NodesController],
-  providers: [NodesService],
+  providers: [
+    NodesService,
+    NodeRepository,
+    NodeTaskRepository,
+    NodeRequirementRepository,
+    NodePBSRepository,
+    NodeDataRepository,
+    TaskService,
+    RequirementService,
+    PBSService,
+    DataService,
+  ],
   exports: [NodesService],
 })
 export class NodesModule {}

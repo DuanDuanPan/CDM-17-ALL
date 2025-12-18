@@ -19,14 +19,14 @@ export function RequirementForm({ nodeId, initialData, onUpdate }: RequirementFo
   const [formData, setFormData] = useState<RequirementProps>({
     reqType: initialData?.reqType || '',
     acceptanceCriteria: initialData?.acceptanceCriteria || '',
-    priority: initialData?.priority || 'should',
+    priority: initialData?.priority || 'must',
   });
 
   useEffect(() => {
     setFormData({
       reqType: initialData?.reqType || '',
       acceptanceCriteria: initialData?.acceptanceCriteria || '',
-      priority: initialData?.priority || 'should',
+      priority: initialData?.priority || 'must',
     });
   }, [initialData]);
 

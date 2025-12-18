@@ -33,3 +33,13 @@ export const STORAGE_KEY_LAYOUT_MODE = 'cdm:layoutMode';
 
 /** LocalStorage key for persisted grid enabled state */
 export const STORAGE_KEY_GRID_ENABLED = 'cdm:gridEnabled';
+
+// ============================================================================
+// Node Defaults
+// ============================================================================
+
+/** Default creator name used before auth integration */
+export const DEFAULT_CREATOR_NAME = 'Mock User';
+
+/** Debounce interval for persisting node props to backend (ms) */
+export const PROPS_UPDATE_DEBOUNCE_MS = 250;

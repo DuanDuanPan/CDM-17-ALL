@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Node } from '@antv/x6';
 import { CheckCircle, FileText, Box, Database } from 'lucide-react';
-import { NodeType } from '@cdm/types';
+import { NodeType, type TaskProps } from '@cdm/types';
 import type { MindNodeData } from '@cdm/types';
+import { updateNodeProps } from '@/lib/api/nodes';
+import { graphLogger as logger } from '@/lib/logger';
 
 type MindNodeOperation = 'addChild' | 'addSibling';
 
@@ -146,7 +148,7 @@ export function MindNode({ node }: MindNodeProps) {
   // [AI-Review-2][MEDIUM-3] Fixed: Use MindNodeData type instead of 'as any'
   const data = getData();
   const nodeType = data.nodeType || NodeType.ORDINARY;
-  const taskStatus = (data.props as { status?: string } | undefined)?.status;
+  const taskStatus = (data.props as TaskProps | undefined)?.status;
   const isTaskDone = nodeType === NodeType.TASK && taskStatus === 'done';
 
   // Visual differentiation by type (Story 2.1)
@@ -157,7 +159,7 @@ export function MindNode({ node }: MindNodeProps) {
       return {
         borderColor: 'border-gray-400',
         bgColor: 'bg-gray-100/90',
-        icon: <CheckCircle className="w-4 h-4 text-gray-500" />,
+        icon: null,
         textClass: 'text-gray-500 line-through',
       };
     }
@@ -167,7 +169,7 @@ export function MindNode({ node }: MindNodeProps) {
         return {
           borderColor: 'border-green-400',
           bgColor: 'bg-green-50/90',
-          icon: <CheckCircle className="w-4 h-4 text-green-600" />,
+          icon: null,
           textClass: 'text-gray-900',
         };
       case NodeType.REQUIREMENT:
@@ -215,6 +217,32 @@ export function MindNode({ node }: MindNodeProps) {
       onDoubleClick={enterEditMode}
       style={{ cursor: isEditing ? 'text' : 'pointer' }}
     >
+      {/* Task checkbox (AC#9-10) */}
+      {!isEditing && nodeType === NodeType.TASK && (
+        <button
+          type="button"
+          aria-label="Toggle task done"
+          className="flex-shrink-0 w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center hover:border-gray-400 bg-white"
+          onClick={(event) => {
+            event.stopPropagation();
+            const currentData = getData();
+            const currentProps = (currentData.props as TaskProps) || {};
+            const nextStatus = currentProps.status === 'done' ? 'todo' : 'done';
+            const nextProps: TaskProps = { ...currentProps, status: nextStatus };
+            node.setData({ ...currentData, props: nextProps } as Partial<MindNodeData>);
+            updateNodeProps(node.id, NodeType.TASK, nextProps).then((success) => {
+              if (!success) {
+                logger.warn('Backend props update failed', { nodeId: node.id });
+              }
+            }).catch((error) => {
+              logger.error('Failed to update task status', { nodeId: node.id, error });
+            });
+          }}
+        >
+          {isTaskDone && <CheckCircle className="w-4 h-4 text-green-600" />}
+        </button>
+      )}
+
       {/* Type Icon (Story 2.1) */}
       {!isEditing && typeStyles.icon && (
         <div className="flex-shrink-0">{typeStyles.icon}</div>

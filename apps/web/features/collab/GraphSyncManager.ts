@@ -15,6 +15,7 @@ export interface YjsNodeData {
     label: string;
     createdAt?: string;
     updatedAt?: string;
+    creator?: string;
     // Mindmap structure type (root/topic/subtopic)
     mindmapType?: 'root' | 'topic' | 'subtopic';
     /** @deprecated legacy field - use mindmapType */
@@ -315,6 +316,7 @@ export class GraphSyncManager {
             label: data.label || '',
             createdAt: data.createdAt,
             updatedAt: data.updatedAt,
+            creator: data.creator,
             mindmapType,
             parentId: data.parentId,
             collapsed: data.collapsed,
@@ -428,6 +430,7 @@ export class GraphSyncManager {
                 metadata: data.metadata,
                 createdAt: data.createdAt,
                 updatedAt: data.updatedAt,
+                creator: data.creator,
                 // Story 2.1: Apply semantic node type and properties
                 nodeType: data.nodeType,
                 props: data.props,
@@ -451,6 +454,7 @@ export class GraphSyncManager {
                     metadata: data.metadata,
                     createdAt: data.createdAt,
                     updatedAt: data.updatedAt,
+                    creator: data.creator,
                     // Story 2.1: Apply semantic node type and properties
                     nodeType: data.nodeType,
                     props: data.props,

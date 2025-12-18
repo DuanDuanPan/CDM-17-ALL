@@ -8,6 +8,7 @@ export interface NodeData {
   metadata?: Record<string, unknown>;
   createdAt?: string;
   updatedAt?: string;
+  creator?: string;
 }
 
 // Layout mode type for the mindmap
