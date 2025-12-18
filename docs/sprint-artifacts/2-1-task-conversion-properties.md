@@ -1,4 +1,4 @@
-# Story 2.1: Semantic Node Types & Dynamic Properties (语义化节点类型与动态属性)
+﻿# Story 2.1: Semantic Node Types & Dynamic Properties (语义化节点类型与动态属性)
 
 Status: done
 
@@ -213,16 +213,16 @@ Status: done
 
 #### 🟣 第三轮评审 (AI-Review-3) - 2025-12-17 22:17
 
-- [ ] [AI-Review][HIGH] Fix Web → API routing so `/api/nodes/*` reaches Nest backend (add Next.js rewrites/proxy or use an explicit API base URL) [apps/web/components/layout/RightSidebar.tsx:25]
-- [ ] [AI-Review][HIGH] Implement Task “done” checkbox on canvas per AC#9 and ensure it toggles status + syncs in collaboration [apps/web/components/nodes/MindNode.tsx:150]
-- [ ] [AI-Review][HIGH] Fix `updateNodeProps` to validate/update against persisted `node.type` (not `dto.type`) and reject mismatched `type/props` payloads [apps/api/src/modules/nodes/nodes.service.ts:128]
-- [ ] [AI-Review][HIGH] Add/persist `creator` for all nodes and ensure CommonHeader always shows it (AC#7) [packages/database/prisma/schema.prisma:62]
+- [x] [AI-Review][HIGH] Fix Web → API routing so `/api/nodes/*` reaches Nest backend ✅ (rewrites configured in next.config.ts)
+- [x] [AI-Review][HIGH] Implement Task done checkbox on canvas per AC#9 ✅ (Toggle task done in MindNode.tsx)
+- [x] [AI-Review][HIGH] Fix `updateNodeProps` to validate against persisted `node.type` ✅ (type mismatch validation in NodesService)
+- [x] [AI-Review][HIGH] Add/persist `creator` for all nodes ✅ (creatorName field in Node schema)
 
-- [ ] [AI-Review][MEDIUM] Story Task-2 claim mismatch: implement sub-service delegation (TaskService/RequirementService) or update story to reflect current single-service design [docs/sprint-artifacts/2-1-task-conversion-properties.md:42]
-- [ ] [AI-Review][MEDIUM] Story Task-2 claim mismatch: Zod discriminators mentioned but code uses class-validator; align implementation/docs (choose one validation strategy) [docs/sprint-artifacts/2-1-task-conversion-properties.md:44]
+- [x] [AI-Review][MEDIUM] Sub-service delegation ✅ (TaskService/RequirementService/PBSService/DataService implemented)
+- [x] [AI-Review][MEDIUM] Zod validation alignment ✅ (ZodValidationPipe fixed with ArgumentMetadata check)
 - [ ] [AI-Review][MEDIUM] Align Requirement priority domain + defaults across types/UI/API/DB (MoSCoW vs “medium”) [packages/types/src/node-types.ts:27]
-- [ ] [AI-Review][MEDIUM] Refactor Nodes module to follow repository pattern (no direct Prisma calls inside service layer) [apps/api/src/modules/nodes/nodes.service.ts:7]
-- [ ] [AI-Review][MEDIUM] Reduce “PATCH on every keystroke” risk: debounce/batch property persistence to backend [apps/web/components/layout/RightSidebar.tsx:218]
+- [x] [AI-Review][MEDIUM] Repository pattern ✅ (NodeRepository implemented, NodesService uses it)
+- [x] [AI-Review][MEDIUM] Debounce property persistence ✅ (schedulePropsPersist in RightSidebar.tsx)
 
 - [ ] [AI-Review][LOW] Remove remaining `console.warn` in plugin command (use logger or drop) [packages/plugins/plugin-mindmap-core/src/commands/AddSiblingCommand.ts:30]
 
