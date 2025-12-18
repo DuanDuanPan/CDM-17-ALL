@@ -15,5 +15,8 @@
   "devDependencies": {
     "turbo": "^2.6.0",
     "typescript": "^5.7.0"
+  },
+  "volta": {
+    "node": "22.21.1"
   }
 }
