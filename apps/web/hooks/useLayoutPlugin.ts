@@ -65,8 +65,6 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     } else {
       graph.options.interacting = { nodeMovable };
     }
-    console.log('[useLayoutPlugin] Updated graph.options.interacting:', graph.options.interacting);
-
     layoutPlugin.changeLayout(currentMode, true).catch((err) => {
       console.error('Failed to change layout:', err);
       addToast({

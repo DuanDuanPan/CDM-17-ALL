@@ -54,6 +54,7 @@ export type NodeProps = TaskProps | RequirementProps | PBSProps | DataProps | Re
 export interface EnhancedNodeData {
   id: string;
   label: string;
+  description?: string; // Story 2.2: Node description for card UI
   type: NodeType;
   props?: NodeProps;
 
@@ -90,6 +91,7 @@ export interface UpdateNodePropsDto {
 export interface CreateNodeDto {
   id?: string; // optional for sync with frontend/Yjs
   label: string;
+  description?: string;
   type?: NodeType; // defaults to ORDINARY
   graphId: string;
   parentId?: string;
@@ -101,6 +103,7 @@ export interface CreateNodeDto {
 // Update Node Request
 export interface UpdateNodeDto {
   label?: string;
+  description?: string;
   type?: NodeType;
   props?: NodeProps;
   x?: number;
@@ -113,6 +116,7 @@ export interface UpdateNodeDto {
 export interface NodeResponse {
   id: string;
   label: string;
+  description?: string;
   type: NodeType;
   x: number;
   y: number;

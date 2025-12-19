@@ -128,3 +128,6 @@ export class MindmapCorePlugin extends Plugin {
 export const mindmapCorePlugin = new MindmapCorePlugin();
 
 export * from './commands';
+
+// Story 2.2: Export edge filtering utilities for tree protection
+export * from './utils';

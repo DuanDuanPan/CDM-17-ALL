@@ -1,6 +1,6 @@
 'use client';
 
-import { GitBranch, AlignLeft, Move, Grid3X3 } from 'lucide-react';
+import { GitBranch, AlignLeft, Move, Grid3X3, Network } from 'lucide-react';
 import { LayoutMode } from '@cdm/types';
 
 export interface LayoutSwitcherProps {
@@ -53,10 +53,9 @@ export function LayoutSwitcher({
         disabled={isLoading}
         className={`
           px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-2
-          ${
-            mode === 'mindmap'
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.5)]'
-              : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
+          ${mode === 'mindmap'
+            ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.5)]'
+            : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
           }
           ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
         `}
@@ -76,10 +75,9 @@ export function LayoutSwitcher({
         disabled={isLoading}
         className={`
           px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-2
-          ${
-            mode === 'logic'
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.5)]'
-              : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
+          ${mode === 'logic'
+            ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.5)]'
+            : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
           }
           ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
         `}
@@ -99,10 +97,9 @@ export function LayoutSwitcher({
         disabled={isLoading}
         className={`
           px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-2
-          ${
-            mode === 'free'
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.5)]'
-              : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
+          ${mode === 'free'
+            ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.5)]'
+            : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
           }
           ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
         `}
@@ -116,6 +113,28 @@ export function LayoutSwitcher({
         )}
       </button>
 
+      {/* Network Mode */}
+      <button
+        onClick={() => handleModeChange('network')}
+        disabled={isLoading}
+        className={`
+          px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-2
+          ${mode === 'network'
+            ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.5)]'
+            : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
+          }
+          ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+        `}
+        data-testid="layout-network"
+        title="网络图模式 - 自动优化依赖连线 (Story 2.2)"
+      >
+        <Network className="w-4 h-4" />
+        <span className="text-sm font-medium">网络图</span>
+        {isLoading && mode === 'network' && (
+          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        )}
+      </button>
+
       {/* Grid Snapping Toggle (only visible in Free mode) */}
       {mode === 'free' && (
         <>
@@ -124,10 +143,9 @@ export function LayoutSwitcher({
             onClick={handleGridToggle}
             className={`
               px-3 py-1.5 rounded-md transition-all duration-200 flex items-center gap-2
-              ${
-                isGridEnabled
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.5)]'
-                  : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
+              ${isGridEnabled
+                ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.5)]'
+                : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'
               }
             `}
             data-testid="grid-snap-toggle"

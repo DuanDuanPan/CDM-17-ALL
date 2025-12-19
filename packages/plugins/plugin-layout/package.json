@@ -11,12 +11,14 @@
     "test:watch": "vitest --watch"
   },
   "dependencies": {
+    "@antv/hierarchy": "^0.6.0",
+    "@antv/x6": "^3.1.2",
     "@cdm/plugins": "workspace:*",
     "@cdm/types": "workspace:*",
-    "@antv/x6": "^3.1.2",
-    "@antv/hierarchy": "^0.6.0"
+    "dagre": "^0.8.5"
   },
   "devDependencies": {
+    "@types/dagre": "^0.7.53",
     "@types/node": "^20.10.0",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"

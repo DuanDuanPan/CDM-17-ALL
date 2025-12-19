@@ -47,7 +47,7 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
           状态
         </label>
         <select
-          value={formData.status}
+          value={formData.status ?? 'todo'}
           onChange={(e) => handleFieldChange('status', e.target.value as TaskProps['status'])}
           className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         >
@@ -64,7 +64,7 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
           优先级
         </label>
         <select
-          value={formData.priority}
+          value={formData.priority ?? 'medium'}
           onChange={(e) => handleFieldChange('priority', e.target.value as TaskProps['priority'])}
           className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         >
@@ -82,7 +82,7 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
         </label>
         <input
           type="text"
-          value={formData.assigneeId}
+          value={formData.assigneeId ?? ''}
           onChange={(e) => handleFieldChange('assigneeId', e.target.value)}
           placeholder="输入执行人 ID 或邮箱"
           className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"

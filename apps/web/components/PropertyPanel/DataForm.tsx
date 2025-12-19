@@ -97,7 +97,7 @@ export function DataForm({ nodeId, initialData, onUpdate }: DataFormProps) {
         </label>
         <input
           type="text"
-          value={formData.version}
+          value={formData.version ?? ''}
           onChange={(e) => handleFieldChange('version', e.target.value)}
           placeholder="例如: v1.0.0"
           className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono"
@@ -112,7 +112,7 @@ export function DataForm({ nodeId, initialData, onUpdate }: DataFormProps) {
           密级
         </label>
         <select
-          value={formData.secretLevel}
+          value={formData.secretLevel ?? 'public'}
           onChange={(e) => handleFieldChange('secretLevel', e.target.value as DataProps['secretLevel'])}
           className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
         >
@@ -130,7 +130,7 @@ export function DataForm({ nodeId, initialData, onUpdate }: DataFormProps) {
         </label>
         <input
           type="text"
-          value={formData.storagePath}
+          value={formData.storagePath ?? ''}
           onChange={(e) => handleFieldChange('storagePath', e.target.value)}
           placeholder="例如: /data/exports/2024/report.docx"
           className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent font-mono"
@@ -196,8 +196,8 @@ export function DataForm({ nodeId, initialData, onUpdate }: DataFormProps) {
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
         dataType={formData.dataType || 'document'}
-        version={formData.version}
-        storagePath={formData.storagePath}
+        version={formData.version ?? undefined}
+        storagePath={formData.storagePath ?? undefined}
       />
     </div>
   );

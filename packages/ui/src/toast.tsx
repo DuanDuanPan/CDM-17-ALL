@@ -3,6 +3,74 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { cn } from './utils';
 
+// Icons
+const CheckCircle = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+    <polyline points="22 4 12 14.01 9 11.01" />
+  </svg>
+);
+
+const AlertCircle = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="8" x2="12" y2="12" />
+    <line x1="12" y1="16" x2="12.01" y2="16" />
+  </svg>
+);
+
+const AlertTriangle = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
+const Info = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="16" x2="12" y2="12" />
+    <line x1="12" y1="8" x2="12.01" y2="8" />
+  </svg>
+);
+
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
 export interface Toast {
@@ -91,12 +159,12 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
     info: 'border-blue-500/50 bg-blue-500/10',
   };
 
-  const iconStyles = {
-    success: '✓',
-    error: '✕',
-    warning: '⚠',
-    info: 'ℹ',
-  };
+  const Icon = {
+    success: CheckCircle,
+    error: AlertCircle,
+    warning: AlertTriangle,
+    info: Info,
+  }[toast.type];
 
   return (
     <div
@@ -109,17 +177,17 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
     >
       <div className="flex items-start gap-3">
         <span className="text-xl" aria-hidden="true">
-          {iconStyles[toast.type]}
+          <Icon className="w-6 h-6" />
         </span>
         <div className="flex-1">
-          <p className="font-semibold text-white">{toast.title}</p>
+          <p className="font-semibold text-gray-900">{toast.title}</p>
           {toast.description && (
-            <p className="text-sm text-white/70 mt-1">{toast.description}</p>
+            <p className="text-sm text-gray-700 mt-1">{toast.description}</p>
           )}
         </div>
         <button
           onClick={handleRemove}
-          className="text-white/50 hover:text-white transition-colors"
+          className="text-gray-500 hover:text-gray-900 transition-colors"
           aria-label="Close notification"
         >
           ✕

@@ -34,6 +34,9 @@ export default function Home() {
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('mindmap');
   const [gridEnabled, setGridEnabled] = useState(false);
 
+  // Story 2.2: Dependency mode state for edge creation
+  const [isDependencyMode, setIsDependencyMode] = useState(false);
+
   // Restore state from localStorage on client mount (after hydration)
   useEffect(() => {
     // Restore layout mode
@@ -75,6 +78,11 @@ export default function Home() {
     localStorage.setItem(STORAGE_KEY_GRID_ENABLED, String(enabled));
   }, []);
 
+  // Story 2.2: Toggle dependency mode for edge creation
+  const handleDependencyModeToggle = useCallback(() => {
+    setIsDependencyMode((prev) => !prev);
+  }, []);
+
   // Story 1.4 MED-12: Handle user hover on avatar (could highlight their cursor)
   const handleUserHover = useCallback((userId: string | null) => {
     logger.debug('User hover', { userId });
@@ -103,10 +111,14 @@ export default function Home() {
 
         {/* Main content area with three columns */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Left Sidebar - Component Library */}
-          <LeftSidebar />
+          {/* Left Sidebar - Component Library + Story 2.2: Dependency Mode */}
+          <LeftSidebar
+            isDependencyMode={isDependencyMode}
+            onDependencyModeToggle={handleDependencyModeToggle}
+          />
 
           {/* Center Canvas - Story 1.4 MED-12: Uses Context to report remote users */}
+          {/* Story 2.2: Pass dependency mode for edge creation */}
           <main className="flex-1 relative overflow-hidden">
             <GraphComponent
               onNodeSelect={handleNodeSelect}
@@ -117,6 +129,8 @@ export default function Home() {
               graphId={DEMO_GRAPH_ID}
               user={DEMO_USER}
               onGraphReady={setGraph}
+              isDependencyMode={isDependencyMode}
+              onExitDependencyMode={() => setIsDependencyMode(false)}
             />
           </main>
 

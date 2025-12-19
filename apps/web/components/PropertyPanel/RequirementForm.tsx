@@ -46,7 +46,7 @@ export function RequirementForm({ nodeId, initialData, onUpdate }: RequirementFo
         </label>
         <input
           type="text"
-          value={formData.reqType}
+          value={formData.reqType ?? ''}
           onChange={(e) => handleFieldChange('reqType', e.target.value)}
           placeholder="例如: 功能性需求、非功能性需求"
           className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -60,7 +60,7 @@ export function RequirementForm({ nodeId, initialData, onUpdate }: RequirementFo
           优先级 (MoSCoW)
         </label>
         <select
-          value={formData.priority}
+          value={formData.priority ?? 'must'}
           onChange={(e) => handleFieldChange('priority', e.target.value as RequirementProps['priority'])}
           className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         >
@@ -75,7 +75,7 @@ export function RequirementForm({ nodeId, initialData, onUpdate }: RequirementFo
       <div>
         <label className="text-sm font-medium text-gray-700 block mb-2">验收标准</label>
         <textarea
-          value={formData.acceptanceCriteria}
+          value={formData.acceptanceCriteria ?? ''}
           onChange={(e) => handleFieldChange('acceptanceCriteria', e.target.value)}
           placeholder="输入验收标准..."
           className="w-full min-h-[120px] text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-y"

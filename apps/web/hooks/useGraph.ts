@@ -70,13 +70,16 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
 
     // Enable selection plugin so graph emits `node:selected`/`node:unselected`
     // and `graph.getSelectedCells()` works for keyboard operations.
+    // Story 2.2: Enable edge selection for dependency edge management
     graph.use(
       new Selection({
         enabled: true,
         multiple: false,
         rubberband: false,
         showNodeSelectionBox: false, // We handle selection UI in MindNode
-        showEdgeSelectionBox: false,
+        showEdgeSelectionBox: false, // Story 2.2: Disable box, use highlight instead
+        pointerEvents: 'none', // Critical: Selection box should not block interactions
+        strict: true, // Only select if fully enclosed (for rubberband) or precise click
       })
     );
 

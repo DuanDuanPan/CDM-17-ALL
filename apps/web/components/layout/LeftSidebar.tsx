@@ -9,6 +9,7 @@ import {
   Link2,
   ChevronLeft,
   ChevronRight,
+  GitBranch, // Story 2.2: Icon for dependency mode
 } from 'lucide-react';
 
 interface NavItem {
@@ -25,7 +26,18 @@ const navItems: NavItem[] = [
   { id: 'links', icon: <Link2 className="w-5 h-5" />, label: '链接' },
 ];
 
-export function LeftSidebar() {
+// Story 2.2: Props for dependency mode
+export interface LeftSidebarProps {
+  /** Whether dependency mode is active */
+  isDependencyMode?: boolean;
+  /** Callback when dependency mode is toggled */
+  onDependencyModeToggle?: () => void;
+}
+
+export function LeftSidebar({
+  isDependencyMode = false,
+  onDependencyModeToggle,
+}: LeftSidebarProps = {}) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeNav, setActiveNav] = useState('components');
 
@@ -50,6 +62,27 @@ export function LeftSidebar() {
             {item.icon}
           </button>
         ))}
+
+        {/* Story 2.2: Dependency mode toggle - separates from other nav items */}
+        <div className="flex-1" /> {/* Spacer to push to bottom */}
+        <div className="border-t border-gray-100 pt-2 w-full flex flex-col items-center">
+          <button
+            onClick={onDependencyModeToggle}
+            className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
+              isDependencyMode
+                ? 'bg-orange-100 text-orange-600 ring-2 ring-orange-300'
+                : 'text-gray-500 hover:bg-gray-100'
+            }`}
+            title={isDependencyMode ? '退出依赖连线模式 (ESC)' : '依赖连线模式'}
+          >
+            <GitBranch className="w-5 h-5" />
+          </button>
+          {isDependencyMode && (
+            <span className="text-[10px] text-orange-600 mt-1 text-center leading-tight">
+              连线中
+            </span>
+          )}
+        </div>
       </nav>
 
       {/* Expandable panel */}

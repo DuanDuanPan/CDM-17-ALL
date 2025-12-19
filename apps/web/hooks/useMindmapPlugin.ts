@@ -29,8 +29,6 @@ export function useMindmapPlugin(graph: Graph | null, isReady: boolean) {
     // Initialize plugin with graph instance
     mindmapCorePlugin.initialize(graph);
 
-    console.log('MindmapCorePlugin initialized with React shape registered');
-
     // Cleanup on unmount
     return () => {
       mindmapCorePlugin.dispose();

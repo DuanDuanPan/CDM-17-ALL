@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { prisma } from '@cdm/database';
+import { prisma, type Node } from '@cdm/database';
 import { NodeType } from '@cdm/types';
 
 export interface NodeCreateData {
@@ -21,13 +21,24 @@ export interface NodeUpdateData {
   creatorName?: string;
 }
 
+/**
+ * Story 2.2: Added explicit return types to fix TypeScript portability issues
+ * with Prisma client type inference.
+ */
+export interface NodeWithProps extends Node {
+  taskProps: unknown | null;
+  requirementProps: unknown | null;
+  pbsProps: unknown | null;
+  dataProps: unknown | null;
+}
+
 @Injectable()
 export class NodeRepository {
-  async findById(nodeId: string) {
+  async findById(nodeId: string): Promise<Node | null> {
     return prisma.node.findUnique({ where: { id: nodeId } });
   }
 
-  async findByIdWithProps(nodeId: string) {
+  async findByIdWithProps(nodeId: string): Promise<NodeWithProps | null> {
     return prisma.node.findUnique({
       where: { id: nodeId },
       include: {
@@ -36,10 +47,10 @@ export class NodeRepository {
         pbsProps: true,
         dataProps: true,
       },
-    });
+    }) as Promise<NodeWithProps | null>;
   }
 
-  async create(data: NodeCreateData) {
+  async create(data: NodeCreateData): Promise<Node> {
     return prisma.node.create({
       data: {
         id: data.id,
@@ -54,7 +65,7 @@ export class NodeRepository {
     });
   }
 
-  async update(nodeId: string, data: NodeUpdateData) {
+  async update(nodeId: string, data: NodeUpdateData): Promise<Node> {
     return prisma.node.update({
       where: { id: nodeId },
       data,

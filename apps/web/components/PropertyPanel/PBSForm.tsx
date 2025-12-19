@@ -46,7 +46,7 @@ export function PBSForm({ nodeId, initialData, onUpdate }: PBSFormProps) {
         </label>
         <input
           type="text"
-          value={formData.code}
+          value={formData.code ?? ''}
           onChange={(e) => handleFieldChange('code', e.target.value)}
           placeholder="例如: PBS-001"
           className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
@@ -62,7 +62,7 @@ export function PBSForm({ nodeId, initialData, onUpdate }: PBSFormProps) {
         </label>
         <input
           type="text"
-          value={formData.version}
+          value={formData.version ?? ''}
           onChange={(e) => handleFieldChange('version', e.target.value)}
           placeholder="例如: v1.0.0"
           className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
@@ -78,7 +78,7 @@ export function PBSForm({ nodeId, initialData, onUpdate }: PBSFormProps) {
         </label>
         <input
           type="text"
-          value={formData.ownerId}
+          value={formData.ownerId ?? ''}
           onChange={(e) => handleFieldChange('ownerId', e.target.value)}
           placeholder="输入负责人 ID 或邮箱"
           className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"

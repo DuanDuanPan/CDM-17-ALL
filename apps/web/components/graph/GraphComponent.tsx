@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { useGraph, addCenterNode } from '@/hooks/useGraph';
 import { useMindmapPlugin } from '@/hooks/useMindmapPlugin';
 import { useLayoutPlugin } from '@/hooks/useLayoutPlugin';
-import { Graph, Node } from '@antv/x6';
+import { Graph, Node, Edge } from '@antv/x6';
 import { AddChildCommand, AddSiblingCommand, RemoveNodeCommand, NavigationCommand } from '@cdm/plugin-mindmap-core';
 import { LayoutMode } from '@cdm/types';
 
@@ -16,6 +16,18 @@ import { RemoteCursorsOverlay } from '@/components/collab/RemoteCursor';
 import { useCollaborationUIOptional } from '@/contexts';
 // Story 1.4 LOW-1: Use centralized constants
 import { CURSOR_UPDATE_THROTTLE_MS, DEFAULT_CREATOR_NAME } from '@/lib/constants';
+// Story 2.2: Edge validation utilities
+import { isDependencyEdge, validateDependencyEdge, isTaskNode, getEdgeMetadata } from '@/lib/edgeValidation';
+import { NodeType, DependencyType } from '@cdm/types';
+import { useToast } from '@cdm/ui';
+
+// Story 2.2: Dependency type options for context menu
+const DEPENDENCY_TYPES: { value: DependencyType; label: string; description: string }[] = [
+    { value: 'FS', label: 'FS', description: '完成-开始 (Finish-to-Start)' },
+    { value: 'SS', label: 'SS', description: '开始-开始 (Start-to-Start)' },
+    { value: 'FF', label: 'FF', description: '完成-完成 (Finish-to-Finish)' },
+    { value: 'SF', label: 'SF', description: '开始-完成 (Start-to-Finish)' },
+];
 
 export interface GraphComponentProps {
     onNodeSelect?: (nodeId: string | null) => void;
@@ -29,6 +41,11 @@ export interface GraphComponentProps {
     graphId?: string;
     /** Current user info for collaboration */
     user?: CollabUser;
+    // Story 2.2: Dependency mode props
+    /** Whether dependency mode is active for edge creation */
+    isDependencyMode?: boolean;
+    /** Callback when dependency mode should be exited (e.g., ESC key) */
+    onExitDependencyMode?: () => void;
 }
 
 export function GraphComponent({
@@ -40,9 +57,13 @@ export function GraphComponent({
     // Story 1.4: Collaboration props with defaults
     graphId = 'default-graph',
     user = { id: 'anonymous', name: '匿名用户', color: '#6366f1' },
+    // Story 2.2: Dependency mode props
+    isDependencyMode = false,
+    onExitDependencyMode,
 }: GraphComponentProps) {
     // Story 1.4 MED-12: Get context to report remote users
     const collabUIContext = useCollaborationUIOptional();
+    const { addToast } = useToast();
     const containerRef = useRef<HTMLDivElement>(null);
     const [container, setContainer] = useState<HTMLElement | null>(null);
 
@@ -50,6 +71,20 @@ export function GraphComponent({
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
     const [scale, setScale] = useState(1);
     const [hasInitializedGraphState, setHasInitializedGraphState] = useState(false);
+
+    // Story 2.2: Track selected edge for deletion
+    const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
+
+    // Story 2.2: Track connection start node for dependency edge creation
+    const [connectionStartNode, setConnectionStartNode] = useState<Node | null>(null);
+
+    // Story 2.2: Context menu state for dependency type change
+    const [contextMenu, setContextMenu] = useState<{
+        visible: boolean;
+        x: number;
+        y: number;
+        edge: Edge | null;
+    }>({ visible: false, x: 0, y: 0, edge: null });
 
     // Story 1.4 HIGH-3: Throttle cursor updates to prevent WebSocket flooding
     const lastCursorUpdateTime = useRef<number>(0);
@@ -224,11 +259,93 @@ export function GraphComponent({
         graphSyncManager.setLayoutMode(currentLayout);
     }, [currentLayout, isConnected, yDoc]);
 
+    // Story 2.2: Clear connection start node when exiting dependency mode
+    useEffect(() => {
+        if (!isDependencyMode) {
+            setConnectionStartNode(null);
+        }
+    }, [isDependencyMode]);
+
+    // Story 2.2: Handle node clicks for dependency edge creation
+    useEffect(() => {
+        if (!graph || !isReady || !isDependencyMode) return;
+
+        const handleNodeClickForDependency = ({ node }: { node: Node }) => {
+            // Only allow TASK nodes for dependency edges
+            if (!isTaskNode(node)) {
+                console.warn('依赖连线只能连接任务节点');
+                return;
+            }
+
+            if (!connectionStartNode) {
+                // First click: set start node
+                setConnectionStartNode(node);
+                // Add visual indicator to the node
+                node.setData({ ...node.getData(), isConnectionSource: true });
+            } else {
+                // Second click: create edge
+                if (connectionStartNode.id !== node.id) {
+                    // Validate the edge
+                    const validation = validateDependencyEdge(graph, connectionStartNode.id, node.id);
+                    if (validation.isValid) {
+                        // Create the dependency edge
+                        createDependencyEdge(graph, connectionStartNode, node);
+                    } else {
+                        console.warn('无法创建依赖边:', validation.errorMessage);
+                        addToast({
+                            type: 'error',
+                            title: '检测到循环依赖',
+                            description: validation.errorMessage || '未知错误',
+                        });
+                    }
+                }
+                // Clear the visual indicator and reset
+                connectionStartNode.setData({ ...connectionStartNode.getData(), isConnectionSource: false });
+                setConnectionStartNode(null);
+            }
+        };
+
+        graph.on('node:click', handleNodeClickForDependency);
+
+        return () => {
+            graph.off('node:click', handleNodeClickForDependency);
+            // Clear visual indicator on cleanup
+            if (connectionStartNode) {
+                connectionStartNode.setData({ ...connectionStartNode.getData(), isConnectionSource: false });
+            }
+        };
+    }, [graph, isReady, isDependencyMode, connectionStartNode]);
+
 
     // Keyboard event handler - must be at container level to intercept Tab
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
             if (!graph || !isReady) return;
+
+            // Story 2.2: ESC to exit dependency mode or cancel connection
+            if (e.key === 'Escape') {
+                if (connectionStartNode) {
+                    // Cancel current connection
+                    connectionStartNode.setData({ ...connectionStartNode.getData(), isConnectionSource: false });
+                    setConnectionStartNode(null);
+                    e.preventDefault();
+                    return;
+                }
+                if (isDependencyMode && onExitDependencyMode) {
+                    onExitDependencyMode();
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            // Story 2.2: Handle edge deletion with Delete/Backspace
+            if (selectedEdge && (e.key === 'Delete' || e.key === 'Backspace')) {
+                e.preventDefault();
+                e.stopPropagation();
+                removeEdge(graph, selectedEdge);
+                setSelectedEdge(null);
+                return;
+            }
 
             // Get selected nodes
             const selectedNodes = graph.getSelectedCells().filter((cell) => cell.isNode());
@@ -299,8 +416,91 @@ export function GraphComponent({
                     break;
             }
         },
-        [graph, isReady]
+        [graph, isReady, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode]
     );
+
+    // Story 2.2: Handler to change dependency type
+    const handleDependencyTypeChange = useCallback(
+        (newType: DependencyType) => {
+            if (!contextMenu.edge || !graph) return;
+
+            const edge = contextMenu.edge;
+            const currentData = edge.getData() || {};
+            const currentMetadata = currentData.metadata || { kind: 'dependency' };
+
+            // Update edge data with new dependency type
+            const newMetadata = {
+                ...currentMetadata,
+                dependencyType: newType,
+            };
+            edge.setData({
+                ...currentData,
+                metadata: newMetadata,
+            });
+
+            // Update edge connector and attrs for dependency edges
+            edge.setProp({
+                router: {
+                    name: 'manhattan',
+                    args: {
+                        padding: 20,
+                        startDirections: ['right', 'left', 'top', 'bottom'],
+                        endDirections: ['right', 'left', 'top', 'bottom'],
+                    },
+                },
+                connector: {
+                    name: 'rounded',
+                    args: {
+                        radius: 10,
+                    },
+                },
+                attrs: {
+                    line: {
+                        stroke: '#cbd5e1', // Slate-300, lighter than before
+                        strokeWidth: 2,
+                        targetMarker: {
+                            name: 'block',
+                            width: 12,
+                            height: 8,
+                            fill: '#cbd5e1',
+                            stroke: '#cbd5e1',
+                        },
+                    },
+                },
+            });
+
+            // Update edge label to show new type
+            edge.setLabels([
+                {
+                    attrs: {
+                        label: {
+                            text: newType,
+                            fill: '#6b7280',
+                            fontSize: 10,
+                            fontWeight: 'bold',
+                        },
+                        body: {
+                            fill: '#f3f4f6',
+                            stroke: '#9ca3af',
+                            strokeWidth: 1,
+                            rx: 4,
+                            ry: 4,
+                        },
+                    },
+                    position: 0.5,
+                },
+            ]);
+
+            // Close context menu
+            setContextMenu({ visible: false, x: 0, y: 0, edge: null });
+        },
+        [contextMenu.edge, graph]
+    );
+
+    // Story 2.2: Close context menu when clicking outside
+    const handleCloseContextMenu = useCallback(() => {
+        setContextMenu({ visible: false, x: 0, y: 0, edge: null });
+    }, []);
 
     // Setup event handlers and add center node when graph is ready
     useEffect(() => {
@@ -349,6 +549,25 @@ export function GraphComponent({
                 containerRef.current?.focus();
             };
 
+            // Story 2.2: Hover feedback for dependency creation
+            const handleNodeMouseEnter = ({ node }: { node: Node }) => {
+                if (!connectionStartNode || !isDependencyMode) return;
+
+                // Don't validate against self (handled elsewhere or implied)
+                if (connectionStartNode.id === node.id) return;
+
+                const validation = validateDependencyEdge(graph, connectionStartNode.id, node.id);
+                if (!validation.isValid && containerRef.current) {
+                    containerRef.current.style.cursor = 'not-allowed';
+                }
+            };
+
+            const handleNodeMouseLeave = () => {
+                if (containerRef.current) {
+                    containerRef.current.style.cursor = '';
+                }
+            };
+
             // Handle node operations dispatched from MindNode while editing (Tab/Enter).
             const handleMindmapNodeOperation = (event: Event) => {
                 const detail = (event as CustomEvent<{ action?: string; nodeId?: string }>).detail;
@@ -378,6 +597,59 @@ export function GraphComponent({
             graph.on('node:unselected', handleNodeUnselected);
             graph.on('blank:click', handleBlankClick);
             graph.on('node:click', handleNodeClick);
+            graph.on('node:mouseenter', handleNodeMouseEnter);
+            graph.on('node:mouseleave', handleNodeMouseLeave);
+
+            // Story 2.2: Edge selection events for dependency edge management
+            // Story 2.2: Edge selection events for dependency edge management
+            const handleEdgeSelected = ({ edge }: { edge: Edge }) => {
+                setSelectedEdge(edge);
+                // Clear node selection when edge is selected
+                onNodeSelect?.(null);
+
+                // Apply highlight style
+                edge.attr('line/stroke', '#feb663'); // Amber-400 highlight
+                edge.attr('line/strokeWidth', 3);
+                edge.attr('line/filter', {
+                    name: 'dropShadow',
+                    args: { dx: 0, dy: 0, blur: 4, color: '#feb663' }
+                });
+            };
+
+            const handleEdgeUnselected = ({ edge }: { edge: Edge }) => {
+                setSelectedEdge(null);
+
+                // Revert style based on edge type
+                const isDependency = isDependencyEdge(edge);
+                if (isDependency) {
+                    edge.attr('line/stroke', '#9ca3af'); // Revert to gray
+                    edge.attr('line/strokeWidth', 2); // Revert width
+                } else {
+                    edge.attr('line/stroke', '#3b82f6'); // Revert to blue
+                    edge.attr('line/strokeWidth', 2);
+                }
+                // Remove filter
+                edge.attr('line/filter', null);
+            };
+
+            // Story 2.2: Edge context menu for dependency type change
+            const handleEdgeContextMenu = ({ e, edge }: { e: MouseEvent; edge: Edge }) => {
+                // Only show context menu for dependency edges
+                if (isDependencyEdge(edge)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setContextMenu({
+                        visible: true,
+                        x: e.clientX,
+                        y: e.clientY,
+                        edge: edge,
+                    });
+                }
+            };
+
+            graph.on('edge:selected', handleEdgeSelected);
+            graph.on('edge:unselected', handleEdgeUnselected);
+            graph.on('edge:contextmenu', handleEdgeContextMenu);
 
             // Cleanup function to remove event listeners
             return () => {
@@ -390,6 +662,12 @@ export function GraphComponent({
                     graph.off('node:unselected', handleNodeUnselected);
                     graph.off('blank:click', handleBlankClick);
                     graph.off('node:click', handleNodeClick);
+                    graph.off('node:mouseenter', handleNodeMouseEnter);
+                    graph.off('node:mouseleave', handleNodeMouseLeave);
+                    // Story 2.2: Cleanup edge events
+                    graph.off('edge:selected', handleEdgeSelected);
+                    graph.off('edge:unselected', handleEdgeUnselected);
+                    graph.off('edge:contextmenu', handleEdgeContextMenu);
                 }
             };
         }
@@ -438,6 +716,93 @@ export function GraphComponent({
                 {syncStatus === 'offline' && '离线模式'}
                 {syncStatus === 'idle' && '未连接'}
             </div>
+
+            {/* Story 2.2: Dependency Mode Indicator */}
+            {isDependencyMode && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-orange-100 text-orange-700 px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-3">
+                    <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                    {connectionStartNode ? (
+                        <span>
+                            已选择起点节点，点击另一个任务节点创建依赖连线
+                            <button
+                                onClick={() => {
+                                    connectionStartNode.setData({ ...connectionStartNode.getData(), isConnectionSource: false });
+                                    setConnectionStartNode(null);
+                                }}
+                                className="ml-2 underline hover:text-orange-900"
+                            >
+                                取消
+                            </button>
+                        </span>
+                    ) : (
+                        <span>依赖连线模式 - 点击第一个任务节点开始</span>
+                    )}
+                    <button
+                        onClick={onExitDependencyMode}
+                        className="ml-2 text-orange-500 hover:text-orange-700"
+                        title="按 ESC 退出"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
+
+            {/* Story 2.2: Dependency Edge Context Menu */}
+            {contextMenu.visible && contextMenu.edge && (
+                <>
+                    {/* Backdrop to close menu */}
+                    <div
+                        className="fixed inset-0 z-40"
+                        onClick={handleCloseContextMenu}
+                    />
+                    {/* Context Menu */}
+                    <div
+                        className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[200px]"
+                        style={{
+                            left: contextMenu.x,
+                            top: contextMenu.y,
+                        }}
+                    >
+                        <div className="px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-100">
+                            修改依赖类型
+                        </div>
+                        {DEPENDENCY_TYPES.map((type) => {
+                            const currentMetadata = getEdgeMetadata(contextMenu.edge!);
+                            const isSelected = currentMetadata.dependencyType === type.value;
+                            return (
+                                <button
+                                    key={type.value}
+                                    onClick={() => handleDependencyTypeChange(type.value)}
+                                    className={`w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center justify-between ${isSelected ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                                        }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <span className="font-mono font-bold text-sm">{type.label}</span>
+                                        <span className="text-xs text-gray-500">{type.description}</span>
+                                    </span>
+                                    {isSelected && (
+                                        <span className="text-blue-500">✓</span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                        <div className="border-t border-gray-100 mt-1 pt-1">
+                            <button
+                                onClick={() => {
+                                    if (contextMenu.edge && graph) {
+                                        removeEdge(graph, contextMenu.edge);
+                                        setSelectedEdge(null);
+                                    }
+                                    handleCloseContextMenu();
+                                }}
+                                className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 text-sm"
+                            >
+                                删除依赖连线
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
@@ -510,5 +875,97 @@ function navigateToFirstChild(graph: Graph, currentNode: Node): void {
     if (firstChild) {
         graph.select(firstChild);
     }
+}
+
+// Story 2.2: Helper to remove a dependency edge
+function removeEdge(graph: Graph, edge: Edge): void {
+    // Only allow deletion of dependency edges to protect tree structure
+    if (!isDependencyEdge(edge)) {
+        console.warn('Cannot delete hierarchical edge - use node deletion instead');
+        return;
+    }
+
+    // Remove the edge from the graph
+    graph.removeEdge(edge);
+}
+
+// Story 2.2: Helper to create a dependency edge between two task nodes
+function createDependencyEdge(graph: Graph, sourceNode: Node, targetNode: Node): void {
+    const dependencyType = 'FS';
+
+    // Create edge with dependency styling
+    graph.addEdge({
+        source: sourceNode.id,
+        target: targetNode.id,
+        data: {
+            metadata: {
+                kind: 'dependency',
+                dependencyType: dependencyType, // Default to Finish-to-Start
+            },
+        },
+        router: {
+            name: 'manhattan',
+            args: {
+                padding: 20,
+            }
+        },
+        connector: {
+            name: 'rounded',
+            args: { radius: 10 }
+        },
+        attrs: {
+            line: {
+                stroke: '#9ca3af', // Neutral gray base
+                strokeWidth: 1.5,
+                strokeDasharray: '5 5', // Distinct dashed line for dependencies
+                targetMarker: {
+                    name: 'block',
+                    width: 8, // Smaller, sharper arrow
+                    height: 8,
+                    offset: -1,
+                },
+            },
+        },
+        labels: [
+            {
+                markup: [
+                    {
+                        tagName: 'rect',
+                        selector: 'body',
+                    },
+                    {
+                        tagName: 'text',
+                        selector: 'label',
+                    },
+                ],
+                attrs: {
+                    label: {
+                        text: dependencyType,
+                        fill: '#10b981', // Emerald text matching task cards
+                        fontSize: 10,
+                        fontWeight: '800', // Extra bold
+                    },
+                    body: {
+                        fill: '#ffffff',
+                        stroke: '#d1fae5', // Light emerald stroke
+                        strokeWidth: 1.5,
+                        rx: 10, // Full capsule rounded
+                        ry: 10,
+                        refWidth: '100%',
+                        refHeight: '100%',
+                        refWidth2: 12, // More padding width
+                        refHeight2: 4, // More padding height
+                        refX: -6,      // Center adjustment
+                        refY: -2,
+                        filter: {
+                            name: 'dropShadow',
+                            args: { dx: 0, dy: 1, blur: 2, color: '#0000001a' } // Subtle shadow
+                        }
+                    },
+                },
+                position: 0.5,
+            },
+        ],
+    });
 }
 

@@ -3,6 +3,7 @@ import { LayoutMode } from '@cdm/types';
 import { BaseLayout } from './strategies/BaseLayout';
 import { MindmapLayout } from './strategies/MindmapLayout';
 import { LogicLayout } from './strategies/LogicLayout';
+import { NetworkLayout } from './strategies/NetworkLayout';
 
 /**
  * LayoutManager - Orchestrates layout transitions and mode switching
@@ -24,6 +25,7 @@ export class LayoutManager {
     this.strategies = new Map<LayoutMode, BaseLayout>([
       ['mindmap' as LayoutMode, new MindmapLayout(graph)],
       ['logic' as LayoutMode, new LogicLayout(graph)],
+      ['network' as LayoutMode, new NetworkLayout(graph)],
       // 'free' mode doesn't use a strategy (manual positioning)
     ]);
 

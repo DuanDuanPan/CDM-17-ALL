@@ -1,5 +1,6 @@
-import { Graph, Node } from '@antv/x6';
+import { Graph, Node, Edge } from '@antv/x6';
 import { sortNodesRightToLeftTopToBottom } from '../utils/sortNodes';
+import type { EdgeMetadata } from '@cdm/types';
 
 // Animation constants
 const LAYOUT_TRANSITION_DURATION = 500; // milliseconds
@@ -129,10 +130,15 @@ export abstract class BaseLayout {
 
       // Fallback: If no children found by parentId, try to find by edges
       // This handles legacy nodes that don't have parentId set
+      // Story 2.2: CRITICAL - Only use hierarchical edges, NOT dependency edges
       if (children.length === 0) {
         const outgoingEdges = this.graph.getOutgoingEdges(node);
         if (outgoingEdges && outgoingEdges.length > 0) {
-          children = outgoingEdges
+          // Filter to only hierarchical edges (Story 2.2)
+          const hierarchicalEdges = outgoingEdges.filter((edge) =>
+            this.isHierarchicalEdge(edge)
+          );
+          children = hierarchicalEdges
             .map((edge) => this.graph.getCellById(edge.getTargetCellId()) as Node)
             .filter((child) => child != null);
         }
@@ -177,6 +183,33 @@ export abstract class BaseLayout {
 
     traverse(tree);
     return result;
+  }
+
+  /**
+   * Story 2.2: Check if an edge is a hierarchical edge (not a dependency edge).
+   * Used to filter edges during tree hierarchy building.
+   *
+   * @param edge - The edge to check
+   * @returns true if the edge is hierarchical, false if it's a dependency edge
+   */
+  protected isHierarchicalEdge(edge: Edge): boolean {
+    const data = edge.getData();
+
+    // Check for metadata in data object (preferred location)
+    if (data?.metadata && typeof data.metadata === 'object') {
+      const metadata = data.metadata as EdgeMetadata;
+      if (metadata.kind === 'dependency') {
+        return false;
+      }
+    }
+
+    // Check for kind directly in data (alternative location)
+    if (data?.kind === 'dependency') {
+      return false;
+    }
+
+    // Default: treat as hierarchical for backward compatibility
+    return true;
   }
 }
 

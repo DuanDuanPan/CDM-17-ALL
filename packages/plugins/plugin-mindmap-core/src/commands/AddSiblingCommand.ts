@@ -50,7 +50,7 @@ export class AddSiblingCommand {
       shape: 'mind-node',
       x: siblingPosition.x,
       y: siblingPosition.y,
-      width: 120,
+      width: 220,
       height: 50,
       data: {
         id: `node-${Date.now()}`,
@@ -67,6 +67,7 @@ export class AddSiblingCommand {
     graph.addEdge({
       source: parentNode.id,
       target: newNode.id,
+      connector: { name: 'smooth' },
       attrs: {
         line: {
           stroke: '#3b82f6',
@@ -98,7 +99,7 @@ export class AddSiblingCommand {
       shape: 'mind-node',
       x: position.x,
       y: position.y,
-      width: 120,
+      width: 220,
       height: 50,
       data: {
         id: `node-${Date.now()}`,
@@ -115,6 +116,7 @@ export class AddSiblingCommand {
     graph.addEdge({
       source: parentNode.id,
       target: newNode.id,
+      connector: { name: 'smooth' },
       attrs: {
         line: {
           stroke: '#3b82f6',

@@ -9,9 +9,19 @@ const createMockNode = (id: string, position: { x: number; y: number }) => ({
     isNode: () => true,
 });
 
+/**
+ * Story 2.2: Edge structure now includes kind for filtering hierarchical vs dependency edges.
+ * Default kind is 'hierarchical' for backward compatibility with existing tests.
+ */
+interface MockEdge {
+    source: string;
+    target: string;
+    kind?: 'hierarchical' | 'dependency';
+}
+
 const createMockGraph = () => {
     const nodes: Map<string, ReturnType<typeof createMockNode>> = new Map();
-    const edges: Array<{ source: string; target: string }> = [];
+    const edges: MockEdge[] = [];
 
     return {
         getCellById: vi.fn((id: string) => nodes.get(id) || null),
@@ -19,17 +29,22 @@ const createMockGraph = () => {
             const incoming = edges.filter((e) => e.target === node.id);
             return incoming.map((e) => ({
                 getSourceCellId: () => e.source,
+                // Story 2.2: Add getData() for edge filtering - default to hierarchical
+                getData: () => ({ metadata: { kind: e.kind || 'hierarchical' } }),
             }));
         }),
         getOutgoingEdges: vi.fn((node: ReturnType<typeof createMockNode>) => {
             const outgoing = edges.filter((e) => e.source === node.id);
             return outgoing.map((e) => ({
                 getTargetCellId: () => e.target,
+                // Story 2.2: Add getData() for edge filtering - default to hierarchical
+                getData: () => ({ metadata: { kind: e.kind || 'hierarchical' } }),
             }));
         }),
         // Test helpers
         _addNode: (node: ReturnType<typeof createMockNode>) => nodes.set(node.id, node),
-        _addEdge: (source: string, target: string) => edges.push({ source, target }),
+        _addEdge: (source: string, target: string, kind: 'hierarchical' | 'dependency' = 'hierarchical') =>
+            edges.push({ source, target, kind }),
     };
 };
 

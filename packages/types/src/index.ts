@@ -2,6 +2,7 @@
 export interface NodeData {
   id: string;
   label: string;
+  description?: string; // Story 2.2: Description for card UI
   type?: 'root' | 'topic' | 'subtopic';
   parentId?: string;
   collapsed?: boolean;
@@ -12,7 +13,7 @@ export interface NodeData {
 }
 
 // Layout mode type for the mindmap
-export type LayoutMode = 'mindmap' | 'logic' | 'free';
+export type LayoutMode = 'mindmap' | 'logic' | 'free' | 'network';
 
 // Story 2.1: Import semantic node types for MindNodeData extension
 import type { NodeType, NodeProps } from './node-types';
@@ -22,6 +23,7 @@ import type { NodeType, NodeProps } from './node-types';
 export interface MindNodeData extends NodeData {
   isEditing?: boolean;   // Whether node is in edit mode
   isSelected?: boolean;  // Whether node is selected
+  description?: string;  // Explicitly add description
   x?: number;            // Node position X
   y?: number;            // Node position Y
   width?: number;        // Node width (auto-resize)
@@ -32,12 +34,19 @@ export interface MindNodeData extends NodeData {
   props?: NodeProps;
 }
 
+// Story 2.2: Import edge types for EdgeData extension
+import type { EdgeKind, DependencyType } from './edge-types';
+
 // Edge types for connections between nodes
+// Story 2.2: Extended with EdgeKind and DependencyType support
 export interface EdgeData {
   id: string;
   source: string;
   target: string;
-  type?: 'hierarchical' | 'reference';
+  type?: 'hierarchical' | 'reference'; // Legacy field for backward compatibility
+  // Story 2.2: Edge polymorphism support
+  kind?: EdgeKind;           // 'hierarchical' | 'dependency'
+  dependencyType?: DependencyType; // 'FS' | 'SS' | 'FF' | 'SF' (only when kind === 'dependency')
 }
 
 // Graph state representation
@@ -55,3 +64,6 @@ export interface ApiResponse<T> {
 
 // Story 2.1: Export semantic node types
 export * from './node-types';
+
+// Story 2.2: Export edge types for dependency management
+export * from './edge-types';

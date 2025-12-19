@@ -143,7 +143,11 @@ model NodeData {
 
 model Edge {
   id   String @id @default(cuid())
-  type String @default("hierarchical")
+  type String @default("hierarchical") // Legacy field for backward compatibility
+
+  // Story 2.2: Edge metadata for polymorphism (hierarchical vs dependency)
+  // Stores: { kind: 'hierarchical' | 'dependency', dependencyType?: 'FS' | 'SS' | 'FF' | 'SF' }
+  metadata Json @default("{\"kind\": \"hierarchical\"}")
 
   graphId String
   graph   Graph  @relation(fields: [graphId], references: [id], onDelete: Cascade)

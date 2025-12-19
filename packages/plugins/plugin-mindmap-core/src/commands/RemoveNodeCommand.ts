@@ -1,23 +1,32 @@
 import { Graph, Node } from '@antv/x6';
+import {
+  getHierarchicalParent,
+  getHierarchicalChildren,
+  isRootNode,
+} from '../utils/edgeFilters';
 
 /**
  * RemoveNodeCommand - Delete a node and its subtree
  *
  * Strategy:
  * - Remove selected node
- * - Recursively remove all descendants
+ * - Recursively remove all descendants (via hierarchical edges ONLY)
  * - Clean up edges automatically (X6 handles this)
+ *
+ * Story 2.2: CRITICAL - Subtree deletion MUST only cascade via hierarchical edges.
+ * Dependency edges connected to deleted nodes should be removed, but they should NOT
+ * cause additional nodes to be deleted.
  */
 export class RemoveNodeCommand {
   execute(graph: Graph, selectedNode: Node): void {
     // Prevent deleting root node
-    const incomingEdges = graph.getIncomingEdges(selectedNode);
-    if (!incomingEdges || incomingEdges.length === 0) {
+    // Story 2.2: Use hierarchical parent check, not raw incoming edges
+    if (isRootNode(graph, selectedNode)) {
       console.warn('Cannot delete root node');
       return;
     }
 
-    // Get all descendant nodes
+    // Get all descendant nodes via hierarchical edges only
     const descendants = this.getAllDescendants(graph, selectedNode);
 
     // Remove all descendants first (bottom-up)
@@ -30,7 +39,8 @@ export class RemoveNodeCommand {
   }
 
   /**
-   * Get all descendant nodes recursively
+   * Get all descendant nodes recursively (via hierarchical edges only).
+   * Story 2.2: Uses getHierarchicalChildren to exclude dependency edges.
    */
   private getAllDescendants(graph: Graph, node: Node): Node[] {
     const descendants: Node[] = [];
@@ -46,14 +56,10 @@ export class RemoveNodeCommand {
   }
 
   /**
-   * Get direct children of a node
+   * Get direct children of a node (via hierarchical edges only).
+   * Story 2.2: Uses getHierarchicalChildren to exclude dependency edges.
    */
   private getDirectChildren(graph: Graph, node: Node): Node[] {
-    const outgoingEdges = graph.getOutgoingEdges(node);
-    if (!outgoingEdges) return [];
-
-    return outgoingEdges
-      .map((edge) => graph.getCellById(edge.getTargetCellId()) as Node)
-      .filter((child) => child != null);
+    return getHierarchicalChildren(graph, node);
   }
 }

@@ -1,6 +1,6 @@
 import { Graph, Node, Edge, Cell } from '@antv/x6';
 import * as Y from 'yjs';
-import { LayoutMode, NodeData, EdgeData, NodeType, TaskProps, RequirementProps, PBSProps, DataProps } from '@cdm/types';
+import { LayoutMode, NodeData, EdgeData, NodeType, TaskProps, RequirementProps, PBSProps, DataProps, EdgeKind, DependencyType, EdgeMetadata } from '@cdm/types';
 import { syncLogger as logger } from '@/lib/logger';
 
 /**
@@ -32,12 +32,16 @@ export interface YjsNodeData {
 
 /**
  * Edge data structure stored in Yjs
+ * Story 2.2: Extended with edge metadata (kind, dependencyType)
  */
 export interface YjsEdgeData {
     id: string;
     source: string;
     target: string;
+    /** @deprecated Use metadata.kind instead */
     type: 'hierarchical' | 'reference';
+    // Story 2.2: Edge metadata for polymorphic edges
+    metadata?: EdgeMetadata;
 }
 
 /**
@@ -79,6 +83,7 @@ export class GraphSyncManager {
         nodeDataChange?: (args: { node: Node }) => void;
         edgeAdded?: (args: { edge: Edge }) => void;
         edgeRemoved?: (args: { edge: Edge }) => void;
+        edgeDataChange?: (args: { edge: Edge }) => void;
     } = {};
 
     // Layout mode change callback
@@ -190,6 +195,16 @@ export class GraphSyncManager {
             this.removeEdgeFromYjs(edge.id);
         };
         this.graph.on('edge:removed', this.boundHandlers.edgeRemoved);
+
+        // Story 2.2: Edge data change (metadata, dependencyType)
+        this.boundHandlers.edgeDataChange = ({ edge }) => {
+            if (this.isRemoteUpdate) return;
+            // Bugfix: Defer sync to ensure X6 data is fully updated before reading
+            setTimeout(() => {
+                this.syncEdgeToYjs(edge);
+            }, 0);
+        };
+        this.graph.on('edge:change:data', this.boundHandlers.edgeDataChange);
     }
 
     /**
@@ -284,6 +299,9 @@ export class GraphSyncManager {
         if (this.boundHandlers.edgeRemoved) {
             this.graph.off('edge:removed', this.boundHandlers.edgeRemoved);
         }
+        if (this.boundHandlers.edgeDataChange) {
+            this.graph.off('edge:change:data', this.boundHandlers.edgeDataChange);
+        }
 
         this.boundHandlers = {};
     }
@@ -370,6 +388,7 @@ export class GraphSyncManager {
 
     /**
      * Sync an edge to Yjs
+     * Story 2.2: Now includes edge metadata (kind, dependencyType)
      */
     private syncEdgeToYjs(edge: Edge): void {
         if (!this.yEdges || !this.yDoc) return;
@@ -379,11 +398,17 @@ export class GraphSyncManager {
 
         if (!source || !target) return;
 
+        const edgeData = edge.getData() || {};
+        // Story 2.2: Extract edge metadata from edge data
+        const metadata: EdgeMetadata = edgeData.metadata || { kind: 'hierarchical' };
+
         const yjsEdgeData: YjsEdgeData = {
             id: edge.id,
             source,
             target,
-            type: (edge.getData()?.type as 'hierarchical' | 'reference') || 'hierarchical',
+            type: (edgeData.type as 'hierarchical' | 'reference') || 'hierarchical',
+            // Story 2.2: Include edge metadata for polymorphic edges
+            metadata,
         };
 
         this.yDoc.transact(() => {
@@ -479,28 +504,140 @@ export class GraphSyncManager {
 
     /**
      * Apply edge data from Yjs to X6 graph
+     * Story 2.2: Now applies edge metadata and uses appropriate styling
      */
     private applyEdgeToGraph(data: YjsEdgeData): void {
         if (!this.graph) return;
 
         const existingEdge = this.graph.getCellById(data.id);
+        // Story 2.2: Determine edge kind from metadata or fall back to legacy type
+        const edgeKind = data.metadata?.kind || (data.type === 'reference' ? 'dependency' : 'hierarchical');
+        const isDependency = edgeKind === 'dependency';
+
+        // Story 2.2: Different styling for dependency edges vs hierarchical edges
+        const dependencyType = data.metadata?.dependencyType || 'FS';
+        const edgeAttrs = isDependency
+            ? {
+                line: {
+                    stroke: '#9ca3af', // Gray-400 for dependency edges (per design spec)
+                    strokeWidth: 2,
+                    strokeDasharray: '5 5', // Dashed line for dependency
+                    sourceMarker: {
+                        name: 'circle',
+                        r: 4,
+                        stroke: '#9ca3af',
+                        fill: '#fff',
+                    },
+                    targetMarker: {
+                        name: 'classic',
+                        size: 8,
+                        stroke: '#9ca3af',
+                        fill: '#9ca3af',
+                    },
+                },
+            }
+            : {
+                line: {
+                    stroke: '#3b82f6', // Blue for hierarchical edges
+                    strokeWidth: 2,
+                    targetMarker: null,
+                },
+            };
+
+        // Story 2.2: Labels for dependency edges showing type (FS/SS/FF/SF)
+        const edgeLabels = isDependency
+            ? [
+                {
+                    attrs: {
+                        label: {
+                            text: dependencyType,
+                            fill: '#6b7280',
+                            fontSize: 10,
+                            fontWeight: 'bold',
+                        },
+                        body: {
+                            fill: '#f3f4f6',
+                            stroke: '#9ca3af',
+                            strokeWidth: 1,
+                            rx: 4,
+                            ry: 4,
+                        },
+                    },
+                    position: 0.5,
+                },
+            ]
+            : [];
 
         if (!existingEdge) {
-            // Add new edge with proper styling to match locally created edges
+            // Add new edge with proper styling based on edge kind
             this.graph.addEdge({
                 id: data.id,
                 source: data.source,
                 target: data.target,
-                data: { type: data.type },
-                attrs: {
-                    line: {
-                        stroke: '#3b82f6',
-                        strokeWidth: 2,
-                        targetMarker: null,
-                    },
+                data: {
+                    type: data.type,
+                    // Story 2.2: Include metadata in edge data
+                    metadata: data.metadata || { kind: 'hierarchical' },
                 },
+                // Story 2.2: Apply Router and Connector based on edge kind
+                // Dependency: Manhattan router + Rounded connector (Step 79)
+                // Hierarchical: Smooth connector (Step 105/117)
+                router: isDependency ? {
+                    name: 'manhattan',
+                    args: {
+                        padding: 20,
+                        startDirections: ['right', 'left', 'top', 'bottom'],
+                        endDirections: ['right', 'left', 'top', 'bottom'],
+                    }
+                } : undefined,
+                connector: isDependency ? {
+                    name: 'rounded',
+                    args: { radius: 10 }
+                } : {
+                    name: 'smooth'
+                },
+                attrs: edgeAttrs,
+                labels: edgeLabels,
             });
-            logger.debug('Added edge', { id: data.id, source: data.source, target: data.target });
+            logger.debug('Added edge', { id: data.id, source: data.source, target: data.target, kind: edgeKind });
+        } else if (existingEdge.isEdge()) {
+            // Story 2.2: Update existing edge metadata
+            const edge = existingEdge as Edge;
+            edge.setData({
+                type: data.type,
+                metadata: data.metadata || { kind: 'hierarchical' },
+            });
+            edge.setAttrs(edgeAttrs);
+
+            // Story 2.2: Update labels for dependency type changes
+            if (isDependency) {
+                edge.setLabels(edgeLabels);
+            }
+
+            // Sync Router and Connector for existing edges
+            if (isDependency) {
+                edge.setRouter({
+                    name: 'manhattan',
+                    args: {
+                        padding: 20,
+                        startDirections: ['right', 'left', 'top', 'bottom'],
+                        endDirections: ['right', 'left', 'top', 'bottom'],
+                    }
+                });
+            } else {
+                edge.removeRouter();
+                // Clear labels for hierarchical edges if they had any
+                edge.setLabels([]);
+            }
+
+            edge.setConnector(isDependency ? {
+                name: 'rounded',
+                args: { radius: 10 }
+            } : {
+                name: 'smooth'
+            });
+
+            logger.debug('Updated edge', { id: data.id, kind: edgeKind });
         }
     }
 

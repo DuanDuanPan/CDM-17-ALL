@@ -1,4 +1,8 @@
 import { Graph, Node } from '@antv/x6';
+import {
+    getHierarchicalParent,
+    getHierarchicalChildren,
+} from '../utils/edgeFilters';
 
 /**
  * NavigationCommand - Keyboard navigation between nodes
@@ -7,38 +11,28 @@ import { Graph, Node } from '@antv/x6';
  * - Up/Down: Navigate between sibling nodes (sorted by Y position)
  * - Left: Navigate to parent node
  * - Right: Navigate to first child node
+ *
+ * Story 2.2: CRITICAL - Navigation MUST only traverse hierarchical edges.
+ * Dependency edges represent execution logic, not structural relationships,
+ * and must be ignored during tree navigation.
  */
 export class NavigationCommand {
     /**
-     * Get the parent node of a given node
+     * Get the parent node of a given node (via hierarchical edge only).
+     * Story 2.2: Uses getHierarchicalParent to exclude dependency edges.
      * @returns Parent node or null if root node
      */
     getParent(graph: Graph, node: Node): Node | null {
-        const incomingEdges = graph.getIncomingEdges(node);
-        if (!incomingEdges || incomingEdges.length === 0) {
-            return null;
-        }
-        const parentEdge = incomingEdges[0];
-        const parentCell = graph.getCellById(parentEdge.getSourceCellId());
-        if (parentCell && parentCell.isNode()) {
-            return parentCell as Node;
-        }
-        return null;
+        return getHierarchicalParent(graph, node);
     }
 
     /**
-     * Get all direct children of a node, sorted by Y position (top to bottom)
+     * Get all direct children of a node, sorted by Y position (top to bottom).
+     * Story 2.2: Uses getHierarchicalChildren to exclude dependency edges.
      * @returns Array of child nodes sorted by vertical position
      */
     getChildren(graph: Graph, node: Node): Node[] {
-        const outgoingEdges = graph.getOutgoingEdges(node);
-        if (!outgoingEdges || outgoingEdges.length === 0) {
-            return [];
-        }
-
-        const children = outgoingEdges
-            .map((edge) => graph.getCellById(edge.getTargetCellId()))
-            .filter((cell): cell is Node => cell != null && cell.isNode());
+        const children = getHierarchicalChildren(graph, node);
 
         // Sort by Y position (top to bottom)
         return children.sort((a, b) => {

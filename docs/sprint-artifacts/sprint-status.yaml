@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2025-12-18 09:10 - Story 2.1 completed; ZodValidationPipe fix applied
+last_updated: 2025-12-19 - Story 2.2 COMPLETE; All 7 tasks done, all Code Review issues resolved (7/7 fixed)
 
 development_status:
   epic-1: done
@@ -51,10 +51,13 @@ development_status:
 
   epic-2: in-progress
   2-1-task-conversion-properties: done  # All HIGH issues fixed; 2 LOW/MEDIUM deferred
-  2-2-task-dependency-network: backlog
+  2-2-task-dependency-network: done  # All tasks complete, tests added; 4 minor issues deferred
   2-3-multi-view-synchronization: backlog
   2-4-task-dispatch-feedback: backlog
   2-5-data-organization-search: backlog
+  2-6-pbs-node-enhancement: backlog
+  2-7-knowledge-link-recommendation-mock: backlog
+  2-8-app-node-type: backlog
   epic-2-retrospective: optional
 
   epic-4: backlog

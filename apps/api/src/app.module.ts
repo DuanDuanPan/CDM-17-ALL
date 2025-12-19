@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CollabModule } from './modules/collab';
 import { NodesModule } from './modules/nodes'; // Story 2.1
+import { EdgesModule } from './modules/edges'; // Story 2.2
 import { DemoSeedService } from './demo/demo-seed.service';
 
 @Module({
@@ -14,6 +15,7 @@ import { DemoSeedService } from './demo/demo-seed.service';
     }),
     CollabModule,
     NodesModule, // Story 2.1: Node type management
+    EdgesModule, // Story 2.2: Edge management with dependency support
   ],
   controllers: [AppController],
   providers: [AppService, DemoSeedService],
