@@ -11,6 +11,9 @@ import {
   createEdgeMetadata,
   DEFAULT_DEPENDENCY_TYPE,
 } from '../edge-types';
+// Story 2.3: Import task types for multi-view synchronization
+import type { TaskProps, TaskStatus } from '../node-types';
+import { TaskPropsSchema, NodeType } from '../node-types';
 
 describe('Type definitions', () => {
   it('should create a valid NodeData object', () => {
@@ -234,6 +237,142 @@ describe('Edge Types (Story 2.2)', () => {
         });
         expect(result.success).toBe(true);
       });
+    });
+  });
+});
+
+// Story 2.3: Task Types Tests for Multi-View Synchronization
+describe('Task Types (Story 2.3)', () => {
+  describe('TaskProps Interface', () => {
+    it('should create valid TaskProps with all fields', () => {
+      const taskProps: TaskProps = {
+        status: 'in-progress',
+        assigneeId: 'user-1',
+        startDate: '2025-01-01T00:00:00Z',
+        dueDate: '2025-01-15T00:00:00Z',
+        priority: 'high',
+        customStage: 'Development',
+        progress: 50,
+      };
+      expect(taskProps.status).toBe('in-progress');
+      expect(taskProps.startDate).toBe('2025-01-01T00:00:00Z');
+      expect(taskProps.dueDate).toBe('2025-01-15T00:00:00Z');
+      expect(taskProps.customStage).toBe('Development');
+      expect(taskProps.progress).toBe(50);
+    });
+
+    it('should allow partial TaskProps for optional fields', () => {
+      const taskProps: TaskProps = {
+        status: 'todo',
+      };
+      expect(taskProps.status).toBe('todo');
+      expect(taskProps.startDate).toBeUndefined();
+      expect(taskProps.customStage).toBeUndefined();
+    });
+
+    it('should allow null values for nullable fields', () => {
+      const taskProps: TaskProps = {
+        status: 'done',
+        startDate: null,
+        dueDate: null,
+        customStage: null,
+        progress: null,
+      };
+      expect(taskProps.startDate).toBeNull();
+      expect(taskProps.customStage).toBeNull();
+    });
+  });
+
+  describe('TaskStatus Type', () => {
+    it('should only allow valid status values', () => {
+      const validStatuses: TaskStatus[] = ['todo', 'in-progress', 'done'];
+      validStatuses.forEach((status) => {
+        const props: TaskProps = { status };
+        expect(props.status).toBe(status);
+      });
+    });
+  });
+
+  describe('TaskPropsSchema Validation', () => {
+    it('should validate complete TaskProps', () => {
+      const result = TaskPropsSchema.safeParse({
+        status: 'in-progress',
+        assigneeId: 'user-1',
+        startDate: '2025-01-01T00:00:00Z',
+        dueDate: '2025-01-15T00:00:00Z',
+        priority: 'high',
+        customStage: 'Development',
+        progress: 75,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate TaskProps with only startDate (Gantt use case)', () => {
+      const result = TaskPropsSchema.safeParse({
+        startDate: '2025-01-01T00:00:00Z',
+        dueDate: '2025-01-15T00:00:00Z',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate TaskProps with customStage (Kanban use case)', () => {
+      const result = TaskPropsSchema.safeParse({
+        status: 'todo',
+        customStage: 'Design',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate TaskProps with progress (Gantt progress bar)', () => {
+      const result = TaskPropsSchema.safeParse({
+        progress: 50,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject progress outside 0-100 range', () => {
+      const result1 = TaskPropsSchema.safeParse({
+        progress: -1,
+      });
+      expect(result1.success).toBe(false);
+
+      const result2 = TaskPropsSchema.safeParse({
+        progress: 101,
+      });
+      expect(result2.success).toBe(false);
+    });
+
+    it('should accept progress at boundary values', () => {
+      const result0 = TaskPropsSchema.safeParse({ progress: 0 });
+      expect(result0.success).toBe(true);
+
+      const result100 = TaskPropsSchema.safeParse({ progress: 100 });
+      expect(result100.success).toBe(true);
+    });
+
+    it('should validate null values for nullable fields', () => {
+      const result = TaskPropsSchema.safeParse({
+        startDate: null,
+        dueDate: null,
+        customStage: null,
+        progress: null,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject invalid status values', () => {
+      const result = TaskPropsSchema.safeParse({
+        status: 'invalid-status',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject extra fields (strict mode)', () => {
+      const result = TaskPropsSchema.safeParse({
+        status: 'todo',
+        unknownField: 'value',
+      });
+      expect(result.success).toBe(false);
     });
   });
 });

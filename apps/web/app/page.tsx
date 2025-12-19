@@ -2,12 +2,14 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { TopBar, LeftSidebar, RightSidebar } from '@/components/layout';
-import { GraphComponent } from '@/components/graph';
 import type { Graph } from '@antv/x6';
 import { LayoutMode } from '@cdm/types';
 // Story 1.4 MED-12: Use Context for collaboration UI state
 import { CollaborationUIProvider } from '@/contexts';
 import { collabLogger as logger } from '@/lib/logger';
+import { useViewStore } from '@/features/views';
+import { ViewContainer } from '@/features/views';
+import { useCollaboration } from '@/hooks/useCollaboration';
 // Story 1.4 LOW-1: Use centralized constants
 import {
   STORAGE_KEY_LAYOUT_MODE,
@@ -36,6 +38,17 @@ export default function Home() {
 
   // Story 2.2: Dependency mode state for edge creation
   const [isDependencyMode, setIsDependencyMode] = useState(false);
+
+  // Story 2.3: View mode state from store
+  const viewMode = useViewStore((state) => state.viewMode);
+  const setViewMode = useViewStore((state) => state.setViewMode);
+
+  // Story 2.3: Shared collaboration session for all projections
+  const collab = useCollaboration({
+    graphId: DEMO_GRAPH_ID,
+    user: DEMO_USER,
+    wsUrl: process.env.NEXT_PUBLIC_COLLAB_WS_URL || 'ws://localhost:1234',
+  });
 
   // Restore state from localStorage on client mount (after hydration)
   useEffect(() => {
@@ -107,6 +120,8 @@ export default function Home() {
           onGridToggle={handleGridToggle}
           gridEnabled={gridEnabled}
           isLoading={isLayoutLoading}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
         />
 
         {/* Main content area with three columns */}
@@ -120,14 +135,15 @@ export default function Home() {
           {/* Center Canvas - Story 1.4 MED-12: Uses Context to report remote users */}
           {/* Story 2.2: Pass dependency mode for edge creation */}
           <main className="flex-1 relative overflow-hidden">
-            <GraphComponent
+            <ViewContainer
+              graphId={DEMO_GRAPH_ID}
+              user={DEMO_USER}
+              collaboration={collab}
               onNodeSelect={handleNodeSelect}
               onLayoutChange={handleLayoutChange}
               onGridToggle={handleGridToggle}
               currentLayout={layoutMode}
               gridEnabled={gridEnabled}
-              graphId={DEMO_GRAPH_ID}
-              user={DEMO_USER}
               onGraphReady={setGraph}
               isDependencyMode={isDependencyMode}
               onExitDependencyMode={() => setIsDependencyMode(false)}
@@ -139,6 +155,7 @@ export default function Home() {
             selectedNodeId={selectedNodeId}
             graph={graph}
             graphId={DEMO_GRAPH_ID}
+            yDoc={collab.yDoc}
             creatorName={DEMO_USER.name}
             onClose={handleClosePanel}
           />
@@ -147,4 +164,3 @@ export default function Home() {
     </CollaborationUIProvider>
   );
 }
-

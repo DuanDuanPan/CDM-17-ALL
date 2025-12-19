@@ -15,6 +15,9 @@ export class TaskService {
       status: props.status || 'todo',
       assigneeId: props.assigneeId || null,
       dueDate: props.dueDate ? new Date(props.dueDate) : null,
+      startDate: props.startDate ? new Date(props.startDate) : null,
+      customStage: props.customStage || null,
+      progress: typeof props.progress === 'number' ? props.progress : null,
       priority: props.priority || 'medium',
     };
     return this.taskRepo.upsert(nodeId, data);

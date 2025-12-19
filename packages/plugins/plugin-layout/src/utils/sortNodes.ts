@@ -18,6 +18,18 @@ import { Node } from '@antv/x6';
  * @returns Negative if a should come first, positive if b should come first, 0 if equal
  */
 export function sortNodesRightToLeftTopToBottom(a: Node, b: Node): number {
+    const dataA = a.getData() || {};
+    const dataB = b.getData() || {};
+    const orderA = typeof dataA.order === 'number' ? dataA.order : null;
+    const orderB = typeof dataB.order === 'number' ? dataB.order : null;
+
+    // If explicit order is provided, prioritize it for stable sibling ordering
+    if (orderA !== null || orderB !== null) {
+        if (orderA === null) return 1;
+        if (orderB === null) return -1;
+        if (orderA !== orderB) return orderA - orderB;
+    }
+
     const posA = a.getPosition();
     const posB = b.getPosition();
 

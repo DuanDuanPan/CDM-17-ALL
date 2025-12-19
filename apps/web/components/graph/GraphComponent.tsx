@@ -9,7 +9,7 @@ import { AddChildCommand, AddSiblingCommand, RemoveNodeCommand, NavigationComman
 import { LayoutMode } from '@cdm/types';
 
 // Story 1.4: Collaboration imports
-import { useCollaboration, CollabUser } from '@/hooks/useCollaboration';
+import type { CollabUser, UseCollaborationReturn } from '@/hooks/useCollaboration';
 import { graphSyncManager } from '@/features/collab/GraphSyncManager';
 import { RemoteCursorsOverlay } from '@/components/collab/RemoteCursor';
 // Story 1.4 MED-12: Use Context to report remote users
@@ -36,6 +36,17 @@ export interface GraphComponentProps {
     currentLayout?: LayoutMode;
     gridEnabled?: boolean;
     onGraphReady?: (graph: Graph | null) => void;
+    /** Collaboration session (shared across views) */
+    collaboration?: Pick<
+        UseCollaborationReturn,
+        | 'yDoc'
+        | 'isConnected'
+        | 'isSynced'
+        | 'syncStatus'
+        | 'remoteUsers'
+        | 'updateCursor'
+        | 'updateSelectedNode'
+    >;
     // Story 1.4: Collaboration props
     /** Graph ID for collaboration (enables collab if provided) */
     graphId?: string;
@@ -54,6 +65,7 @@ export function GraphComponent({
     onGridToggle,
     currentLayout = 'mindmap',
     onGraphReady,
+    collaboration,
     // Story 1.4: Collaboration props with defaults
     graphId = 'default-graph',
     user = { id: 'anonymous', name: '匿名用户', color: '#6366f1' },
@@ -117,7 +129,17 @@ export function GraphComponent({
         onGridToggle?.(gridEnabled);
     }, [gridEnabled, onGridToggle]);
 
-    // Story 1.4: Initialize collaboration
+    // Collaboration session (shared across views) or local fallback
+    const fallbackCollab = {
+        yDoc: null,
+        isConnected: false,
+        isSynced: false,
+        syncStatus: 'idle',
+        remoteUsers: [],
+        updateCursor: (_x: number, _y: number) => {},
+        updateSelectedNode: (_nodeId: string | null) => {},
+    } as const;
+
     const {
         yDoc,
         isConnected,
@@ -126,11 +148,7 @@ export function GraphComponent({
         updateSelectedNode,
         isSynced,
         syncStatus,
-    } = useCollaboration({
-        graphId,
-        user,
-        wsUrl: process.env.NEXT_PUBLIC_COLLAB_WS_URL || 'ws://localhost:1234',
-    });
+    } = collaboration ?? fallbackCollab;
 
     // Reset init flag when switching graphs
     useEffect(() => {
@@ -968,4 +986,3 @@ function createDependencyEdge(graph: Graph, sourceNode: Node, targetNode: Node):
         ],
     });
 }
-

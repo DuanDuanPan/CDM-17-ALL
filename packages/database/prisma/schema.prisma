@@ -91,14 +91,18 @@ model Node {
 }
 
 // Story 2.1: Extension Tables for Polymorphic Node Properties
+// Story 2.3: Added startDate, customStage, progress for Multi-View Synchronization
 model NodeTask {
   nodeId   String   @id
   node     Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
-  status     String   @default("todo") // todo, in-progress, done
-  assigneeId String?
-  dueDate    DateTime?
-  priority   String?  @default("medium") // low, medium, high
+  status      String   @default("todo") // todo, in-progress, done
+  assigneeId  String?
+  startDate   DateTime? // Story 2.3: Gantt start date
+  dueDate     DateTime? // Story 2.3: Gantt end date
+  priority    String?  @default("medium") // low, medium, high
+  customStage String?  // Story 2.3: Dynamic Kanban grouping field
+  progress    Int?     @default(0) // Story 2.3: 0-100 percentage for Gantt progress bar
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

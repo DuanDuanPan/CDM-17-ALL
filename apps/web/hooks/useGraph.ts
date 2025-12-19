@@ -89,9 +89,18 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
     // Cleanup function to prevent double-instantiation in React Strict Mode
     return () => {
       if (graphRef.current) {
-        graphRef.current.dispose();
+        const graphToDispose = graphRef.current;
         graphRef.current = null;
         setIsReady(false);
+        // Defer disposal to avoid React unmount during render (ReactShapeView unmount warning)
+        setTimeout(() => {
+          try {
+            graphToDispose.dispose();
+          } catch (error) {
+            // Disposal should be safe but guard against double-dispose in dev
+            console.warn('[useGraph] Graph dispose failed', error);
+          }
+        }, 0);
       }
     };
   }, [container, width, height]);

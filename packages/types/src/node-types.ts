@@ -1,5 +1,6 @@
 /**
  * Story 2.1: Semantic Node Types & Dynamic Properties
+ * Story 2.3: Multi-View Synchronization (added startDate, customStage)
  * Node type definitions and property interfaces
  */
 
@@ -14,12 +15,18 @@ export enum NodeType {
   DATA = 'DATA',
 }
 
+// Task Status Enum - for type safety across views
+export type TaskStatus = 'todo' | 'in-progress' | 'done';
+
 // Task Node Properties
 export interface TaskProps {
-  status?: 'todo' | 'in-progress' | 'done';
+  status?: TaskStatus;
   assigneeId?: string | null;
-  dueDate?: string | null; // ISO 8601 format
+  startDate?: string | null; // Story 2.3: ISO 8601 format - Gantt start date
+  dueDate?: string | null; // ISO 8601 format - Gantt end date
   priority?: 'low' | 'medium' | 'high' | null;
+  customStage?: string | null; // Story 2.3: Dynamic Kanban grouping field
+  progress?: number | null; // Story 2.3: 0-100 percentage for Gantt progress bar
 }
 
 // Requirement Node Properties
@@ -143,8 +150,11 @@ export const TaskPropsSchema = z
   .object({
     status: z.enum(['todo', 'in-progress', 'done']).optional(),
     assigneeId: z.string().nullable().optional(),
+    startDate: z.string().nullable().optional(), // Story 2.3: ISO 8601 format
     dueDate: z.string().nullable().optional(),
     priority: z.enum(['low', 'medium', 'high']).nullable().optional(),
+    customStage: z.string().nullable().optional(), // Story 2.3: Dynamic Kanban grouping
+    progress: z.number().min(0).max(100).nullable().optional(), // Story 2.3: Gantt progress
   })
   .strict();
 

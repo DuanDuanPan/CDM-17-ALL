@@ -593,6 +593,10 @@ cdm-17-gemini/
 **Component Boundaries:**
 *   **Host (web):** Provides the "Shell", Auth, and Canvas container.
 *   **Plugin (ui):** Provides the specific node renderers (React Components) injected into the Canvas.
+*   **View Projections (Feature):** `apps/web/features/views` provides Graph/Kanban/Gantt projections.
+    *   `components/ViewSwitcher.tsx` controls view mode.
+    *   `components/ViewContainer.tsx` mounts the active projection.
+    *   `components/KanbanView/*` + `components/GanttView/*` render Yjs-backed views.
 
 ### Requirements to Structure Mapping
 
@@ -690,4 +694,3 @@ npx create-turbo@latest cdm-17-gemini
 *   **Unit:** Service tests MUST mock Repository (never hit DB).
 *   **E2E:** `test/app.e2e-spec.ts` hits real Dockerized DB (spin up/down per suite).
 *   **FactoryBot:** Use factories for generating complex test data fixtures.
-

@@ -1,0 +1,45 @@
+# AI CODING RULES & ARCHITECTURE STANDARDS
+
+You are acting as a Senior Architect and Engineer for the CDM-17 project.
+These rules are MANDATORY. Do not ignore them for "convenience".
+
+# 🚨 CRITICAL ARCHITECTURE RULES (ZERO TOLERANCE)
+
+1.  **MICROKERNEL PLUGIN ARCHITECTURE**:
+    *   **"Everything is a Plugin"**: All business features (Views, Tools, logic) MUST be implemented as independent plugins in `packages/plugins/`.
+    *   **Forbidden Zones**: Do NOT add functional code to `apps/web/features` or `apps/api/src/modules`. These are strictly for "Kernel" infrastructure.
+    *   **Structure**:
+        ```text
+        packages/plugins/plugin-name/
+        ├── client/          # UI Components, Routes (Next.js)
+        ├── server/          # Backend Logic (NestJS)
+        ├── src/             # Shared Logic
+        └── package.json
+        ```
+
+2.  **SINGLE SOURCE OF TRUTH (SSOT)**:
+    *   **State**: All collaborative state resides in Yjs (Hocuspocus).
+    *   **Mutation**: Never mutate local state for business data. Always update Yjs shared types.
+    *   **Database**: `packages/database` is the schema authority. Apps import strictly from there.
+
+3.  **MONOREPO PROTOCOL**:
+    *   **Imports**: Use workspace aliases (`@cdm/types`, `@cdm/ui`) instead of relative paths (`../../`).
+    *   **Coupling**: Plugins MUST NOT depend on other plugins directly unless via defined interfaces in `Shared`.
+
+# 🛠 CODING STANDARDS
+
+## Frontend (React/Next.js)
+- **Styling**: TailwindCSS ONLY. No CSS-in-JS.
+- **Components**: Functional components, typed props.
+- **Performance**: `React.memo` for all Canvas interactions (Nodes, Edges).
+- **Icons**: Lucide React only.
+
+## Backend (NestJS)
+- **Controller**: Slim controllers, heavy services.
+- **DTO**: All inputs validated via Zod + Pipes.
+- **Logs**: Structured logging. No `console.log`.
+
+## Testing
+- **Unit**: Vitest for utility/logic.
+- **E2E**: Playwright for critical user flows.
+- **Mocking**: Mock Yjs doc rather than WebSocket connection for unit tests.

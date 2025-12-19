@@ -20,7 +20,9 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
     status: initialData?.status || 'todo',
     priority: initialData?.priority || 'medium',
     assigneeId: initialData?.assigneeId || '',
+    startDate: initialData?.startDate || '',
     dueDate: initialData?.dueDate || '',
+    customStage: initialData?.customStage || '',
   });
 
   useEffect(() => {
@@ -28,7 +30,9 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
       status: initialData?.status || 'todo',
       priority: initialData?.priority || 'medium',
       assigneeId: initialData?.assigneeId || '',
+      startDate: initialData?.startDate || '',
       dueDate: initialData?.dueDate || '',
+      customStage: initialData?.customStage || '',
     });
   }, [initialData]);
 
@@ -89,6 +93,44 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
         />
       </div>
 
+      {/* Custom Stage */}
+      <div>
+        <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
+          自定义阶段
+        </label>
+        <input
+          type="text"
+          value={formData.customStage ?? ''}
+          onChange={(e) => handleFieldChange('customStage', e.target.value)}
+          placeholder="例如：设计 / 开发 / 测试 / 交付"
+          className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+
+      {/* Start Date - Story 2.3: Required for Gantt view */}
+      <div>
+        <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
+          <Calendar className="w-4 h-4" />
+          开始时间
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="date"
+            value={formData.startDate ? new Date(formData.startDate).toISOString().split('T')[0] : ''}
+            onChange={(e) => handleFieldChange('startDate', e.target.value ? new Date(e.target.value).toISOString() : '')}
+            className="flex-1 text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <button
+            type="button"
+            onClick={() => handleFieldChange('startDate', new Date().toISOString())}
+            className="px-3 py-2 text-xs bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors"
+            title="设置为今天"
+          >
+            今天
+          </button>
+        </div>
+      </div>
+
       {/* Due Date */}
       <div>
         <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
@@ -108,13 +150,12 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-600">任务状态</span>
           <span
-            className={`px-2 py-1 rounded font-medium ${
-              formData.status === 'done'
-                ? 'bg-green-100 text-green-700'
-                : formData.status === 'in-progress'
+            className={`px-2 py-1 rounded font-medium ${formData.status === 'done'
+              ? 'bg-green-100 text-green-700'
+              : formData.status === 'in-progress'
                 ? 'bg-blue-100 text-blue-700'
                 : 'bg-gray-200 text-gray-700'
-            }`}
+              }`}
           >
             {formData.status === 'done' ? '✓ 已完成' : formData.status === 'in-progress' ? '进行中' : '待办'}
           </span>

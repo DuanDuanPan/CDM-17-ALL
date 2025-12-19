@@ -38,7 +38,7 @@ class NodePropsValidator implements ValidatorConstraintInterface {
 
     const allowedKeys: Record<NodeType, string[]> = {
       [NodeType.ORDINARY]: [],
-      [NodeType.TASK]: ['status', 'assigneeId', 'dueDate', 'priority'],
+      [NodeType.TASK]: ['status', 'assigneeId', 'dueDate', 'priority', 'startDate', 'customStage', 'progress'],
       [NodeType.REQUIREMENT]: ['reqType', 'acceptanceCriteria', 'priority'],
       [NodeType.PBS]: ['code', 'version', 'ownerId'],
       [NodeType.DATA]: ['dataType', 'version', 'secretLevel', 'storagePath'],

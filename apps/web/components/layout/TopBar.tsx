@@ -2,6 +2,7 @@
 
 import { Menu, Share2, Settings } from 'lucide-react';
 import { LayoutSwitcher } from '../toolbar/LayoutSwitcher';
+import { ViewSwitcher } from '@/features/views';
 import { ActiveUsersAvatarStack } from '../collab/ActiveUsersAvatarStack';
 import { LayoutMode } from '@cdm/types';
 // Story 1.4 MED-12: Use Context instead of props drilling
@@ -16,6 +17,10 @@ export interface TopBarProps {
   onGridToggle?: (enabled: boolean) => void;
   gridEnabled?: boolean;
   isLoading?: boolean;
+  /** View mode state (graph/kanban/gantt) */
+  viewMode?: import('@/features/views').ViewMode;
+  /** Optional view mode handler */
+  onViewModeChange?: (mode: import('@/features/views').ViewMode) => void;
 }
 
 /**
@@ -31,6 +36,8 @@ export function TopBar({
   onGridToggle,
   gridEnabled = false,
   isLoading = false,
+  viewMode,
+  onViewModeChange,
 }: TopBarProps) {
   // Story 1.4 MED-12: Get collaboration state from context (optional for standalone usage)
   const collabContext = useCollaborationUIOptional();
@@ -48,13 +55,21 @@ export function TopBar({
         <h1 className="text-sm font-medium text-gray-800">{projectName}</h1>
       </div>
 
-      {/* Center section - Layout Switcher */}
-      <div className="flex items-center">
-        <LayoutSwitcher
-          currentMode={currentLayout}
-          onModeChange={onLayoutChange}
-          onGridToggle={onGridToggle}
-          gridEnabled={gridEnabled}
+      {/* Center section - Layout + View Switchers */}
+      <div className="flex items-center gap-3">
+        {/* Only show LayoutSwitcher when in graph view - Kanban/Gantt toolbars moved to content areas */}
+        {viewMode === 'graph' && (
+          <LayoutSwitcher
+            currentMode={currentLayout}
+            onModeChange={onLayoutChange}
+            onGridToggle={onGridToggle}
+            gridEnabled={gridEnabled}
+            isLoading={isLoading}
+          />
+        )}
+        <ViewSwitcher
+          currentMode={viewMode}
+          onModeChange={onViewModeChange}
           isLoading={isLoading}
         />
       </div>
@@ -89,4 +104,3 @@ export function TopBar({
     </header>
   );
 }
-

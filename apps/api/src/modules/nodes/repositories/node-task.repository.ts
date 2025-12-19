@@ -3,7 +3,18 @@ import { prisma } from '@cdm/database';
 
 @Injectable()
 export class NodeTaskRepository {
-  async upsert(nodeId: string, data: { status?: string; assigneeId?: string | null; dueDate?: Date | null; priority?: string | null }) {
+  async upsert(
+    nodeId: string,
+    data: {
+      status?: string;
+      assigneeId?: string | null;
+      dueDate?: Date | null;
+      startDate?: Date | null;
+      customStage?: string | null;
+      progress?: number | null;
+      priority?: string | null;
+    }
+  ) {
     return prisma.nodeTask.upsert({
       where: { nodeId },
       create: { nodeId, ...data },

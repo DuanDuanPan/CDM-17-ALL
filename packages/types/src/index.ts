@@ -6,6 +6,7 @@ export interface NodeData {
   type?: 'root' | 'topic' | 'subtopic';
   parentId?: string;
   collapsed?: boolean;
+  order?: number; // Sibling order for stable layout/serialization
   metadata?: Record<string, unknown>;
   createdAt?: string;
   updatedAt?: string;

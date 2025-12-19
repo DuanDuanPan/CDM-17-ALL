@@ -9,14 +9,17 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { PropertyPanel } from '@/components/PropertyPanel';
 import { NodeType, type EnhancedNodeData, type NodeProps } from '@cdm/types';
 import type { Graph, Node } from '@antv/x6';
+import type * as Y from 'yjs';
 import { syncLogger as logger } from '@/lib/logger';
 import { createNode, fetchNode, updateNodeProps, updateNodeType } from '@/lib/api/nodes';
 import { DEFAULT_CREATOR_NAME, PROPS_UPDATE_DEBOUNCE_MS } from '@/lib/constants';
+import type { YjsNodeData } from '@/features/collab/GraphSyncManager';
 
 export interface RightSidebarProps {
   selectedNodeId: string | null;
   graph: Graph | null;  // X6 Graph reference for Yjs sync
   graphId: string;
+  yDoc?: Y.Doc | null; // Yjs doc for sync when graph is not available
   creatorName?: string;
   onClose?: () => void;
 }
@@ -62,7 +65,14 @@ function ensureNodeTimestamps(
   return { createdAt, updatedAt, creator };
 }
 
-export function RightSidebar({ selectedNodeId, graph, graphId, creatorName, onClose }: RightSidebarProps) {
+export function RightSidebar({
+  selectedNodeId,
+  graph,
+  graphId,
+  yDoc = null,
+  creatorName,
+  onClose,
+}: RightSidebarProps) {
   const resolvedCreatorName = creatorName || DEFAULT_CREATOR_NAME;
   const [nodeData, setNodeData] = useState<EnhancedNodeData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -78,6 +88,12 @@ export function RightSidebar({ selectedNodeId, graph, graphId, creatorName, onCl
     }
     return null;
   }, [graph]);
+
+  const getYjsNode = useCallback((nodeId: string): YjsNodeData | null => {
+    if (!yDoc) return null;
+    const yNodes = yDoc.getMap<YjsNodeData>('nodes');
+    return yNodes.get(nodeId) ?? null;
+  }, [yDoc]);
 
   const ensureNodeExists = useCallback(async (nodeId: string, node: Node) => {
     try {
@@ -117,8 +133,30 @@ export function RightSidebar({ selectedNodeId, graph, graphId, creatorName, onCl
         updatedAt,
       });
       logger.debug('Synced node data to X6 graph', { nodeId, data });
+      return;
     }
-  }, [getX6Node]);
+
+    if (yDoc) {
+      const yNodes = yDoc.getMap<YjsNodeData>('nodes');
+      const existing = yNodes.get(nodeId);
+      if (!existing) return;
+      const now = new Date().toISOString();
+      const createdAt = existing.createdAt ?? now;
+      const creator = existing.creator ?? resolvedCreatorName;
+
+      yDoc.transact(() => {
+        yNodes.set(nodeId, {
+          ...existing,
+          nodeType: (data.type ?? existing.nodeType) as NodeType,
+          props: data.props ?? existing.props,
+          createdAt,
+          updatedAt: now,
+          creator,
+        });
+      });
+      logger.debug('Synced node data to Yjs', { nodeId, data });
+    }
+  }, [getX6Node, yDoc, resolvedCreatorName]);
 
   const schedulePropsPersist = useCallback((nodeId: string, nodeType: NodeType, props: NodeProps) => {
     if (propsUpdateTimer.current) {
@@ -173,7 +211,23 @@ export function RightSidebar({ selectedNodeId, graph, graphId, creatorName, onCl
       return;
     }
 
-    // If not in graph, fetch from API
+    // If not in graph, try Yjs
+    const yjsNode = getYjsNode(selectedNodeId);
+    if (yjsNode) {
+      setNodeData({
+        id: selectedNodeId,
+        label: yjsNode.label || '未命名节点',
+        type: (yjsNode.nodeType as NodeType) || NodeType.ORDINARY,
+        props: (yjsNode.props as NodeProps) || {},
+        createdAt: yjsNode.createdAt,
+        updatedAt: yjsNode.updatedAt,
+        creator: yjsNode.creator || resolvedCreatorName,
+      });
+      setFetchError(null);
+      return;
+    }
+
+    // If not in graph or Yjs, fetch from API
     setIsLoading(true);
     setFetchError(null);
 
@@ -199,7 +253,57 @@ export function RightSidebar({ selectedNodeId, graph, graphId, creatorName, onCl
       .finally(() => {
         setIsLoading(false);
       });
-  }, [selectedNodeId, getX6Node, ensureNodeExists, resolvedCreatorName]);
+  }, [selectedNodeId, getX6Node, getYjsNode, ensureNodeExists, resolvedCreatorName]);
+
+  // Subscribe to data changes for the selected node
+  useEffect(() => {
+    if (!selectedNodeId) return;
+
+    // Prefer graph updates when available
+    const x6Node = getX6Node(selectedNodeId);
+    if (x6Node) {
+      const handleNodeDataChange = () => {
+        const data = x6Node.getData() || {};
+        setNodeData((prev) => ({
+          id: selectedNodeId,
+          label: data.label || prev?.label || '未命名节点',
+          type: (data.nodeType as NodeType) || prev?.type || NodeType.ORDINARY,
+          props: (data.props as NodeProps) || prev?.props || {},
+          createdAt: data.createdAt ?? prev?.createdAt,
+          updatedAt: data.updatedAt ?? prev?.updatedAt,
+          creator: data.creator ?? prev?.creator ?? resolvedCreatorName,
+        }));
+      };
+
+      x6Node.on('change:data', handleNodeDataChange);
+      return () => {
+        x6Node.off('change:data', handleNodeDataChange);
+      };
+    }
+
+    // Fall back to Yjs updates
+    if (yDoc) {
+      const yNodes = yDoc.getMap<YjsNodeData>('nodes');
+      const handleYjsChange = () => {
+        const yjsNode = yNodes.get(selectedNodeId);
+        if (!yjsNode) return;
+        setNodeData({
+          id: selectedNodeId,
+          label: yjsNode.label || '未命名节点',
+          type: (yjsNode.nodeType as NodeType) || NodeType.ORDINARY,
+          props: (yjsNode.props as NodeProps) || {},
+          createdAt: yjsNode.createdAt,
+          updatedAt: yjsNode.updatedAt,
+          creator: yjsNode.creator || resolvedCreatorName,
+        });
+      };
+
+      yNodes.observe(handleYjsChange);
+      return () => {
+        yNodes.unobserve(handleYjsChange);
+      };
+    }
+  }, [selectedNodeId, getX6Node, yDoc, resolvedCreatorName]);
 
   // Handle type change - sync to both API and X6/Yjs
   const handleTypeChange = useCallback(async (nodeId: string, newType: NodeType) => {
