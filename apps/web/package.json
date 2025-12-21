@@ -26,6 +26,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@hocuspocus/provider": "^3.4.3",
     "@types/lodash": "^4.17.21",
+    "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "dhtmlx-gantt": "^9.1.1",
     "lodash": "^4.17.21",
@@ -34,6 +35,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "socket.io-client": "^4.8.1",
+    "use-debounce": "^10.0.6",
     "yjs": "^13.6.27",
     "zustand": "^5.0.9"
   },

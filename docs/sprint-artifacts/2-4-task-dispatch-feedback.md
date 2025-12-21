@@ -1,6 +1,6 @@
 # Story 2.4: Task Dispatch & Feedback (任务下发与反馈)
 
-Status: in-progress
+Status: done
 
 ## Story
 

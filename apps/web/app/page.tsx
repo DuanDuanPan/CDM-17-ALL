@@ -114,7 +114,7 @@ export default function Home() {
       onUserClickExternal={handleUserClick}
     >
       {/* Story 2.4: GraphProvider enables notification click navigation */}
-      <GraphProvider graph={graph} onNodeSelect={handleNodeSelect}>
+      <GraphProvider graph={graph} graphId={DEMO_GRAPH_ID} onNodeSelect={handleNodeSelect}>
         <div className="flex flex-col h-screen">
           {/* Top Bar - Story 1.4 MED-12: Now uses Context for remoteUsers */}
           <TopBar

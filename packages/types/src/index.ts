@@ -33,6 +33,10 @@ export interface MindNodeData extends NodeData {
   // Story 2.1: Semantic node type and properties
   nodeType?: NodeType;
   props?: NodeProps;
+  // Story 2.5: Tags & Archive support
+  tags?: string[];           // 标签数组
+  isArchived?: boolean;      // 归档状态
+  archivedAt?: string | null; // 归档时间
 }
 
 // Story 2.2: Import edge types for EdgeData extension
@@ -71,3 +75,6 @@ export * from './edge-types';
 
 // Story 2.4: Export notification types for task dispatch & feedback
 export * from './notification-types';
+
+// Story 2.5: Export search types for data organization & search
+export * from './search-types';

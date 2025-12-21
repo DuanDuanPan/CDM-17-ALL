@@ -59,11 +59,60 @@ export async function updateNodeType(nodeId: string, type: NodeType): Promise<bo
  * Update node basic data (label, type, props, position)
  * PATCH /api/nodes/:id
  */
-export async function updateNode(nodeId: string, data: { label?: string; type?: NodeType; props?: NodeProps; x?: number; y?: number }): Promise<boolean> {
+export async function updateNode(
+  nodeId: string,
+  data: {
+    label?: string;
+    description?: string;
+    type?: NodeType;
+    props?: NodeProps;
+    tags?: string[];
+    isArchived?: boolean;
+    x?: number;
+    y?: number;
+  }
+): Promise<boolean> {
   const response = await fetch(`/api/nodes/${nodeId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
+  });
+  return response.ok;
+}
+
+/**
+ * Update node tags
+ * PATCH /api/nodes/:id/tags
+ */
+export async function updateNodeTags(nodeId: string, tags: string[]): Promise<boolean> {
+  const response = await fetch(`/api/nodes/${nodeId}/tags`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tags }),
+  });
+  return response.ok;
+}
+
+/**
+ * Archive node (soft delete)
+ * POST /api/nodes/:id:archive
+ */
+export async function archiveNode(nodeId: string): Promise<boolean> {
+  const response = await fetch(`/api/nodes/${nodeId}:archive`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return response.ok;
+}
+
+/**
+ * Unarchive node (restore)
+ * POST /api/nodes/:id:unarchive
+ */
+export async function unarchiveNode(nodeId: string): Promise<boolean> {
+  const response = await fetch(`/api/nodes/${nodeId}:unarchive`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
   });
   return response.ok;
 }

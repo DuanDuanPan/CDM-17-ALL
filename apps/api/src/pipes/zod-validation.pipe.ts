@@ -5,15 +5,15 @@ export class ZodValidationPipe implements PipeTransform {
   constructor(private readonly schema: ZodSchema) { }
 
   transform(value: unknown, metadata: ArgumentMetadata) {
-    // Only validate 'body' parameters - skip path params, query params, etc.
-    // This prevents trying to JSON.parse() path parameters like UUIDs
-    if (metadata.type !== 'body') {
+    // Validate request bodies and query objects; skip path params/custom by default.
+    // For 'body' we additionally support raw JSON strings (missing Content-Type).
+    if (metadata.type !== 'body' && metadata.type !== 'query') {
       return value;
     }
 
     // Accept raw JSON strings (e.g., when Content-Type header is missing)
     let parsedValue = value;
-    if (typeof value === 'string') {
+    if (metadata.type === 'body' && typeof value === 'string') {
       try {
         parsedValue = JSON.parse(value);
       } catch (err) {

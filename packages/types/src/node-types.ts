@@ -1,6 +1,7 @@
 /**
  * Story 2.1: Semantic Node Types & Dynamic Properties
  * Story 2.3: Multi-View Synchronization (added startDate, customStage)
+ * Story 2.5: Data Organization & Search (added tags, isArchived, archivedAt)
  * Node type definitions and property interfaces
  */
 
@@ -21,8 +22,15 @@ export type TaskStatus = 'todo' | 'in-progress' | 'done';
 // Story 2.4: Assignment Status for task dispatch & feedback
 export type AssignmentStatus = 'idle' | 'dispatched' | 'accepted' | 'rejected';
 
+// Story 2.5: Base properties for all node types (tags & archive support)
+export interface BaseNodeProps {
+  tags?: string[];           // 标签数组
+  isArchived?: boolean;      // 归档状态 (软删除)
+  archivedAt?: string | null; // 归档时间 (ISO 8601)
+}
+
 // Task Node Properties
-export interface TaskProps {
+export interface TaskProps extends BaseNodeProps {
   status?: TaskStatus;
   assigneeId?: string | null;
   startDate?: string | null; // Story 2.3: ISO 8601 format - Gantt start date
@@ -40,14 +48,14 @@ export interface TaskProps {
 }
 
 // Requirement Node Properties
-export interface RequirementProps {
+export interface RequirementProps extends BaseNodeProps {
   reqType?: string; // e.g., 'functional', 'non-functional'
   acceptanceCriteria?: string;
   priority?: 'must' | 'should' | 'could' | 'wont' | null; // MoSCoW
 }
 
 // PBS (Product Breakdown Structure) Node Properties
-export interface PBSProps {
+export interface PBSProps extends BaseNodeProps {
   code?: string | null; // e.g., 'PBS-001'
   version?: string | null; // e.g., 'v1.0.0'
   ownerId?: string | null;
@@ -57,7 +65,7 @@ export interface PBSProps {
 export type DataType = 'document' | 'model' | 'drawing';
 
 // Data Node Properties
-export interface DataProps {
+export interface DataProps extends BaseNodeProps {
   dataType?: DataType; // 数据类型: 文档、模型、图纸
   version?: string | null; // 版本号: v1.0.0
   secretLevel?: 'public' | 'internal' | 'secret' | null;
@@ -74,6 +82,11 @@ export interface EnhancedNodeData {
   description?: string; // Story 2.2: Node description for card UI
   type: NodeType;
   props?: NodeProps;
+
+  // Story 2.5: Tags & Archive support
+  tags?: string[];           // 标签数组
+  isArchived?: boolean;      // 归档状态
+  archivedAt?: string | null; // 归档时间
 
   // Yjs sync fields
   x?: number;
@@ -144,6 +157,10 @@ export interface NodeResponse {
   updatedAt: string;
   creator: string;
   props: NodeProps;
+  // Story 2.5: Tags & Archive support
+  tags?: string[];
+  isArchived?: boolean;
+  archivedAt?: string | null;
 }
 
 // Node Type Change Response

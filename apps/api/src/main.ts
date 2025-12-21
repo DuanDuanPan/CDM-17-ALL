@@ -21,7 +21,11 @@ async function bootstrap() {
   );
 
   // Setup CORS using environment variable
-  const corsOrigin = configService.get<string>('CORS_ORIGIN', 'http://localhost:3000');
+  // Support both localhost and 127.0.0.1 to avoid CORS issues
+  const corsOrigin = configService.get<string>(
+    'CORS_ORIGIN',
+    'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173'
+  );
   app.enableCors({
     origin: corsOrigin.split(','),
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],

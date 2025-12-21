@@ -1,11 +1,12 @@
 /**
  * Story 2.1: Nodes Module
+ * Story 2.5: Extended with TagsController for tag management
  * Provides node management functionality with polymorphic type support
  * Story 2.4: Added NotificationModule for task dispatch & feedback
  */
 
 import { Module } from '@nestjs/common';
-import { NodesController } from './nodes.controller';
+import { NodesController, TagsController } from './nodes.controller';
 import { NodesService } from './nodes.service';
 import { NodeRepository } from './repositories/node.repository';
 import { NodeTaskRepository } from './repositories/node-task.repository';
@@ -20,7 +21,7 @@ import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [NotificationModule], // Story 2.4: Import for task dispatch notifications
-  controllers: [NodesController],
+  controllers: [NodesController, TagsController], // Story 2.5: Added TagsController
   providers: [
     NodesService,
     NodeRepository,
@@ -35,4 +36,4 @@ import { NotificationModule } from '../notification/notification.module';
   ],
   exports: [NodesService],
 })
-export class NodesModule {}
+export class NodesModule { }

@@ -61,9 +61,10 @@ export interface UseCollaborationReturn {
 
 /**
  * Collaboration configuration
+ * Story 2.5 MEDIUM-3: Added reconnection configuration
  */
 export interface CollaborationConfig {
-    /** Graph/Document ID to collaborate on */
+    /** Graph/ Document ID to collaborate on */
     graphId: string;
     /** Current user information */
     user: CollabUser;
@@ -71,6 +72,16 @@ export interface CollaborationConfig {
     wsUrl?: string;
     /** Auth token (Clerk token for production) */
     token?: string;
+    /** Enable automatic reconnection (default: true) */
+    enableReconnect?: boolean;
+    /** Maximum reconnection attempts (default: 10, 0 = infinite) */
+    maxReconnectAttempts?: number;
+    /** Initial reconnection delay in ms (default: 1000) */
+    initialReconnectDelay?: number;
+    /** Maximum reconnection delay in ms (default: 30000) */
+    maxReconnectDelay?: number;
+    /** Silent mode - suppress connection warnings (default: false) */
+    silent?: boolean;
 }
 
 // Predefined color palette for user cursors (Magic UI aesthetic)
@@ -113,7 +124,17 @@ function getUserColor(userId: string): string {
  * ```
  */
 export function useCollaboration(config: CollaborationConfig): UseCollaborationReturn {
-    const { graphId, user, wsUrl = 'ws://localhost:1234', token } = config;
+    const {
+        graphId,
+        user,
+        wsUrl = 'ws://localhost:1234',
+        token,
+        enableReconnect = true,
+        maxReconnectAttempts = 10,
+        initialReconnectDelay = 1000,
+        maxReconnectDelay = 30000,
+        silent = false,
+    } = config;
 
     // Refs to persist across renders
     const yDocRef = useRef<Y.Doc | null>(null);
@@ -121,6 +142,11 @@ export function useCollaboration(config: CollaborationConfig): UseCollaborationR
     const prevRemoteUsersRef = useRef<AwarenessUser[]>([]);
     const lastCursorUpdateRef = useRef<number>(0);
     // MED-3: Throttle cursor updates on receive side (using centralized constant)
+
+    // Story 2.5 MEDIUM-3: Reconnection state
+    const reconnectAttemptsRef = useRef<number>(0);
+    const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const intentionalDisconnectRef = useRef<boolean>(false);
 
     // State
     const [isConnected, setIsConnected] = useState(false);
@@ -151,14 +177,20 @@ export function useCollaboration(config: CollaborationConfig): UseCollaborationR
             document: yDoc,
             // Connection lifecycle handlers
             onConnect: () => {
-                logger.info('Connected to collaboration server');
+                if (!silent) {
+                    logger.info('Connected to collaboration server');
+                }
                 setIsConnected(true);
                 setIsSynced(false);
                 setSyncStatus('syncing'); // MED-6: Start syncing
                 setError(null);
+                // Story 2.5 MEDIUM-3: Reset reconnection attempts on successful connection
+                reconnectAttemptsRef.current = 0;
             },
             onClose: ({ event }) => {
-                logger.info('Disconnected from collaboration server');
+                if (!silent) {
+                    logger.info('Disconnected from collaboration server');
+                }
                 setIsConnected(false);
                 setIsSynced(false);
                 setSyncStatus('offline'); // MED-6: Mark as offline
@@ -166,25 +198,65 @@ export function useCollaboration(config: CollaborationConfig): UseCollaborationR
                 // Suppress error logging for expected connection failures
                 if (event?.code === 1006) {
                     // Connection failed - server likely not running
-                    logger.debug('Collaboration server not available (this is expected in development if backend is not running)');
+                    if (!silent) {
+                        logger.debug(
+                            'Collaboration server not available (this is expected in development if backend is not running)'
+                        );
+                    }
+                }
+
+                // Story 2.5 MEDIUM-3: Attempt reconnection with exponential backoff
+                if (enableReconnect && !intentionalDisconnectRef.current) {
+                    const shouldReconnect =
+                        maxReconnectAttempts === 0 || reconnectAttemptsRef.current < maxReconnectAttempts;
+
+                    if (shouldReconnect) {
+                        reconnectAttemptsRef.current += 1;
+                        // Exponential backoff: delay = min(initialDelay * 2^attempts, maxDelay)
+                        const delay = Math.min(
+                            initialReconnectDelay * Math.pow(2, reconnectAttemptsRef.current - 1),
+                            maxReconnectDelay
+                        );
+
+                        if (!silent) {
+                            logger.info(
+                                `Scheduling reconnection attempt ${reconnectAttemptsRef.current}${maxReconnectAttempts > 0 ? `/${maxReconnectAttempts}` : ''} in ${delay}ms`
+                            );
+                        }
+
+                        reconnectTimeoutRef.current = setTimeout(() => {
+                            if (providerRef.current && !intentionalDisconnectRef.current) {
+                                if (!silent) {
+                                    logger.debug('Attempting to reconnect...');
+                                }
+                                providerRef.current.connect();
+                            }
+                        }, delay);
+                    } else {
+                        if (!silent) {
+                            logger.warn(
+                                `Max reconnection attempts (${maxReconnectAttempts}) reached. Giving up.`
+                            );
+                        }
+                        setError(new Error('Failed to reconnect after maximum attempts'));
+                    }
                 }
             },
             onDisconnect: ({ event }) => {
-                logger.info('WebSocket disconnected');
+                if (!silent) {
+                    logger.info('WebSocket disconnected');
+                }
                 setIsConnected(false);
                 setIsSynced(false);
                 setSyncStatus('offline'); // MED-6: Mark as offline
             },
             onSynced: () => {
-                logger.debug('Document synced');
+                if (!silent) {
+                    logger.debug('Document synced');
+                }
                 setIsSynced(true);
                 setSyncStatus('synced'); // MED-6: Sync complete
             },
-            // Reduce reconnection attempts to prevent console spam
-            maxReconnectTimeout: 5000,
-            minReconnectTimeout: 1000,
-            // Quiet mode - suppress console warnings for connection errors
-            quiet: true,
         });
 
         providerRef.current = provider;
@@ -261,6 +333,13 @@ export function useCollaboration(config: CollaborationConfig): UseCollaborationR
 
         // Cleanup
         return () => {
+            // Story 2.5 MEDIUM-3: Clear reconnection timeout and mark as intentional disconnect
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+                reconnectTimeoutRef.current = null;
+            }
+            intentionalDisconnectRef.current = true;
+
             provider.awareness?.off('change', handleAwarenessChange);
             provider.destroy();
             yDoc.destroy();
@@ -290,6 +369,13 @@ export function useCollaboration(config: CollaborationConfig): UseCollaborationR
 
     // Disconnect from collaboration
     const disconnect = useCallback(() => {
+        // Story 2.5 MEDIUM-3: Mark as intentional disconnect to prevent reconnection
+        intentionalDisconnectRef.current = true;
+        if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+        }
+
         const provider = providerRef.current;
         if (provider) {
             provider.destroy();

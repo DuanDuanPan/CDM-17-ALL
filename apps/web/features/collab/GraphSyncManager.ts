@@ -28,6 +28,11 @@ export interface YjsNodeData {
     // Story 2.1: Type-specific properties (Full Sync Strategy - 方案A)
     nodeType?: NodeType;  // Semantic node type (TASK, REQUIREMENT, PBS, DATA, ORDINARY)
     props?: TaskProps | RequirementProps | PBSProps | DataProps | Record<string, never>;
+
+    // Story 2.5: Tags and Archive fields
+    tags?: string[];
+    isArchived?: boolean;
+    archivedAt?: string | null;
 }
 
 /**
@@ -343,6 +348,10 @@ export class GraphSyncManager {
             // Story 2.1: Sync semantic node type and properties
             nodeType: data.nodeType as NodeType,
             props: data.props,
+            // Story 2.5: Sync tags and archive fields
+            tags: Array.isArray(data.tags) ? data.tags : undefined,
+            isArchived: typeof data.isArchived === 'boolean' ? data.isArchived : undefined,
+            archivedAt: data.archivedAt !== undefined ? data.archivedAt : undefined,
         };
 
         this.yDoc.transact(() => {
@@ -459,6 +468,10 @@ export class GraphSyncManager {
                 // Story 2.1: Apply semantic node type and properties
                 nodeType: data.nodeType,
                 props: data.props,
+                // Story 2.5: Apply tags and archive fields
+                tags: data.tags,
+                isArchived: data.isArchived,
+                archivedAt: data.archivedAt,
             });
             logger.debug('Updated existing node', { id: data.id, mindmapType, nodeType: data.nodeType });
         } else if (!existingCell) {
@@ -483,6 +496,10 @@ export class GraphSyncManager {
                     // Story 2.1: Apply semantic node type and properties
                     nodeType: data.nodeType,
                     props: data.props,
+                    // Story 2.5: Apply tags and archive fields
+                    tags: data.tags,
+                    isArchived: data.isArchived,
+                    archivedAt: data.archivedAt,
                 },
             });
             logger.debug('Added new node', { id: data.id, mindmapType, nodeType: data.nodeType });
@@ -707,6 +724,10 @@ export class GraphSyncManager {
                     // Story 2.1: Sync semantic node type and properties
                     nodeType: data.nodeType as NodeType,
                     props: data.props,
+                    // Story 2.5: Sync tags and archive fields
+                    tags: Array.isArray(data.tags) ? data.tags : undefined,
+                    isArchived: typeof data.isArchived === 'boolean' ? data.isArchived : undefined,
+                    archivedAt: data.archivedAt !== undefined ? data.archivedAt : undefined,
                 };
 
                 this.yNodes?.set(node.id, yjsNodeData);

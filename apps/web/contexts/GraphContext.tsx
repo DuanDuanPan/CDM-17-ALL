@@ -11,6 +11,8 @@ import type { Graph } from '@antv/x6';
 export interface GraphContextValue {
     /** X6 Graph instance */
     graph: Graph | null;
+    /** Current graph ID */
+    graphId: string | null;
     /** Navigate to a specific node by ID */
     navigateToNode: (nodeId: string) => void;
     /** Select a specific node by ID */
@@ -22,10 +24,11 @@ const GraphContext = createContext<GraphContextValue | null>(null);
 export interface GraphProviderProps {
     children: ReactNode;
     graph: Graph | null;
+    graphId: string;
     onNodeSelect?: (nodeId: string | null) => void;
 }
 
-export function GraphProvider({ children, graph, onNodeSelect }: GraphProviderProps) {
+export function GraphProvider({ children, graph, graphId, onNodeSelect }: GraphProviderProps) {
     /**
      * Navigate to a node: center the graph viewport on the node and select it
      */
@@ -74,7 +77,7 @@ export function GraphProvider({ children, graph, onNodeSelect }: GraphProviderPr
     }, [graph, onNodeSelect]);
 
     return (
-        <GraphContext.Provider value={{ graph, navigateToNode, selectNode }}>
+        <GraphContext.Provider value={{ graph, graphId, navigateToNode, selectNode }}>
             {children}
         </GraphContext.Provider>
     );

@@ -3,6 +3,8 @@
  * [AI-Review-2][HIGH-3] Added custom validator for type-specific props
  */
 import {
+  IsArray,
+  IsBoolean,
   IsEnum,
   IsNotEmpty,
   IsNumber,
@@ -70,6 +72,10 @@ export class CreateNodeDto {
   @IsNotEmpty()
   label!: string;
 
+  @IsString()
+  @IsOptional()
+  description?: string;
+
   @IsEnum(NodeType)
   @IsOptional()
   type?: NodeType;
@@ -81,6 +87,11 @@ export class CreateNodeDto {
   @IsString()
   @IsOptional()
   parentId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  tags?: string[];
 
   @IsNumber()
   @IsOptional()
@@ -100,6 +111,10 @@ export class UpdateNodeDto {
   @IsOptional()
   label?: string;
 
+  @IsString()
+  @IsOptional()
+  description?: string;
+
   @IsEnum(NodeType)
   @IsOptional()
   type?: NodeType;
@@ -108,6 +123,15 @@ export class UpdateNodeDto {
   @IsOptional()
   @Validate(NodePropsValidator)
   props?: NodeProps;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  tags?: string[];
+
+  @IsBoolean()
+  @IsOptional()
+  isArchived?: boolean;
 
   @IsNumber()
   @IsOptional()
@@ -143,4 +167,52 @@ export class FeedbackTaskDto {
   @IsString()
   @IsOptional()
   reason?: string;
+}
+
+// ============================
+// Story 2.5: Search & Tag DTOs
+// ============================
+
+/**
+ * Story 2.5: Search Query Request DTO
+ * For query parameter validation in search endpoint
+ */
+export class SearchQueryRequestDto {
+  @IsString()
+  @IsOptional()
+  q?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  tags?: string[];
+
+  @IsBoolean()
+  @IsOptional()
+  includeArchived?: boolean;
+
+  @IsString()
+  @IsOptional()
+  graphId?: string;
+
+  @IsOptional()
+  nodeTypes?: NodeType[];
+
+  @IsNumber()
+  @IsOptional()
+  limit?: number;
+
+  @IsNumber()
+  @IsOptional()
+  offset?: number;
+}
+
+/**
+ * Story 2.5: Tag Update Request DTO
+ * For updating node tags
+ */
+export class TagUpdateRequestDto {
+  @IsArray()
+  @IsString({ each: true })
+  tags!: string[];
 }

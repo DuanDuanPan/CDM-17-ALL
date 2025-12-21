@@ -45,7 +45,7 @@ function createMockNode(
   label: string,
   nodeType: NodeType = NodeType.TASK,
   props: Record<string, unknown> = {},
-  mindmapType: string = 'topic'
+  mindmapType: 'root' | 'topic' | 'subtopic' = 'topic'
 ): YjsNodeData {
   return {
     id,

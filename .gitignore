@@ -38,6 +38,7 @@ temp
 
 # Next.js TypeScript
 next-env.d.ts
+*.tsbuildinfo
 
 # BMAD temporary files
 .bmad/**/checkpoint.txt

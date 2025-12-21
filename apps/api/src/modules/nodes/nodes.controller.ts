@@ -1,19 +1,30 @@
 /**
  * Story 2.1: Nodes Controller
+ * Story 2.5: Extended with search, tags, and archive endpoints
  * REST API endpoints for node operations with polymorphic type support
  * [AI-Review][MEDIUM-2] Fixed: Added explicit return types
  */
 
-import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus, UsePipes } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, HttpCode, HttpStatus, UsePipes } from '@nestjs/common';
 import { NodesService } from './nodes.service';
 import { TaskService } from './services/task.service';
-import { NodeResponse, NodeTypeChangeResponse, UpdateNodePropsSchema } from '@cdm/types';
+import {
+  NodeResponse,
+  NodeTypeChangeResponse,
+  UpdateNodePropsSchema,
+  SearchQuerySchema,
+  TagUpdateSchema,
+  SearchResponse,
+  type SearchQueryDto,
+  PopularTagsResponse,
+} from '@cdm/types';
 import {
   CreateNodeDto,
   UpdateNodeDto,
   UpdateNodeTypeDto,
   UpdateNodePropsDto,
   FeedbackTaskDto,
+  TagUpdateRequestDto,
 } from './nodes.request.dto';
 import { ZodValidationPipe } from '../../pipes/zod-validation.pipe';
 
@@ -24,6 +35,35 @@ export class NodesController {
     private readonly nodesService: NodesService,
     private readonly taskService: TaskService
   ) { }
+
+  // ============================
+  // Story 2.5: Search Endpoints
+  // ============================
+
+  /**
+   * Search nodes across all graphs
+   * GET /api/nodes/search?q=keyword&tags=tag1,tag2&includeArchived=false
+   * Story 2.5 AC#1.2, AC#3.1
+   */
+  @Get('search')
+  @UsePipes(new ZodValidationPipe(SearchQuerySchema))
+  async searchNodes(@Query() query: SearchQueryDto): Promise<SearchResponse> {
+    return this.nodesService.search(query);
+  }
+
+  /**
+   * List archived nodes
+   * GET /api/nodes/archived?graphId=xxx
+   * Story 2.5 AC#4.3
+   */
+  @Get('archived')
+  async listArchivedNodes(@Query('graphId') graphId?: string): Promise<SearchResponse> {
+    return this.nodesService.listArchived(graphId);
+  }
+
+  // ============================
+  // Existing CRUD Endpoints
+  // ============================
 
   /**
    * Create a new node
@@ -75,6 +115,49 @@ export class NodesController {
     return this.nodesService.updateNodeProps(id, dto);
   }
 
+  // ============================
+  // Story 2.5: Tags Endpoints
+  // ============================
+
+  /**
+   * Update node tags
+   * PATCH /api/nodes/:id/tags
+   * Story 2.5 AC#2.1, AC#2.3
+   */
+  @Patch(':id/tags')
+  @UsePipes(new ZodValidationPipe(TagUpdateSchema))
+  async updateNodeTags(@Param('id') id: string, @Body() dto: TagUpdateRequestDto): Promise<NodeResponse> {
+    return this.nodesService.updateTags(id, dto.tags);
+  }
+
+  // ============================
+  // Story 2.5: Archive Endpoints
+  // ============================
+
+  /**
+   * Archive node (soft delete)
+   * POST /api/nodes/:id:archive
+   * Story 2.5 AC#4.1, AC#4.2
+   */
+  @Post(':id\\:archive')
+  async archiveNode(@Param('id') id: string): Promise<NodeResponse> {
+    return this.nodesService.archive(id);
+  }
+
+  /**
+   * Unarchive node (restore)
+   * POST /api/nodes/:id:unarchive
+   * Story 2.5 AC#4.3
+   */
+  @Post(':id\\:unarchive')
+  async unarchiveNode(@Param('id') id: string): Promise<NodeResponse> {
+    return this.nodesService.unarchive(id);
+  }
+
+  // ============================
+  // Story 2.4: Task Dispatch Endpoints
+  // ============================
+
   /**
    * Dispatch task to assignee
    * POST /api/nodes/:id:dispatch
@@ -99,5 +182,24 @@ export class NodesController {
   ) {
     const user = { id: 'test1' }; // TODO: Replace with @CurrentUser() after Clerk integration
     return this.taskService.feedbackTask(nodeId, user.id, body.action, body.reason);
+  }
+}
+
+// ============================
+// Tags Controller (separate controller for /api/tags endpoints)
+// ============================
+
+@Controller('tags')
+export class TagsController {
+  constructor(private readonly nodesService: NodesService) { }
+
+  /**
+   * Get popular tags
+   * GET /api/tags/popular?graphId=xxx
+   * Story 2.5: Helper for tag suggestions
+   */
+  @Get('popular')
+  async getPopularTags(@Query('graphId') graphId?: string): Promise<PopularTagsResponse> {
+    return this.nodesService.getPopularTags(graphId);
   }
 }

@@ -1,5 +1,6 @@
 /**
  * Story 2.1: Node Service with polymorphic type support
+ * Story 2.5: Extended with search, tags, and archive functionality
  * Handles node CRUD operations and type-specific property management
  */
 
@@ -13,6 +14,10 @@ import {
   PBSProps,
   RequirementProps,
   TaskProps,
+  SearchQueryDto,
+  SearchResponse,
+  SearchResultItem,
+  PopularTagsResponse,
 } from '@cdm/types';
 import {
   CreateNodeDto,
@@ -20,7 +25,7 @@ import {
   UpdateNodeTypeDto,
   UpdateNodePropsDto,
 } from './nodes.request.dto';
-import { NodeRepository, NodeUpdateData } from './repositories/node.repository';
+import { NodeRepository, NodeUpdateData, NodeWithGraph } from './repositories/node.repository';
 import { TaskService } from './services/task.service';
 import { RequirementService } from './services/requirement.service';
 import { PBSService } from './services/pbs.service';
@@ -36,7 +41,11 @@ export class NodesService {
     private readonly requirementService: RequirementService,
     private readonly pbsService: PBSService,
     private readonly dataService: DataService
-  ) {}
+  ) { }
+
+  private normalizeTags(tags: string[]): string[] {
+    return [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))];
+  }
 
   /**
    * Update node type and initialize corresponding extension table
@@ -116,6 +125,7 @@ export class NodesService {
     return {
       id: node.id,
       label: node.label,
+      description: (node as { description?: string }).description,
       type: node.type as unknown as NodeType,
       x: node.x,
       y: node.y,
@@ -126,6 +136,10 @@ export class NodesService {
       updatedAt: node.updatedAt.toISOString(),
       creator: (node as { creatorName?: string }).creatorName || DEFAULT_CREATOR_NAME,
       props,
+      // Story 2.5: Tags & Archive support
+      tags: (node as { tags?: string[] }).tags ?? [],
+      isArchived: (node as { isArchived?: boolean }).isArchived ?? false,
+      archivedAt: (node as { archivedAt?: Date | null }).archivedAt?.toISOString() ?? null,
     };
   }
 
@@ -137,12 +151,14 @@ export class NodesService {
     const node = await this.nodeRepo.create({
       id: dto.id,
       label: dto.label,
+      description: dto.description,
       type: dto.type || NodeType.ORDINARY,
       graphId: dto.graphId,
       parentId: dto.parentId,
       x: dto.x ?? 0,
       y: dto.y ?? 0,
       creatorName: dto.creatorName || DEFAULT_CREATOR_NAME,
+      tags: dto.tags ? this.normalizeTags(dto.tags) : undefined,
     });
 
     if (node.type !== NodeType.ORDINARY) {
@@ -158,8 +174,15 @@ export class NodesService {
   async updateNode(nodeId: string, dto: UpdateNodeDto): Promise<NodeResponse> {
     const updateData: NodeUpdateData = {};
     if (dto.label !== undefined) updateData.label = dto.label;
+    if (dto.description !== undefined) updateData.description = dto.description;
     if (dto.x !== undefined) updateData.x = dto.x;
     if (dto.y !== undefined) updateData.y = dto.y;
+    if (dto.tags !== undefined) updateData.tags = this.normalizeTags(dto.tags);
+
+    if (dto.isArchived !== undefined) {
+      updateData.isArchived = dto.isArchived;
+      updateData.archivedAt = dto.isArchived ? new Date() : null;
+    }
 
     if (dto.type !== undefined) {
       await this.updateNodeType(nodeId, { type: dto.type });
@@ -214,5 +237,162 @@ export class NodesService {
       default:
         break;
     }
+  }
+
+  // ============================
+  // Story 2.5: Search & Tag Methods
+  // ============================
+
+  /**
+   * Search nodes across all graphs
+   * Story 2.5 AC#1.2, AC#3.1
+   */
+  async search(query: SearchQueryDto): Promise<SearchResponse> {
+    const { results: nodes, total } = await this.nodeRepo.search(query);
+
+    // Transform to SearchResultItem
+    const results: SearchResultItem[] = nodes.map((node) => ({
+      id: node.id,
+      label: node.label,
+      description: (node as { description?: string }).description,
+      type: node.type as unknown as NodeType,
+      tags: (node as { tags?: string[] }).tags ?? [],
+      isArchived: (node as { isArchived?: boolean }).isArchived ?? false,
+      graphId: node.graphId,
+      graphName: node.graph.name,
+      x: node.x,
+      y: node.y,
+      matchType: this.determineMatchType(node, query),
+      matchHighlight: this.createHighlight(node, query.q),
+    }));
+
+    return {
+      results,
+      total,
+      hasMore: (query.offset || 0) + results.length < total,
+      query,
+    };
+  }
+
+  /**
+   * Update node tags
+   * Story 2.5 AC#2.1, AC#2.3
+   */
+  async updateTags(nodeId: string, tags: string[]): Promise<NodeResponse> {
+    const node = await this.nodeRepo.findById(nodeId);
+    if (!node) {
+      throw new NotFoundException(`Node ${nodeId} not found`);
+    }
+
+    const normalizedTags = this.normalizeTags(tags);
+
+    await this.nodeRepo.update(nodeId, { tags: normalizedTags });
+    return this.getNodeWithProps(nodeId);
+  }
+
+  /**
+   * Archive node (soft delete)
+   * Story 2.5 AC#4.1, AC#4.2
+   */
+  async archive(nodeId: string): Promise<NodeResponse> {
+    const node = await this.nodeRepo.findById(nodeId);
+    if (!node) {
+      throw new NotFoundException(`Node ${nodeId} not found`);
+    }
+
+    await this.nodeRepo.update(nodeId, {
+      isArchived: true,
+      archivedAt: new Date(),
+    });
+    return this.getNodeWithProps(nodeId);
+  }
+
+  /**
+   * Unarchive node (restore from archive)
+   * Story 2.5 AC#4.3
+   */
+  async unarchive(nodeId: string): Promise<NodeResponse> {
+    const node = await this.nodeRepo.findById(nodeId);
+    if (!node) {
+      throw new NotFoundException(`Node ${nodeId} not found`);
+    }
+
+    await this.nodeRepo.update(nodeId, {
+      isArchived: false,
+      archivedAt: null,
+    });
+    return this.getNodeWithProps(nodeId);
+  }
+
+  /**
+   * List archived nodes
+   * Story 2.5 AC#4.3
+   */
+  async listArchived(graphId?: string): Promise<SearchResponse> {
+    const { results: nodes, total } = await this.nodeRepo.findArchived(graphId);
+
+    const results: SearchResultItem[] = nodes.map((node) => ({
+      id: node.id,
+      label: node.label,
+      description: (node as { description?: string }).description,
+      type: node.type as unknown as NodeType,
+      tags: (node as { tags?: string[] }).tags ?? [],
+      isArchived: true,
+      graphId: node.graphId,
+      graphName: node.graph.name,
+      x: node.x,
+      y: node.y,
+      matchType: 'label' as const,
+    }));
+
+    return {
+      results,
+      total,
+      hasMore: false,
+      query: { includeArchived: true, graphId },
+    };
+  }
+
+  /**
+   * Get popular tags
+   * Story 2.5: Helper for tag suggestions
+   */
+  async getPopularTags(graphId?: string): Promise<PopularTagsResponse> {
+    const tagData = await this.nodeRepo.getPopularTags(graphId);
+    return {
+      tags: tagData.map((t) => ({ name: t.tag, count: t.count })),
+    };
+  }
+
+  // ============================
+  // Private Helpers for Search
+  // ============================
+
+  private determineMatchType(
+    node: NodeWithGraph,
+    query: SearchQueryDto
+  ): 'label' | 'description' | 'tag' {
+    const nodeTags = (node as { tags?: string[] }).tags ?? [];
+    if (query.tags?.some((t) => nodeTags.includes(t))) {
+      return 'tag';
+    }
+    if (query.q && node.label.toLowerCase().includes(query.q.toLowerCase())) {
+      return 'label';
+    }
+    return 'description';
+  }
+
+  private createHighlight(
+    node: NodeWithGraph,
+    keyword?: string
+  ): string | undefined {
+    if (!keyword) return undefined;
+    const lowerKeyword = keyword.toLowerCase();
+    const lowerLabel = node.label.toLowerCase();
+    if (lowerLabel.includes(lowerKeyword)) {
+      return node.label; // Full label for now
+    }
+    const description = (node as { description?: string }).description;
+    return description?.substring(0, 100);
   }
 }

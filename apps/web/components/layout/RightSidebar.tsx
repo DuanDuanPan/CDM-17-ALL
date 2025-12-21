@@ -11,7 +11,15 @@ import { NodeType, type EnhancedNodeData, type NodeProps } from '@cdm/types';
 import type { Graph, Node } from '@antv/x6';
 import type * as Y from 'yjs';
 import { syncLogger as logger } from '@/lib/logger';
-import { createNode, fetchNode, updateNodeProps, updateNodeType } from '@/lib/api/nodes';
+import {
+  archiveNode,
+  createNode,
+  fetchNode,
+  unarchiveNode,
+  updateNodeProps,
+  updateNodeTags,
+  updateNodeType,
+} from '@/lib/api/nodes';
 import { DEFAULT_CREATOR_NAME, PROPS_UPDATE_DEBOUNCE_MS } from '@/lib/constants';
 import type { YjsNodeData } from '@/features/collab/GraphSyncManager';
 
@@ -35,6 +43,7 @@ function buildCreatePayload(
   return {
     id: nodeId,
     label: data.label || '未命名节点',
+    description: typeof data.description === 'string' ? data.description : undefined,
     type: data.nodeType || NodeType.ORDINARY,
     graphId,
     parentId: data.parentId,
@@ -200,8 +209,15 @@ export function RightSidebar({
       setNodeData({
         id: selectedNodeId,
         label: graphData.label || '未命名节点',
+        description: typeof graphData.description === 'string' ? graphData.description : undefined,
         type: graphData.nodeType || NodeType.ORDINARY,
         props: graphData.props || {},
+        tags: Array.isArray(graphData.tags) ? graphData.tags : [],
+        isArchived: typeof graphData.isArchived === 'boolean' ? graphData.isArchived : false,
+        archivedAt:
+          typeof graphData.archivedAt === 'string' || graphData.archivedAt === null
+            ? graphData.archivedAt
+            : null,
         createdAt,
         updatedAt,
         creator,
@@ -217,8 +233,12 @@ export function RightSidebar({
       setNodeData({
         id: selectedNodeId,
         label: yjsNode.label || '未命名节点',
+        description: undefined,
         type: (yjsNode.nodeType as NodeType) || NodeType.ORDINARY,
         props: (yjsNode.props as NodeProps) || {},
+        tags: [],
+        isArchived: false,
+        archivedAt: null,
         createdAt: yjsNode.createdAt,
         updatedAt: yjsNode.updatedAt,
         creator: yjsNode.creator || resolvedCreatorName,
@@ -267,8 +287,15 @@ export function RightSidebar({
         setNodeData((prev) => ({
           id: selectedNodeId,
           label: data.label || prev?.label || '未命名节点',
+          description: typeof data.description === 'string' ? data.description : prev?.description,
           type: (data.nodeType as NodeType) || prev?.type || NodeType.ORDINARY,
           props: (data.props as NodeProps) || prev?.props || {},
+          tags: Array.isArray(data.tags) ? data.tags : prev?.tags ?? [],
+          isArchived: typeof data.isArchived === 'boolean' ? data.isArchived : prev?.isArchived,
+          archivedAt:
+            typeof data.archivedAt === 'string' || data.archivedAt === null
+              ? data.archivedAt
+              : prev?.archivedAt,
           createdAt: data.createdAt ?? prev?.createdAt,
           updatedAt: data.updatedAt ?? prev?.updatedAt,
           creator: data.creator ?? prev?.creator ?? resolvedCreatorName,
@@ -355,6 +382,71 @@ export function RightSidebar({
     schedulePropsPersist(nodeId, nodeType, props);
   }, [nodeData, syncToGraph, schedulePropsPersist]);
 
+  const handleTagsUpdate = useCallback(
+    (nodeId: string, tags: string[]) => {
+      const now = new Date().toISOString();
+
+      setNodeData((prev) => (prev ? { ...prev, tags, updatedAt: now } : prev));
+
+      const x6Node = getX6Node(nodeId);
+      if (x6Node) {
+        const existingData = x6Node.getData() || {};
+        x6Node.setData({ ...existingData, tags, updatedAt: now });
+      }
+
+      updateNodeTags(nodeId, tags).then((success) => {
+        if (!success) {
+          logger.warn('Backend tags update failed, but local state updated', { nodeId });
+        }
+      });
+    },
+    [getX6Node]
+  );
+
+  const handleArchiveToggle = useCallback(
+    async (nodeId: string, nextIsArchived: boolean) => {
+      const success = nextIsArchived ? await archiveNode(nodeId) : await unarchiveNode(nodeId);
+      if (!success) {
+        logger.warn('Backend archive toggle failed', { nodeId, nextIsArchived });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const archivedAt = nextIsArchived ? now : null;
+
+      setNodeData((prev) =>
+        prev
+          ? {
+            ...prev,
+            isArchived: nextIsArchived,
+            archivedAt,
+            updatedAt: now,
+          }
+          : prev
+      );
+
+      const x6Node = getX6Node(nodeId);
+      if (x6Node) {
+        const existingData = x6Node.getData() || {};
+        x6Node.setData({
+          ...existingData,
+          isArchived: nextIsArchived,
+          archivedAt,
+          updatedAt: now,
+        });
+
+        if (nextIsArchived) {
+          x6Node.hide();
+          graph?.cleanSelection();
+          onClose?.();
+        } else {
+          x6Node.show();
+        }
+      }
+    },
+    [getX6Node, graph, onClose]
+  );
+
   if (!selectedNodeId) {
     return null;
   }
@@ -382,6 +474,8 @@ export function RightSidebar({
       onClose={onClose}
       onTypeChange={handleTypeChange}
       onPropsUpdate={handlePropsUpdate}
+      onTagsUpdate={handleTagsUpdate}
+      onArchiveToggle={handleArchiveToggle}
     />
   );
 }

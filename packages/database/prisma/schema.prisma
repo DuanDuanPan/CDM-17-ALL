@@ -61,15 +61,21 @@ model Graph {
 }
 
 model Node {
-  id       String   @id @default(cuid())
-  label    String
-  creatorName String @default("Mock User")
-  type     NodeType @default(ORDINARY) // Story 2.1: Changed from String to NodeType enum
-  x        Float    @default(0)
-  y        Float    @default(0)
-  width    Float    @default(120)
-  height   Float    @default(40)
-  metadata Json     @default("{}")
+  id          String   @id @default(cuid())
+  label       String
+  description String?  // Story 2.5: Node description for search and card UI
+  creatorName String   @default("Mock User")
+  type        NodeType @default(ORDINARY) // Story 2.1: Changed from String to NodeType enum
+  x           Float    @default(0)
+  y           Float    @default(0)
+  width       Float    @default(120)
+  height      Float    @default(40)
+  metadata    Json     @default("{}")
+
+  // Story 2.5: Tags and Archive fields
+  tags        String[] @default([])   // 标签数组
+  isArchived  Boolean  @default(false) // 归档状态 (软删除)
+  archivedAt  DateTime?               // 归档时间
 
   graphId String
   graph   Graph  @relation(fields: [graphId], references: [id], onDelete: Cascade)
@@ -89,6 +95,11 @@ model Node {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Story 2.5: Indexes for search performance
+  @@index([graphId, isArchived])  // Filter archived nodes per graph
+  @@index([tags])                  // Tag filtering (GIN index in PostgreSQL)
+  @@index([graphId, label])        // Label search within graph
 }
 
 // Story 2.1: Extension Tables for Polymorphic Node Properties

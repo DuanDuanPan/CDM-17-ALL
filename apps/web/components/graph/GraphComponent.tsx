@@ -136,8 +136,8 @@ export function GraphComponent({
         isSynced: false,
         syncStatus: 'idle',
         remoteUsers: [],
-        updateCursor: (_x: number, _y: number) => {},
-        updateSelectedNode: (_nodeId: string | null) => {},
+        updateCursor: (_x: number, _y: number) => { },
+        updateSelectedNode: (_nodeId: string | null) => { },
     } as const;
 
     const {
@@ -172,7 +172,7 @@ export function GraphComponent({
 
         if (hasChanged) {
             prevRemoteUsersRef.current = remoteUsers;
-            collabUIContext.setRemoteUsers(remoteUsers);
+            collabUIContext.setRemoteUsers([...remoteUsers]);
         }
     }, [remoteUsers, collabUIContext]);
 

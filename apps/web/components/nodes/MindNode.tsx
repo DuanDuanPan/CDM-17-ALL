@@ -250,6 +250,7 @@ export function MindNode({ node }: MindNodeProps) {
     // Get previous data to check if label changed
     const prevData = getData();
     const labelChanged = label !== prevData.label;
+    const descriptionChanged = description !== (prevData.description ?? '');
 
     node.setData({
       label,
@@ -258,10 +259,14 @@ export function MindNode({ node }: MindNodeProps) {
     } as Partial<MindNodeData>);
     setIsEditing(false);
 
-    // Sync label to database if changed
-    if (labelChanged && node.id) {
-      updateNode(node.id, { label }).catch((err) => {
-        console.error('[MindNode] Failed to sync label to database:', err);
+    // Sync to database if changed
+    if ((labelChanged || descriptionChanged) && node.id) {
+      const payload: { label?: string; description?: string } = {};
+      if (labelChanged) payload.label = label;
+      if (descriptionChanged) payload.description = description;
+
+      updateNode(node.id, payload).catch((err) => {
+        console.error('[MindNode] Failed to sync node to database:', err);
       });
     }
   }, [node, label, description, getData]);
@@ -403,28 +408,60 @@ export function MindNode({ node }: MindNodeProps) {
         </div>
       )}
 
-      {/* === FOOTER (Pill + Assignment + ID) === */}
+      {/* === FOOTER (Pill + Tags + Assignment + ID) === */}
       <div className="w-full flex items-center justify-between mt-1.5 pt-1.5 border-t border-gray-100">
-        {/* Left: Status Pill */}
-        <div className="flex items-center gap-1">
+        {/* Left: Status Pill + Tags */}
+        <div className="flex items-center gap-1 overflow-hidden">
           {pill ? (
-            <div className={`px-1.5 py-0.5 rounded text-[9px] font-medium leading-none ${pill.bg} ${pill.text}`}>
+            <div className={`px-1.5 py-0.5 rounded text-[9px] font-medium leading-none flex-shrink-0 ${pill.bg} ${pill.text}`}>
               {pill.label}
             </div>
           ) : <div />}
 
+          {/* Story 2.5: Tag badges (max 2, then +N) */}
+          {data.tags && data.tags.length > 0 && (
+            <div className="flex items-center gap-0.5 overflow-hidden">
+              {data.tags.slice(0, 2).map((tag: string) => (
+                <button
+                  key={tag}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Dispatch custom event for tag search
+                    const el = containerRef.current;
+                    if (el) {
+                      el.dispatchEvent(new CustomEvent('mindmap:tag-search', {
+                        bubbles: true,
+                        detail: { tag }
+                      }));
+                    }
+                  }}
+                  className="px-1 py-0.5 rounded text-[8px] font-medium
+                             bg-blue-50 text-blue-600 hover:bg-blue-100
+                             transition-colors cursor-pointer truncate max-w-[50px] flex-shrink-0"
+                  title={`搜索标签: #${tag}`}
+                >
+                  #{tag}
+                </button>
+              ))}
+              {data.tags.length > 2 && (
+                <span className="text-[8px] text-gray-400 flex-shrink-0">
+                  +{data.tags.length - 2}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Story 2.4: Assignment Status Badge */}
           {showAssignmentIndicator && (
             <div
-              className={`flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-medium leading-none ${
-                assignmentStatus === 'accepted'
+              className={`flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-medium leading-none flex-shrink-0 ${assignmentStatus === 'accepted'
                   ? 'bg-green-100 text-green-700'
                   : assignmentStatus === 'dispatched'
                     ? 'bg-yellow-100 text-yellow-700'
                     : assignmentStatus === 'rejected'
                       ? 'bg-red-100 text-red-700'
                       : ''
-              }`}
+                }`}
               title={
                 assignmentStatus === 'accepted'
                   ? '已接受'
@@ -449,7 +486,7 @@ export function MindNode({ node }: MindNodeProps) {
 
         {/* Right: Meta ID (Always visible for engineering context) */}
         <div className="flex items-center gap-1">
-          <span className="text-[9px] font-mono text-gray-400">CH-001</span>
+          <span className="text-[9px] font-mono text-gray-400">{node.id.slice(0, 6).toUpperCase()}</span>
           {nodeType === NodeType.DATA && <Lock className="w-2.5 h-2.5 text-gray-300" />}
         </div>
       </div>

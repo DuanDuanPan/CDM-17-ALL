@@ -6,10 +6,12 @@
  */
 
 import { useState, useEffect } from 'react';
-import { X, ChevronDown } from 'lucide-react';
+import { Archive, ChevronDown, RotateCcw, X } from 'lucide-react';
 import { NodeType, type EnhancedNodeData } from '@cdm/types';
 import { CommonHeader } from './CommonHeader';
 import { getFormComponent } from './PropertyPanelRegistry';
+import { TagEditor } from './TagEditor';
+import { useConfirmDialog } from '@cdm/ui';
 
 export interface PropertyPanelProps {
   nodeId: string | null;
@@ -17,6 +19,8 @@ export interface PropertyPanelProps {
   onClose?: () => void;
   onTypeChange?: (nodeId: string, newType: NodeType) => void;
   onPropsUpdate?: (nodeId: string, nodeType: NodeType, props: any) => void;
+  onTagsUpdate?: (nodeId: string, tags: string[]) => void;
+  onArchiveToggle?: (nodeId: string, nextIsArchived: boolean) => void;
 }
 
 export function PropertyPanel({
@@ -25,8 +29,11 @@ export function PropertyPanel({
   onClose,
   onTypeChange,
   onPropsUpdate,
+  onTagsUpdate,
+  onArchiveToggle,
 }: PropertyPanelProps) {
   const [currentType, setCurrentType] = useState<NodeType>(nodeData?.type || NodeType.ORDINARY);
+  const { showConfirm } = useConfirmDialog();
 
   useEffect(() => {
     if (nodeData?.type) {
@@ -46,6 +53,31 @@ export function PropertyPanel({
   const handlePropsUpdate = (props: any) => {
     onPropsUpdate?.(nodeId, currentType, props);
   };
+
+  const handleTagsUpdate = (tags: string[]) => {
+    onTagsUpdate?.(nodeId, tags);
+  };
+
+  const handleArchiveToggle = () => {
+    if (!onArchiveToggle) return;
+    const nextIsArchived = !nodeData.isArchived;
+    
+    if (nextIsArchived) {
+      // Show confirmation dialog for archive action
+      showConfirm({
+        title: '确认归档节点？',
+        description: '归档后将从画布隐藏，但可在"归档箱"中随时恢复。',
+        confirmText: '确认归档',
+        cancelText: '取消',
+        variant: 'warning',
+        onConfirm: () => onArchiveToggle(nodeId, nextIsArchived),
+      });
+    } else {
+      // No confirmation needed for unarchive
+      onArchiveToggle(nodeId, nextIsArchived);
+    }
+  };
+
 
   // Get the appropriate form component
   const FormComponent = getFormComponent(currentType);
@@ -92,6 +124,38 @@ export function PropertyPanel({
                 <option value={NodeType.DATA}>数据 (Data)</option>
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Tags + Archive (Story 2.5) */}
+          <div className="space-y-4">
+            <TagEditor
+              tags={nodeData.tags ?? []}
+              onChange={handleTagsUpdate}
+              maxTags={20}
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-500">归档</span>
+              <button
+                type="button"
+                onClick={handleArchiveToggle}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${nodeData.isArchived
+                  ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                  : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                  }`}
+              >
+                {nodeData.isArchived ? (
+                  <>
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    恢复
+                  </>
+                ) : (
+                  <>
+                    <Archive className="w-3.5 h-3.5" />
+                    归档
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
