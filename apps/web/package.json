@@ -31,10 +31,12 @@
     "dhtmlx-gantt": "^9.1.1",
     "lodash": "^4.17.21",
     "lucide-react": "^0.511.0",
+    "nanoid": "^5.1.6",
     "next": "16.0.7",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "socket.io-client": "^4.8.1",
+    "sonner": "^2.0.7",
     "use-debounce": "^10.0.6",
     "yjs": "^13.6.27",
     "zustand": "^5.0.9"

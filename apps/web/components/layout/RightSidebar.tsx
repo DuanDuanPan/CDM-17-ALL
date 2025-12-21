@@ -109,13 +109,57 @@ export function RightSidebar({
       const existing = await fetchNode(nodeId);
       if (existing) {
         setNodeData((prev) => (prev ? { ...prev, ...existing } : existing));
+
+        // Story 2.6 Fix: Sync API data back to X6 node
+        // This ensures props and tags from DB are available for clipboard copy
+        const existingNodeData = node.getData() || {};
+        const needsSync =
+          JSON.stringify(existingNodeData.props) !== JSON.stringify(existing.props) ||
+          JSON.stringify(existingNodeData.tags) !== JSON.stringify(existing.tags) ||
+          existingNodeData.nodeType !== existing.type;
+
+        if (needsSync) {
+          const now = new Date().toISOString();
+          node.setData({
+            ...existingNodeData,
+            nodeType: existing.type ?? existingNodeData.nodeType,
+            props: existing.props ?? existingNodeData.props,
+            tags: existing.tags ?? existingNodeData.tags,
+            isArchived: existing.isArchived ?? existingNodeData.isArchived,
+            archivedAt: existing.archivedAt ?? existingNodeData.archivedAt,
+            updatedAt: now,
+          });
+          logger.debug('Synced API data back to X6 node', { nodeId, type: existing.type });
+        }
         return;
       }
 
       const created = await createNode(
         buildCreatePayload(nodeId, graphId, resolvedCreatorName, node)
       );
-      setNodeData((prev) => (prev ? { ...prev, ...created } : created));
+
+      // Story 2.6 Fix: After creating node, also sync props and tags from X6 data
+      // This ensures pasted nodes have their props and tags saved to the database
+      const nodeData = node.getData() || {};
+      const nodeType = nodeData.nodeType || created.type;
+      const nodeProps = nodeData.props;
+      const nodeTags = nodeData.tags;
+
+      // Update props if they exist and are non-empty
+      if (nodeProps && Object.keys(nodeProps).length > 0 && nodeType && nodeType !== NodeType.ORDINARY) {
+        await updateNodeProps(nodeId, nodeType, nodeProps).catch((err) => {
+          logger.warn('Failed to save props for new node', { nodeId, error: err });
+        });
+      }
+
+      // Update tags if they exist and are non-empty
+      if (Array.isArray(nodeTags) && nodeTags.length > 0) {
+        await updateNodeTags(nodeId, nodeTags).catch((err) => {
+          logger.warn('Failed to save tags for new node', { nodeId, error: err });
+        });
+      }
+
+      setNodeData((prev) => (prev ? { ...prev, ...created, props: nodeProps, tags: nodeTags } : { ...created, props: nodeProps, tags: nodeTags }));
     } catch (error) {
       const errorInfo = error instanceof Error
         ? { message: error.message, stack: error.stack }

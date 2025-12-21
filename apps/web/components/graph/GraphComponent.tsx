@@ -20,6 +20,12 @@ import { CURSOR_UPDATE_THROTTLE_MS, DEFAULT_CREATOR_NAME } from '@/lib/constants
 import { isDependencyEdge, validateDependencyEdge, isTaskNode, getEdgeMetadata } from '@/lib/edgeValidation';
 import { NodeType, DependencyType } from '@cdm/types';
 import { useToast } from '@cdm/ui';
+// Story 2.6: Multi-Select & Clipboard
+import { useSelection } from '@/hooks/useSelection';
+import { useClipboard } from '@/hooks/useClipboard';
+import { useClipboardShortcuts } from '@/hooks/useClipboardShortcuts';
+import { useEditingState } from '@/hooks/useEditingState';
+import { ClipboardToolbar } from '@/components/toolbar/ClipboardToolbar';
 
 // Story 2.2: Dependency type options for context menu
 const DEPENDENCY_TYPES: { value: DependencyType; label: string; description: string }[] = [
@@ -98,6 +104,15 @@ export function GraphComponent({
         edge: Edge | null;
     }>({ visible: false, x: 0, y: 0, edge: null });
 
+    // Story 2.6: Node context menu state for clipboard operations
+    const [nodeContextMenu, setNodeContextMenu] = useState<{
+        visible: boolean;
+        x: number;
+        y: number;
+        graphX: number; // Graph coordinates for paste position
+        graphY: number;
+    }>({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0 });
+
     // Story 1.4 HIGH-3: Throttle cursor updates to prevent WebSocket flooding
     const lastCursorUpdateTime = useRef<number>(0);
 
@@ -129,6 +144,17 @@ export function GraphComponent({
         onGridToggle?.(gridEnabled);
     }, [gridEnabled, onGridToggle]);
 
+    // Story 2.6: Multi-Select & Clipboard hooks
+    const {
+        selectedNodes,
+        selectedNodeIds,
+        hasSelection,
+        selectNodes,
+        clearSelection,
+    } = useSelection({ graph });
+
+    const { isEditing } = useEditingState({ graph });
+
     // Collaboration session (shared across views) or local fallback
     const fallbackCollab = {
         yDoc: null,
@@ -149,6 +175,28 @@ export function GraphComponent({
         isSynced,
         syncStatus,
     } = collaboration ?? fallbackCollab;
+
+    // Story 2.6: Clipboard operations (depends on yDoc for undo support)
+    const { copy, cut, paste, deleteNodes } = useClipboard({
+        graph,
+        graphId,
+        yDoc,
+        undoManager: null, // TODO: Get from collaboration when available
+        selectedNodes,
+        selectNodes,
+        clearSelection,
+    });
+
+    // Story 2.6: Register clipboard keyboard shortcuts
+    useClipboardShortcuts({
+        copy,
+        cut,
+        paste,
+        deleteNodes,
+        hasSelection,
+        isEditing,
+        enabled: isReady,
+    });
 
     // Reset init flag when switching graphs
     useEffect(() => {
@@ -728,6 +776,41 @@ export function GraphComponent({
             graph.on('edge:unselected', handleEdgeUnselected);
             graph.on('edge:contextmenu', handleEdgeContextMenu);
 
+            // Story 2.6: Blank area context menu for paste at position
+            const handleBlankContextMenu = ({ e }: { e: MouseEvent }) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const graphPoint = graph.clientToLocal(e.clientX, e.clientY);
+                setNodeContextMenu({
+                    visible: true,
+                    x: e.clientX,
+                    y: e.clientY,
+                    graphX: graphPoint.x,
+                    graphY: graphPoint.y,
+                });
+            };
+
+            // Story 2.6: Node context menu for clipboard operations
+            const handleNodeContextMenu = ({ e, node }: { e: MouseEvent; node: Node }) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Select the node if not already selected
+                if (!graph.isSelected(node)) {
+                    graph.select(node);
+                }
+                const graphPoint = graph.clientToLocal(e.clientX, e.clientY);
+                setNodeContextMenu({
+                    visible: true,
+                    x: e.clientX,
+                    y: e.clientY,
+                    graphX: graphPoint.x,
+                    graphY: graphPoint.y,
+                });
+            };
+
+            graph.on('blank:contextmenu', handleBlankContextMenu);
+            graph.on('node:contextmenu', handleNodeContextMenu);
+
             // Cleanup function to remove event listeners
             return () => {
                 containerEl?.removeEventListener(
@@ -749,6 +832,9 @@ export function GraphComponent({
                     graph.off('edge:selected', handleEdgeSelected);
                     graph.off('edge:unselected', handleEdgeUnselected);
                     graph.off('edge:contextmenu', handleEdgeContextMenu);
+                    // Story 2.6: Cleanup context menu events
+                    graph.off('blank:contextmenu', handleBlankContextMenu);
+                    graph.off('node:contextmenu', handleNodeContextMenu);
                 }
             };
         }
@@ -796,6 +882,18 @@ export function GraphComponent({
                 {syncStatus === 'syncing' && '正在同步...'}
                 {syncStatus === 'offline' && '离线模式'}
                 {syncStatus === 'idle' && '未连接'}
+            </div>
+
+            {/* Story 2.6: Clipboard Toolbar */}
+            <div className="absolute top-4 right-4">
+                <ClipboardToolbar
+                    hasSelection={hasSelection}
+                    selectionCount={selectedNodeIds.length}
+                    onCopy={copy}
+                    onCut={cut}
+                    onPaste={() => paste()}
+                    disabled={!isReady}
+                />
             </div>
 
             {/* Story 2.2: Dependency Mode Indicator */}
@@ -884,6 +982,87 @@ export function GraphComponent({
                     </div>
                 </>
             )}
+
+            {/* Story 2.6: Node/Blank Context Menu for Clipboard Operations */}
+            {nodeContextMenu.visible && (
+                <>
+                    {/* Backdrop to close menu */}
+                    <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0 })}
+                    />
+                    {/* Context Menu */}
+                    <div
+                        className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[160px]"
+                        style={{
+                            left: nodeContextMenu.x,
+                            top: nodeContextMenu.y,
+                        }}
+                    >
+                        {/* Copy - only when has selection */}
+                        {hasSelection && (
+                            <button
+                                onClick={() => {
+                                    copy();
+                                    setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0 });
+                                }}
+                                className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
+                            >
+                                <span className="w-4">📋</span>
+                                复制
+                                <span className="ml-auto text-xs text-gray-400">⌘C</span>
+                            </button>
+                        )}
+
+                        {/* Cut - only when has selection */}
+                        {hasSelection && (
+                            <button
+                                onClick={() => {
+                                    cut();
+                                    setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0 });
+                                }}
+                                className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
+                            >
+                                <span className="w-4">✂️</span>
+                                剪切
+                                <span className="ml-auto text-xs text-gray-400">⌘X</span>
+                            </button>
+                        )}
+
+                        {/* Separator */}
+                        {hasSelection && <div className="border-t border-gray-100 my-1" />}
+
+                        {/* Paste - always available, uses click position */}
+                        <button
+                            onClick={() => {
+                                paste({ x: nodeContextMenu.graphX, y: nodeContextMenu.graphY });
+                                setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0 });
+                            }}
+                            className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
+                        >
+                            <span className="w-4">📥</span>
+                            粘贴到此处
+                            <span className="ml-auto text-xs text-gray-400">⌘V</span>
+                        </button>
+
+                        {/* Select All */}
+                        <button
+                            onClick={() => {
+                                if (graph) {
+                                    const allNodes = graph.getNodes();
+                                    graph.select(allNodes);
+                                }
+                                setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0 });
+                            }}
+                            className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
+                        >
+                            <span className="w-4">☑️</span>
+                            全选
+                            <span className="ml-auto text-xs text-gray-400">⌘A</span>
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
@@ -904,6 +1083,8 @@ function createChildNode(graph: Graph, parentNode: Node): void {
         ensureNodeTimestamps(newNode);
         // Store batchId in node data so MindNode can stop it on commit
         newNode.setData({ ...newNode.getData(), _batchId: batchId });
+        // Clear existing selection before selecting new node (Story 2.6: maintain single-select for node creation)
+        graph.unselect(graph.getSelectedCells());
         graph.select(newNode);
     } else {
         // If node creation failed, stop batch immediately
@@ -922,6 +1103,8 @@ function createSiblingOrChildNode(graph: Graph, selectedNode: Node): void {
         ensureNodeTimestamps(newNode);
         // Store batchId in node data so MindNode can stop it on commit
         newNode.setData({ ...newNode.getData(), _batchId: batchId });
+        // Clear existing selection before selecting new node (Story 2.6: maintain single-select for node creation)
+        graph.unselect(graph.getSelectedCells());
         graph.select(newNode);
     } else {
         // If node creation failed, stop batch immediately
@@ -948,6 +1131,8 @@ function ensureNodeTimestamps(node: Node): void {
 function navigateToPrevSibling(graph: Graph, currentNode: Node): void {
     const prevSibling = navigationCommand.navigateUp(graph, currentNode);
     if (prevSibling) {
+        // Clear existing selection before selecting target (Story 2.6: maintain single-select for navigation)
+        graph.unselect(graph.getSelectedCells());
         graph.select(prevSibling);
     }
 }
@@ -956,6 +1141,8 @@ function navigateToPrevSibling(graph: Graph, currentNode: Node): void {
 function navigateToNextSibling(graph: Graph, currentNode: Node): void {
     const nextSibling = navigationCommand.navigateDown(graph, currentNode);
     if (nextSibling) {
+        // Clear existing selection before selecting target (Story 2.6: maintain single-select for navigation)
+        graph.unselect(graph.getSelectedCells());
         graph.select(nextSibling);
     }
 }
@@ -964,6 +1151,8 @@ function navigateToNextSibling(graph: Graph, currentNode: Node): void {
 function navigateToParent(graph: Graph, currentNode: Node): void {
     const parent = navigationCommand.navigateLeft(graph, currentNode);
     if (parent) {
+        // Clear existing selection before selecting target (Story 2.6: maintain single-select for navigation)
+        graph.unselect(graph.getSelectedCells());
         graph.select(parent);
     }
 }
@@ -972,6 +1161,8 @@ function navigateToParent(graph: Graph, currentNode: Node): void {
 function navigateToFirstChild(graph: Graph, currentNode: Node): void {
     const firstChild = navigationCommand.navigateRight(graph, currentNode);
     if (firstChild) {
+        // Clear existing selection before selecting target (Story 2.6: maintain single-select for navigation)
+        graph.unselect(graph.getSelectedCells());
         graph.select(firstChild);
     }
 }

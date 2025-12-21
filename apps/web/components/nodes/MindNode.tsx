@@ -139,6 +139,9 @@ export function MindNode({ node }: MindNodeProps) {
   const [label, setLabel] = useState(() => getData().label ?? '');
   const [description, setDescription] = useState(() => getData().description ?? '');
 
+  // Story 2.6 Fix: State for tags to trigger re-render when tags change
+  const [tags, setTags] = useState<string[]>(() => getData().tags ?? []);
+
   // Sync state with node data
   useEffect(() => {
     if (!node) return;
@@ -146,6 +149,8 @@ export function MindNode({ node }: MindNodeProps) {
       const data = (node.getData() as MindNodeData) ?? DEFAULT_DATA;
       setIsEditing(!!data.isEditing);
       setIsSelected(!!data.isSelected);
+      // Story 2.6 Fix: Always update tags to ensure UI reflects changes
+      setTags(data.tags ?? []);
       if (!data.isEditing) {
         setLabel(data.label ?? '');
         setDescription(data.description ?? '');
@@ -252,10 +257,15 @@ export function MindNode({ node }: MindNodeProps) {
     const labelChanged = label !== prevData.label;
     const descriptionChanged = description !== (prevData.description ?? '');
 
+    // CRITICAL: Preserve ALL existing node data when updating label/description
+    // X6's setData() REPLACES data, so we must spread existing data first
+    // Story 2.6 Fix: Prevents loss of nodeType, props, tags when editing label
     node.setData({
+      ...prevData,  // Preserve existing nodeType, props, tags, parentId, etc.
       label,
       description,
-      isEditing: false
+      isEditing: false,
+      updatedAt: new Date().toISOString(),
     } as Partial<MindNodeData>);
     setIsEditing(false);
 
@@ -281,7 +291,9 @@ export function MindNode({ node }: MindNodeProps) {
     const d = getData();
     setLabel(d.label ?? '');
     setDescription(d.description ?? '');
-    node.setData({ isEditing: false } as Partial<MindNodeData>);
+    // CRITICAL: Preserve ALL existing node data when canceling edit
+    // X6's setData() REPLACES data, so we must spread existing data first
+    node.setData({ ...d, isEditing: false } as Partial<MindNodeData>);
     setIsEditing(false);
   }, [getData, node]);
 
@@ -419,9 +431,10 @@ export function MindNode({ node }: MindNodeProps) {
           ) : <div />}
 
           {/* Story 2.5: Tag badges (max 2, then +N) */}
-          {data.tags && data.tags.length > 0 && (
+          {/* Story 2.6 Fix: Use tags state variable to ensure re-render on tag changes */}
+          {tags && tags.length > 0 && (
             <div className="flex items-center gap-0.5 overflow-hidden">
-              {data.tags.slice(0, 2).map((tag: string) => (
+              {tags.slice(0, 2).map((tag: string) => (
                 <button
                   key={tag}
                   onClick={(e) => {
@@ -443,9 +456,9 @@ export function MindNode({ node }: MindNodeProps) {
                   #{tag}
                 </button>
               ))}
-              {data.tags.length > 2 && (
+              {tags.length > 2 && (
                 <span className="text-[8px] text-gray-400 flex-shrink-0">
-                  +{data.tags.length - 2}
+                  +{tags.length - 2}
                 </span>
               )}
             </div>

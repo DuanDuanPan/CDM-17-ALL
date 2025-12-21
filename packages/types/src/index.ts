@@ -78,3 +78,7 @@ export * from './notification-types';
 
 // Story 2.5: Export search types for data organization & search
 export * from './search-types';
+
+// Story 2.6: Export clipboard types for multi-select & copy/cut/paste
+export * from './clipboard-types';
+
