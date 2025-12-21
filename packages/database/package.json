@@ -13,7 +13,11 @@
     "db:push": "dotenv -e ../../.env -- prisma db push",
     "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "db:studio": "dotenv -e ../../.env -- prisma studio",
+    "db:seed": "dotenv -e ../../.env -- npx tsx prisma/seed.ts",
     "build": "prisma generate"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.9.0"
@@ -22,6 +26,7 @@
     "@types/node": "^22.0.0",
     "dotenv-cli": "^11.0.0",
     "prisma": "^6.9.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.0"
   }
 }

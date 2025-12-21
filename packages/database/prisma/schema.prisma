@@ -28,7 +28,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  projects Project[]
+  projects      Project[]
+  notifications Notification[] // Story 2.4: Task dispatch notifications
 }
 
 model Project {
@@ -92,6 +93,7 @@ model Node {
 
 // Story 2.1: Extension Tables for Polymorphic Node Properties
 // Story 2.3: Added startDate, customStage, progress for Multi-View Synchronization
+// Story 2.4: Added assignment dispatch & feedback fields
 model NodeTask {
   nodeId   String   @id
   node     Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
@@ -103,6 +105,13 @@ model NodeTask {
   priority    String?  @default("medium") // low, medium, high
   customStage String?  // Story 2.3: Dynamic Kanban grouping field
   progress    Int?     @default(0) // Story 2.3: 0-100 percentage for Gantt progress bar
+
+  // Story 2.4: Task dispatch & feedback fields
+  assignmentStatus String    @default("idle") // idle, dispatched, accepted, rejected
+  ownerId          String? // 任务创建者/下发者 ID
+  rejectionReason  String? // 驳回理由
+  dispatchedAt     DateTime? // 下发时间
+  feedbackAt       DateTime? // 反馈时间
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -164,4 +173,23 @@ model Edge {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Story 2.4: Notification Model for task dispatch & feedback
+model Notification {
+  id          String   @id @default(cuid())
+  recipientId String
+  recipient   User     @relation(fields: [recipientId], references: [id])
+
+  type      String // TASK_DISPATCH | TASK_ACCEPTED | TASK_REJECTED
+  title     String
+  content   Json // { taskId, taskName, action, senderName, reason? }
+  refNodeId String? // 关联的节点 ID (用于点击跳转)
+  isRead    Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([recipientId, isRead])
+  @@index([recipientId, createdAt])
 }

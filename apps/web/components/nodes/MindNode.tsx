@@ -9,11 +9,14 @@ import {
   Database,
   MoreHorizontal,
   Lock,
-  User
+  User,
+  Send,
+  AlertCircle,
+  Clock
 } from 'lucide-react';
 import { NodeType, type TaskProps, type RequirementProps, type PBSProps, type DataProps } from '@cdm/types';
 import type { MindNodeData } from '@cdm/types';
-import { updateNodeProps } from '@/lib/api/nodes';
+import { updateNode } from '@/lib/api/nodes';
 import { graphLogger as logger } from '@/lib/logger';
 
 type MindNodeOperation = 'addChild' | 'addSibling';
@@ -39,6 +42,16 @@ function dispatchNodeOperation(
     new CustomEvent('mindmap:node-operation', {
       bubbles: true,
       detail: { action, nodeId },
+    })
+  );
+}
+
+// Dispatch batch-stop event to finalize undo grouping after node creation+editing
+function dispatchBatchStop(el: HTMLElement, nodeId: string) {
+  el.dispatchEvent(
+    new CustomEvent('mindmap:batch-stop', {
+      bubbles: true,
+      detail: { nodeId },
     })
   );
 }
@@ -159,6 +172,10 @@ export function MindNode({ node }: MindNodeProps) {
   const isTaskDone = nodeType === NodeType.TASK && taskProps?.status === 'done';
   const styles = getTypeConfig(nodeType, isTaskDone);
 
+  // Story 2.4: Assignment status indicator
+  const assignmentStatus = taskProps?.assignmentStatus;
+  const showAssignmentIndicator = nodeType === NodeType.TASK && assignmentStatus && assignmentStatus !== 'idle';
+
   // Dynamic pills based on props
   let pill = styles.pill;
   if (nodeType === NodeType.REQUIREMENT) {
@@ -224,15 +241,38 @@ export function MindNode({ node }: MindNodeProps) {
   }, []);
 
   const commit = useCallback(() => {
+    // Dispatch batch-stop event to finalize undo grouping (if this node was just created)
+    const el = containerRef.current;
+    if (el) {
+      dispatchBatchStop(el, node.id);
+    }
+
+    // Get previous data to check if label changed
+    const prevData = getData();
+    const labelChanged = label !== prevData.label;
+
     node.setData({
       label,
       description,
       isEditing: false
     } as Partial<MindNodeData>);
     setIsEditing(false);
-  }, [node, label, description]);
+
+    // Sync label to database if changed
+    if (labelChanged && node.id) {
+      updateNode(node.id, { label }).catch((err) => {
+        console.error('[MindNode] Failed to sync label to database:', err);
+      });
+    }
+  }, [node, label, description, getData]);
 
   const cancel = useCallback(() => {
+    // Dispatch batch-stop event to finalize undo grouping (if this node was just created)
+    const el = containerRef.current;
+    if (el) {
+      dispatchBatchStop(el, node.id);
+    }
+
     const d = getData();
     setLabel(d.label ?? '');
     setDescription(d.description ?? '');
@@ -363,14 +403,49 @@ export function MindNode({ node }: MindNodeProps) {
         </div>
       )}
 
-      {/* === FOOTER (Pill + ID) === */}
+      {/* === FOOTER (Pill + Assignment + ID) === */}
       <div className="w-full flex items-center justify-between mt-1.5 pt-1.5 border-t border-gray-100">
         {/* Left: Status Pill */}
-        {pill ? (
-          <div className={`px-1.5 py-0.5 rounded text-[9px] font-medium leading-none ${pill.bg} ${pill.text}`}>
-            {pill.label}
-          </div>
-        ) : <div />}
+        <div className="flex items-center gap-1">
+          {pill ? (
+            <div className={`px-1.5 py-0.5 rounded text-[9px] font-medium leading-none ${pill.bg} ${pill.text}`}>
+              {pill.label}
+            </div>
+          ) : <div />}
+
+          {/* Story 2.4: Assignment Status Badge */}
+          {showAssignmentIndicator && (
+            <div
+              className={`flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-medium leading-none ${
+                assignmentStatus === 'accepted'
+                  ? 'bg-green-100 text-green-700'
+                  : assignmentStatus === 'dispatched'
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : assignmentStatus === 'rejected'
+                      ? 'bg-red-100 text-red-700'
+                      : ''
+              }`}
+              title={
+                assignmentStatus === 'accepted'
+                  ? '已接受'
+                  : assignmentStatus === 'dispatched'
+                    ? '待确认'
+                    : assignmentStatus === 'rejected'
+                      ? '已驳回'
+                      : ''
+              }
+            >
+              {assignmentStatus === 'accepted' && <CheckCircle className="w-2 h-2" />}
+              {assignmentStatus === 'dispatched' && <Clock className="w-2 h-2" />}
+              {assignmentStatus === 'rejected' && <AlertCircle className="w-2 h-2" />}
+              <span className="hidden sm:inline">
+                {assignmentStatus === 'accepted' && '已接受'}
+                {assignmentStatus === 'dispatched' && '待确认'}
+                {assignmentStatus === 'rejected' && '驳回'}
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* Right: Meta ID (Always visible for engineering context) */}
         <div className="flex items-center gap-1">

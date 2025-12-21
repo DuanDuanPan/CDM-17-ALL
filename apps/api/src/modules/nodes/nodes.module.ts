@@ -1,6 +1,7 @@
 /**
  * Story 2.1: Nodes Module
  * Provides node management functionality with polymorphic type support
+ * Story 2.4: Added NotificationModule for task dispatch & feedback
  */
 
 import { Module } from '@nestjs/common';
@@ -15,8 +16,10 @@ import { TaskService } from './services/task.service';
 import { RequirementService } from './services/requirement.service';
 import { PBSService } from './services/pbs.service';
 import { DataService } from './services/data.service';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
+  imports: [NotificationModule], // Story 2.4: Import for task dispatch notifications
   controllers: [NodesController],
   providers: [
     NodesService,

@@ -38,7 +38,11 @@ class NodePropsValidator implements ValidatorConstraintInterface {
 
     const allowedKeys: Record<NodeType, string[]> = {
       [NodeType.ORDINARY]: [],
-      [NodeType.TASK]: ['status', 'assigneeId', 'dueDate', 'priority', 'startDate', 'customStage', 'progress'],
+      [NodeType.TASK]: [
+        'status', 'assigneeId', 'dueDate', 'priority', 'startDate', 'customStage', 'progress',
+        // Story 2.4: Task dispatch & feedback fields
+        'assignmentStatus', 'ownerId', 'rejectionReason', 'dispatchedAt', 'feedbackAt'
+      ],
       [NodeType.REQUIREMENT]: ['reqType', 'acceptanceCriteria', 'priority'],
       [NodeType.PBS]: ['code', 'version', 'ownerId'],
       [NodeType.DATA]: ['dataType', 'version', 'secretLevel', 'storagePath'],
@@ -126,4 +130,17 @@ export class UpdateNodePropsDto {
   @IsObject()
   @Validate(NodePropsValidator)
   props!: NodeProps;
+}
+
+/**
+ * Story 2.4: Feedback DTO for task accept/reject
+ * [AI-Review][MEDIUM-5] Added proper validation for feedback action
+ */
+export class FeedbackTaskDto {
+  @IsEnum(['accept', 'reject'] as const)
+  action!: 'accept' | 'reject';
+
+  @IsString()
+  @IsOptional()
+  reason?: string;
 }

@@ -60,4 +60,4 @@ export { Repository } from './Repository';
 export { Database, db } from './Database';
 
 // Re-export Prisma generated types (available after prisma generate)
-export type { User, Project, Graph, Node, Edge } from '@prisma/client';
+export type { User, Project, Graph, Node, Edge, Notification, Prisma } from '@prisma/client';

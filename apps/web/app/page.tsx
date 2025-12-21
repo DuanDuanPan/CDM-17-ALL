@@ -5,7 +5,8 @@ import { TopBar, LeftSidebar, RightSidebar } from '@/components/layout';
 import type { Graph } from '@antv/x6';
 import { LayoutMode } from '@cdm/types';
 // Story 1.4 MED-12: Use Context for collaboration UI state
-import { CollaborationUIProvider } from '@/contexts';
+// Story 2.4: GraphProvider for notification navigation
+import { CollaborationUIProvider, GraphProvider } from '@/contexts';
 import { collabLogger as logger } from '@/lib/logger';
 import { useViewStore } from '@/features/views';
 import { ViewContainer } from '@/features/views';
@@ -18,9 +19,10 @@ import {
 } from '@/lib/constants';
 
 // Story 1.4: Demo user for collaboration (in production, use Clerk auth)
+// Story 2.4: Use 'test1' to match seed data for notifications
 const DEMO_USER = {
-  id: 'user-demo-' + Math.random().toString(36).substr(2, 9),
-  name: '演示用户',
+  id: 'test1',
+  name: 'Test User 1',
   color: '#3b82f6',
 };
 
@@ -111,56 +113,59 @@ export default function Home() {
       onUserHoverExternal={handleUserHover}
       onUserClickExternal={handleUserClick}
     >
-      <div className="flex flex-col h-screen">
-        {/* Top Bar - Story 1.4 MED-12: Now uses Context for remoteUsers */}
-        <TopBar
-          projectName="未命名项目"
-          currentLayout={layoutMode}
-          onLayoutChange={handleLayoutChange}
-          onGridToggle={handleGridToggle}
-          gridEnabled={gridEnabled}
-          isLoading={isLayoutLoading}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-        />
-
-        {/* Main content area with three columns */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left Sidebar - Component Library + Story 2.2: Dependency Mode */}
-          <LeftSidebar
-            isDependencyMode={isDependencyMode}
-            onDependencyModeToggle={handleDependencyModeToggle}
+      {/* Story 2.4: GraphProvider enables notification click navigation */}
+      <GraphProvider graph={graph} onNodeSelect={handleNodeSelect}>
+        <div className="flex flex-col h-screen">
+          {/* Top Bar - Story 1.4 MED-12: Now uses Context for remoteUsers */}
+          <TopBar
+            projectName="未命名项目"
+            currentLayout={layoutMode}
+            onLayoutChange={handleLayoutChange}
+            onGridToggle={handleGridToggle}
+            gridEnabled={gridEnabled}
+            isLoading={isLayoutLoading}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
           />
 
-          {/* Center Canvas - Story 1.4 MED-12: Uses Context to report remote users */}
-          {/* Story 2.2: Pass dependency mode for edge creation */}
-          <main className="flex-1 relative overflow-hidden">
-            <ViewContainer
-              graphId={DEMO_GRAPH_ID}
-              user={DEMO_USER}
-              collaboration={collab}
-              onNodeSelect={handleNodeSelect}
-              onLayoutChange={handleLayoutChange}
-              onGridToggle={handleGridToggle}
-              currentLayout={layoutMode}
-              gridEnabled={gridEnabled}
-              onGraphReady={setGraph}
+          {/* Main content area with three columns */}
+          <div className="flex flex-1 overflow-hidden">
+            {/* Left Sidebar - Component Library + Story 2.2: Dependency Mode */}
+            <LeftSidebar
               isDependencyMode={isDependencyMode}
-              onExitDependencyMode={() => setIsDependencyMode(false)}
+              onDependencyModeToggle={handleDependencyModeToggle}
             />
-          </main>
 
-          {/* Right Sidebar - Property Panel */}
-          <RightSidebar
-            selectedNodeId={selectedNodeId}
-            graph={graph}
-            graphId={DEMO_GRAPH_ID}
-            yDoc={collab.yDoc}
-            creatorName={DEMO_USER.name}
-            onClose={handleClosePanel}
-          />
+            {/* Center Canvas - Story 1.4 MED-12: Uses Context to report remote users */}
+            {/* Story 2.2: Pass dependency mode for edge creation */}
+            <main className="flex-1 relative overflow-hidden">
+              <ViewContainer
+                graphId={DEMO_GRAPH_ID}
+                user={DEMO_USER}
+                collaboration={collab}
+                onNodeSelect={handleNodeSelect}
+                onLayoutChange={handleLayoutChange}
+                onGridToggle={handleGridToggle}
+                currentLayout={layoutMode}
+                gridEnabled={gridEnabled}
+                onGraphReady={setGraph}
+                isDependencyMode={isDependencyMode}
+                onExitDependencyMode={() => setIsDependencyMode(false)}
+              />
+            </main>
+
+            {/* Right Sidebar - Property Panel */}
+            <RightSidebar
+              selectedNodeId={selectedNodeId}
+              graph={graph}
+              graphId={DEMO_GRAPH_ID}
+              yDoc={collab.yDoc}
+              creatorName={DEMO_USER.name}
+              onClose={handleClosePanel}
+            />
+          </div>
         </div>
-      </div>
+      </GraphProvider>
     </CollaborationUIProvider>
   );
 }

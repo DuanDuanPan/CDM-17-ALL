@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Graph, Selection } from '@antv/x6';
+import { Graph, Selection, History } from '@antv/x6';
 
 export interface UseGraphOptions {
   container: HTMLElement | null;
@@ -80,6 +80,14 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
         showEdgeSelectionBox: false, // Story 2.2: Disable box, use highlight instead
         pointerEvents: 'none', // Critical: Selection box should not block interactions
         strict: true, // Only select if fully enclosed (for rubberband) or precise click
+      })
+    );
+
+    // Enable History plugin for undo/redo functionality (Ctrl+Z / Ctrl+Y)
+    graph.use(
+      new History({
+        enabled: true,
+        stackSize: 50, // Limit history stack to 50 operations
       })
     );
 

@@ -157,13 +157,19 @@ export function useCollaboration(config: CollaborationConfig): UseCollaborationR
                 setSyncStatus('syncing'); // MED-6: Start syncing
                 setError(null);
             },
-            onClose: () => {
+            onClose: ({ event }) => {
                 logger.info('Disconnected from collaboration server');
                 setIsConnected(false);
                 setIsSynced(false);
                 setSyncStatus('offline'); // MED-6: Mark as offline
+
+                // Suppress error logging for expected connection failures
+                if (event?.code === 1006) {
+                    // Connection failed - server likely not running
+                    logger.debug('Collaboration server not available (this is expected in development if backend is not running)');
+                }
             },
-            onDisconnect: () => {
+            onDisconnect: ({ event }) => {
                 logger.info('WebSocket disconnected');
                 setIsConnected(false);
                 setIsSynced(false);
@@ -174,6 +180,11 @@ export function useCollaboration(config: CollaborationConfig): UseCollaborationR
                 setIsSynced(true);
                 setSyncStatus('synced'); // MED-6: Sync complete
             },
+            // Reduce reconnection attempts to prevent console spam
+            maxReconnectTimeout: 5000,
+            minReconnectTimeout: 1000,
+            // Quiet mode - suppress console warnings for connection errors
+            quiet: true,
         });
 
         providerRef.current = provider;

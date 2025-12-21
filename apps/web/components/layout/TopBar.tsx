@@ -4,11 +4,14 @@ import { Menu, Share2, Settings } from 'lucide-react';
 import { LayoutSwitcher } from '../toolbar/LayoutSwitcher';
 import { ViewSwitcher } from '@/features/views';
 import { ActiveUsersAvatarStack } from '../collab/ActiveUsersAvatarStack';
+import { NotificationBell } from '../notifications';
 import { LayoutMode } from '@cdm/types';
 // Story 1.4 MED-12: Use Context instead of props drilling
-import { useCollaborationUIOptional } from '@/contexts';
+import { useCollaborationUIOptional, useGraphContextOptional } from '@/contexts';
 // Story 1.4 LOW-1: Use centralized constants
 import { MAX_VISIBLE_AVATARS } from '@/lib/constants';
+// Story 2.4: Notification system
+import { useNotifications } from '@/hooks/useNotifications';
 
 export interface TopBarProps {
   projectName?: string;
@@ -45,8 +48,29 @@ export function TopBar({
   const onUserHover = collabContext?.onUserHover;
   const onUserClick = collabContext?.onUserClick;
 
+  // Story 2.4: Get graph context for node navigation
+  const graphContext = useGraphContextOptional();
+  const navigateToNode = graphContext?.navigateToNode;
+
+  // Story 2.4: Notification system
+  const {
+    notifications,
+    unreadCount,
+    isConnected,
+    markAsRead,
+    markAllAsRead,
+    refresh,
+    isLoading: notificationsLoading,
+  } = useNotifications({
+    userId: 'test1', // 默认查看 test1 的通知
+    // Disable WebSocket in development to prevent console spam when backend isn't running
+    // The hook will automatically fall back to polling
+    enableWebSocket: process.env.NEXT_PUBLIC_ENABLE_WS === 'true',
+    enablePolling: true,
+  });
+
   return (
-    <header className="h-12 border-b border-gray-200/50 bg-white/70 backdrop-blur-md flex items-center justify-between px-4">
+    <header className="h-12 border-b border-gray-200/50 bg-white/70 backdrop-blur-md flex items-center justify-between px-4 relative z-10">
       {/* Left section */}
       <div className="flex items-center gap-3">
         <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -93,6 +117,17 @@ export function TopBar({
 
         {/* Action buttons */}
         <div className="flex items-center gap-2">
+          {/* Story 2.4: Notification Bell */}
+          <NotificationBell
+            unreadCount={unreadCount}
+            notifications={notifications}
+            isConnected={isConnected}
+            isLoading={notificationsLoading}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
+            onRefresh={refresh}
+            onNavigate={navigateToNode}
+          />
           <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <Share2 className="w-4 h-4 text-gray-600" />
           </button>

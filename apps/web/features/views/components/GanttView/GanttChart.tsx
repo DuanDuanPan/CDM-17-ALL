@@ -147,6 +147,7 @@ function GanttChartBase({
     // Dynamic import for dhtmlx-gantt (client-side only)
     const initGantt = async () => {
       const { gantt } = await import('dhtmlx-gantt');
+      // @ts-ignore - CSS import for dhtmlx-gantt
       await import('dhtmlx-gantt/codebase/dhtmlxgantt.css');
 
       ganttRef.current = gantt;
@@ -162,7 +163,7 @@ function GanttChartBase({
       // Attach event handlers
       gantt.attachEvent('onAfterTaskDrag', (id: string, mode: string) => {
         const task = gantt.getTask(id);
-        if (task) {
+        if (task && task.start_date && task.end_date) {
           updateTaskDates(
             id,
             new Date(task.start_date),
@@ -183,7 +184,7 @@ function GanttChartBase({
 
       gantt.attachEvent('onAfterTaskUpdate', (id: string) => {
         const task = gantt.getTask(id);
-        if (task) {
+        if (task && task.progress !== undefined) {
           // Update progress
           updateTaskProgress(id, task.progress);
         }
@@ -621,6 +622,8 @@ function configureGantt(
       mfo: '必须在...结束',
       resources_filter_placeholder: '搜索',
       resources_filter_label: '隐藏空闲',
+      section_deadline: '截止日期',
+      section_baselines: '基准',
     },
   };
 }

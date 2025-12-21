@@ -18,6 +18,9 @@ export enum NodeType {
 // Task Status Enum - for type safety across views
 export type TaskStatus = 'todo' | 'in-progress' | 'done';
 
+// Story 2.4: Assignment Status for task dispatch & feedback
+export type AssignmentStatus = 'idle' | 'dispatched' | 'accepted' | 'rejected';
+
 // Task Node Properties
 export interface TaskProps {
   status?: TaskStatus;
@@ -27,6 +30,13 @@ export interface TaskProps {
   priority?: 'low' | 'medium' | 'high' | null;
   customStage?: string | null; // Story 2.3: Dynamic Kanban grouping field
   progress?: number | null; // Story 2.3: 0-100 percentage for Gantt progress bar
+
+  // Story 2.4: Task dispatch & feedback fields
+  assignmentStatus?: AssignmentStatus; // 下发状态 (默认 'idle')
+  ownerId?: string | null; // 任务创建者/下发者 ID
+  rejectionReason?: string | null; // 驳回理由
+  dispatchedAt?: string | null; // 下发时间 (ISO 8601)
+  feedbackAt?: string | null; // 接收/驳回时间 (ISO 8601)
 }
 
 // Requirement Node Properties
@@ -155,6 +165,12 @@ export const TaskPropsSchema = z
     priority: z.enum(['low', 'medium', 'high']).nullable().optional(),
     customStage: z.string().nullable().optional(), // Story 2.3: Dynamic Kanban grouping
     progress: z.number().min(0).max(100).nullable().optional(), // Story 2.3: Gantt progress
+    // Story 2.4: Task dispatch & feedback fields
+    assignmentStatus: z.enum(['idle', 'dispatched', 'accepted', 'rejected']).optional(),
+    ownerId: z.string().nullable().optional(),
+    rejectionReason: z.string().nullable().optional(),
+    dispatchedAt: z.string().nullable().optional(),
+    feedbackAt: z.string().nullable().optional(),
   })
   .strict();
 

@@ -21,4 +21,29 @@ export class NodeTaskRepository {
       update: data,
     });
   }
+
+  // Story 2.4: Additional methods for task dispatch & feedback
+  async findByNodeId(nodeId: string): Promise<any> {
+    return prisma.nodeTask.findUnique({
+      where: { nodeId },
+      include: { node: true },
+    });
+  }
+
+  async update(
+    nodeId: string,
+    data: {
+      assignmentStatus?: string;
+      ownerId?: string | null;
+      rejectionReason?: string | null;
+      dispatchedAt?: Date | null;
+      feedbackAt?: Date | null;
+      status?: string;
+    }
+  ): Promise<any> {
+    return prisma.nodeTask.update({
+      where: { nodeId },
+      data,
+    });
+  }
 }

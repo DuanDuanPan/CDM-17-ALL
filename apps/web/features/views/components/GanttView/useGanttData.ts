@@ -17,7 +17,7 @@
 
 import { useMemo, useCallback, useEffect, useState } from 'react';
 import type * as Y from 'yjs';
-import { NodeType } from '@cdm/types';
+import { NodeType, type TaskProps } from '@cdm/types';
 import type { YjsNodeData, YjsEdgeData } from '@/features/collab/GraphSyncManager';
 import { useGanttState } from '../../stores/useViewStore';
 
@@ -274,7 +274,7 @@ export function useGanttData(yDoc: Y.Doc | null): UseGanttDataReturn {
       if (node.nodeType !== NodeType.TASK) return;
       totalTaskCount += 1;
 
-      const props = node.props || {};
+      const props = (node.props || {}) as TaskProps;
       const startDate = parseDate(props.startDate as string | undefined);
       const dueDate = parseDate(props.dueDate as string | undefined);
       const progress = typeof props.progress === 'number' ? props.progress / 100 : 0;

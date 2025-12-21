@@ -6,19 +6,24 @@
 
 import { Controller, Get, Post, Patch, Param, Body, HttpCode, HttpStatus, UsePipes } from '@nestjs/common';
 import { NodesService } from './nodes.service';
+import { TaskService } from './services/task.service';
 import { NodeResponse, NodeTypeChangeResponse, UpdateNodePropsSchema } from '@cdm/types';
 import {
   CreateNodeDto,
   UpdateNodeDto,
   UpdateNodeTypeDto,
   UpdateNodePropsDto,
+  FeedbackTaskDto,
 } from './nodes.request.dto';
 import { ZodValidationPipe } from '../../pipes/zod-validation.pipe';
 
 // [AI-Review-2][HIGH-2] Fixed: Removed 'api/' prefix (global prefix already set in main.ts)
 @Controller('nodes')
 export class NodesController {
-  constructor(private readonly nodesService: NodesService) { }
+  constructor(
+    private readonly nodesService: NodesService,
+    private readonly taskService: TaskService
+  ) { }
 
   /**
    * Create a new node
@@ -68,5 +73,31 @@ export class NodesController {
   @UsePipes(new ZodValidationPipe(UpdateNodePropsSchema))
   async updateNodeProperties(@Param('id') id: string, @Body() dto: UpdateNodePropsDto): Promise<NodeResponse> {
     return this.nodesService.updateNodeProps(id, dto);
+  }
+
+  /**
+   * Dispatch task to assignee
+   * POST /api/nodes/:id:dispatch
+   * Story 2.4 AC#1
+   */
+  @Post(':id\\:dispatch')
+  async dispatchTask(@Param('id') nodeId: string) {
+    const user = { id: 'test1' }; // TODO: Replace with @CurrentUser() after Clerk integration
+    return this.taskService.dispatchTask(nodeId, user.id);
+  }
+
+  /**
+   * Accept or reject dispatched task
+   * POST /api/nodes/:id:feedback
+   * Story 2.4 AC#2, AC#3
+   * [AI-Review][MEDIUM-5] Fixed: Using FeedbackTaskDto for proper validation
+   */
+  @Post(':id\\:feedback')
+  async feedbackTask(
+    @Param('id') nodeId: string,
+    @Body() body: FeedbackTaskDto
+  ) {
+    const user = { id: 'test1' }; // TODO: Replace with @CurrentUser() after Clerk integration
+    return this.taskService.feedbackTask(nodeId, user.id, body.action, body.reason);
   }
 }

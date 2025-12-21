@@ -45,3 +45,6 @@ next-env.d.ts
 # Playwright artifacts
 apps/web/playwright-report
 apps/web/test-results
+
+# Claude
+.claude/audio

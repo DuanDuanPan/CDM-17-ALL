@@ -68,3 +68,6 @@ export * from './node-types';
 
 // Story 2.2: Export edge types for dependency management
 export * from './edge-types';
+
+// Story 2.4: Export notification types for task dispatch & feedback
+export * from './notification-types';

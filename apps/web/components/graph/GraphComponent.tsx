@@ -156,8 +156,22 @@ export function GraphComponent({
     }, [graphId]);
 
     // Story 1.4 MED-12: Report remote users to context (for TopBar)
+    // Use ref to track previous value and avoid infinite loop
+    const prevRemoteUsersRef = useRef<typeof remoteUsers>([]);
+
     useEffect(() => {
-        if (collabUIContext?.setRemoteUsers) {
+        if (!collabUIContext?.setRemoteUsers) return;
+
+        // Only update if the array actually changed (deep comparison by ID)
+        const hasChanged = remoteUsers.length !== prevRemoteUsersRef.current.length ||
+            remoteUsers.some((user, index) =>
+                user.id !== prevRemoteUsersRef.current[index]?.id ||
+                user.name !== prevRemoteUsersRef.current[index]?.name ||
+                user.color !== prevRemoteUsersRef.current[index]?.color
+            );
+
+        if (hasChanged) {
+            prevRemoteUsersRef.current = remoteUsers;
             collabUIContext.setRemoteUsers(remoteUsers);
         }
     }, [remoteUsers, collabUIContext]);
@@ -339,6 +353,26 @@ export function GraphComponent({
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
             if (!graph || !isReady) return;
+
+            // Undo: Ctrl+Z (or Cmd+Z on Mac)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (graph.canUndo()) {
+                    graph.undo();
+                }
+                return;
+            }
+
+            // Redo: Ctrl+Y or Ctrl+Shift+Z (or Cmd+Shift+Z on Mac)
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y' || ((e.key === 'z' || e.key === 'Z') && e.shiftKey))) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (graph.canRedo()) {
+                    graph.redo();
+                }
+                return;
+            }
 
             // Story 2.2: ESC to exit dependency mode or cancel connection
             if (e.key === 'Escape') {
@@ -604,10 +638,35 @@ export function GraphComponent({
                 }
             };
 
+            // Handle batch-stop event from MindNode when editing is complete
+            const handleBatchStop = (event: Event) => {
+                const detail = (event as CustomEvent<{ nodeId?: string }>).detail;
+                const nodeId = detail?.nodeId;
+                if (!nodeId) return;
+
+                const cell = graph.getCellById(nodeId);
+                if (!cell || !cell.isNode()) return;
+
+                const targetNode = cell as Node;
+                const nodeData = targetNode.getData() || {};
+                const batchId = nodeData._batchId;
+
+                if (batchId) {
+                    // Stop the batch to finalize the undo group
+                    graph.stopBatch(batchId);
+                    // Clear the batchId from node data
+                    targetNode.setData({ ...nodeData, _batchId: undefined });
+                }
+            };
+
             const containerEl = containerRef.current;
             containerEl?.addEventListener(
                 'mindmap:node-operation',
                 handleMindmapNodeOperation as EventListener
+            );
+            containerEl?.addEventListener(
+                'mindmap:batch-stop',
+                handleBatchStop as EventListener
             );
 
             // Setup node selection events
@@ -674,6 +733,10 @@ export function GraphComponent({
                 containerEl?.removeEventListener(
                     'mindmap:node-operation',
                     handleMindmapNodeOperation as EventListener
+                );
+                containerEl?.removeEventListener(
+                    'mindmap:batch-stop',
+                    handleBatchStop as EventListener
                 );
                 if (graph && typeof graph.off === 'function') {
                     graph.off('node:selected', handleNodeSelected);
@@ -830,21 +893,39 @@ const addSiblingCommand = new AddSiblingCommand();
 const removeNodeCommand = new RemoveNodeCommand();
 const navigationCommand = new NavigationCommand();
 
-// Helper: Create child node
+// Helper: Create child node (with batch for undo grouping)
 function createChildNode(graph: Graph, parentNode: Node): void {
+    // Start batch so creation + editing becomes one undo step
+    const batchId = `create-node-${Date.now()}`;
+    graph.startBatch(batchId);
+
     const newNode = addChildCommand.execute(graph, parentNode);
     if (newNode) {
         ensureNodeTimestamps(newNode);
+        // Store batchId in node data so MindNode can stop it on commit
+        newNode.setData({ ...newNode.getData(), _batchId: batchId });
         graph.select(newNode);
+    } else {
+        // If node creation failed, stop batch immediately
+        graph.stopBatch(batchId);
     }
 }
 
-// Helper: Create sibling (or child if root)
+// Helper: Create sibling (or child if root) (with batch for undo grouping)
 function createSiblingOrChildNode(graph: Graph, selectedNode: Node): void {
+    // Start batch so creation + editing becomes one undo step
+    const batchId = `create-node-${Date.now()}`;
+    graph.startBatch(batchId);
+
     const newNode = addSiblingCommand.execute(graph, selectedNode);
     if (newNode) {
         ensureNodeTimestamps(newNode);
+        // Store batchId in node data so MindNode can stop it on commit
+        newNode.setData({ ...newNode.getData(), _batchId: batchId });
         graph.select(newNode);
+    } else {
+        // If node creation failed, stop batch immediately
+        graph.stopBatch(batchId);
     }
 }
 
