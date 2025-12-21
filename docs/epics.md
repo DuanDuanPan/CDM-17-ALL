@@ -111,6 +111,7 @@ FR21: Epic 3 - 安全导出系统
 FR22: Epic 3 - 审计追踪视图
 FR23: Epic 1 - 快速上手与指引
 FR24: Epic 3 - 安全分享闭环
+FR28: Epic 2 - 多选与剪贴板操作
 
 ## Epic List
 
@@ -121,7 +122,7 @@ FR24: Epic 3 - 安全分享闭环
 
 ### Epic 2: 任务与视图管理 (Task & View Management)
 将静态思维转化为动态执行计划，提供多维度的项目视图以满足不同角色（PM/开发）的管理需求。
-**FRs covered:** FR3, FR11, FR14, FR17
+**FRs covered:** FR3, FR11, FR14, FR17, FR28
 **Core Value:** 项目经理和执行者可以在同一数据源上无缝切换视角，管理复杂的依赖和进度。
 
 ### Epic 4: 流程编排与沟通 (Workflow Automation & Communication)
@@ -303,7 +304,25 @@ So that **我能有效管理海量信息，快速定位所需内容。**
 **Then** 系统应过滤并只高亮显示带有该标签的节点
 **And** 我可以将不再需要的节点“归档”，归档后的节点在默认视图中隐藏但在“归档箱”中可见且可恢复
 
-### Story 2.6: PBS 节点增强 (PBS Node Enhancement)
+### Story 2.6: 多选与剪贴板 (Multi-Select & Clipboard)
+
+As a **用户**,
+I want **选择多个节点并进行复制、剪切、粘贴**,
+So that **我可以高效地重组脑图结构，或在不同画布间迁移数据。**
+
+**Acceptance Criteria:**
+
+**Given** 画布上有多个节点
+**When** 按住 Shift 点击或拖拽框选时
+**Then** 所有涉及的节点应进入选中状态（视觉反馈）
+**When** 按下 `Cmd+C` (Copy)
+**Then** 选中节点的结构数据（含子节点关系）应被序列化到系统剪贴板
+**When** 按下 `Cmd+V` (Paste)
+**Then** 剪贴板中的节点结构应被粘贴到当前鼠标位置或选中节点下
+**And** 粘贴的节点 ID 应重新生成以避免重复，但相对结构保持不变
+**And** 支持跨浏览器标签页或窗口的复制粘贴
+
+### Story 2.7: PBS 节点增强 (PBS Node Enhancement)
 
 As a **研发工程师**,
 I want **为 PBS 节点设置指标并从产品库中搜索复用**,
@@ -320,7 +339,7 @@ So that **我能定义产品的技术参数，并复用已有的标准化产品�
 **When** 选中一个已有产品条目
 **Then** 当前节点创建对该产品的引用（链接），后续源产品更新时同步显示
 
-### Story 2.7: 知识关联与推荐 (Knowledge Link & Recommendation - Mock)
+### Story 2.8: 知识关联与推荐 (Knowledge Link & Recommendation - Mock)
 
 As a **用户**,
 I want **在任务节点上关联知识资源，并获得节点的知识推荐**,
@@ -336,7 +355,7 @@ So that **我能快速找到执行任务所需的参考资料。**
 **Then** 可选择已关联的知识条目（本阶段使用 Mock 数据）
 **Note** 实际知识库集成和 AI 推荐功能将在 Epic 5 中实现。
 
-### Story 2.8: APP 节点类型与工业软件集成 (APP Node Type)
+### Story 2.9: APP 节点类型与工业软件集成 (APP Node Type)
 
 As a **用户**,
 I want **创建 APP 节点并调用工业软件或 Web 应用**,

@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2025-12-21 - Story 2.5 complete; all code review issues resolved (inc. WebSocket reconnection)
+last_updated: 2025-12-22 - Story 2.6 complete; Multi-Select & Clipboard implemented with full test coverage
 
 development_status:
   epic-1: done
@@ -55,9 +55,10 @@ development_status:
   2-3-multi-view-synchronization: done
   2-4-task-dispatch-feedback: done  # All HIGH issues fixed; Unit tests added
   2-5-data-organization-search: done  # All CRITICAL/HIGH/MEDIUM issues fixed; reconnection logic added
-  2-6-pbs-node-enhancement: backlog
-  2-7-knowledge-link-recommendation-mock: backlog
-  2-8-app-node-type: backlog
+  2-6-multi-select-clipboard: done  # Multi-select, Copy/Cut/Paste, Keyboard shortcuts, Context menu, Toolbar
+  2-7-pbs-node-enhancement: backlog
+  2-8-knowledge-link-recommendation-mock: backlog
+  2-9-app-node-type: backlog
   epic-2-retrospective: optional
 
   epic-4: backlog
