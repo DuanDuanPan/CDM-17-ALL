@@ -1,171 +1,133 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { TopBar, LeftSidebar, RightSidebar } from '@/components/layout';
-import type { Graph } from '@antv/x6';
-import { LayoutMode } from '@cdm/types';
-// Story 1.4 MED-12: Use Context for collaboration UI state
-// Story 2.4: GraphProvider for notification navigation
-import { CollaborationUIProvider, GraphProvider } from '@/contexts';
-import { collabLogger as logger } from '@/lib/logger';
-import { useViewStore } from '@/features/views';
-import { ViewContainer } from '@/features/views';
-import { useCollaboration } from '@/hooks/useCollaboration';
-// Story 1.4 LOW-1: Use centralized constants
-import {
-  STORAGE_KEY_LAYOUT_MODE,
-  STORAGE_KEY_GRID_ENABLED,
-  LAYOUT_TRANSITION_MS,
-} from '@/lib/constants';
+/**
+ * 首页 - Landing Page
+ * 
+ * 功能：
+ * 1. 获取 userId 参数（默认 test1）
+ * 2. 检查用户是否有图谱
+ * 3. 如果有图谱 -> 重定向到图谱列表
+ * 4. 如果没有图谱 -> 自动创建第一个图谱并直接进入（一键快速开始）
+ */
 
-// Story 1.4: Demo user for collaboration (in production, use Clerk auth)
-// Story 2.4: Use 'test1' to match seed data for notifications
-const DEMO_USER = {
-  id: 'test1',
-  name: 'Test User 1',
-  color: '#3b82f6',
-};
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Folder, Sparkles } from 'lucide-react';
 
-// Story 1.4: Demo graph ID (in production, use URL params or route)
-const DEMO_GRAPH_ID = 'demo-graph-1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-export default function Home() {
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [graph, setGraph] = useState<Graph | null>(null);
-  const [isLayoutLoading, setIsLayoutLoading] = useState(false);
+function HomeContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const userId = searchParams.get('userId') || 'test1';
 
-  // Initialize layout state (will be updated from localStorage on client mount)
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('mindmap');
-  const [gridEnabled, setGridEnabled] = useState(false);
+  const [status, setStatus] = useState<'loading' | 'creating' | 'redirecting'>('loading');
+  const [message, setMessage] = useState('正在加载...');
 
-  // Story 2.2: Dependency mode state for edge creation
-  const [isDependencyMode, setIsDependencyMode] = useState(false);
-
-  // Story 2.3: View mode state from store
-  const viewMode = useViewStore((state) => state.viewMode);
-  const setViewMode = useViewStore((state) => state.setViewMode);
-
-  // Story 2.3: Shared collaboration session for all projections
-  const collab = useCollaboration({
-    graphId: DEMO_GRAPH_ID,
-    user: DEMO_USER,
-    wsUrl: process.env.NEXT_PUBLIC_COLLAB_WS_URL || 'ws://localhost:1234',
-  });
-
-  // Restore state from localStorage on client mount (after hydration)
   useEffect(() => {
-    // Restore layout mode
-    const savedMode = localStorage.getItem(STORAGE_KEY_LAYOUT_MODE);
-    if (savedMode && ['mindmap', 'logic', 'free'].includes(savedMode)) {
-      setLayoutMode(savedMode as LayoutMode);
+    async function initializeUserGraphs() {
+      try {
+        // 1. 获取用户的图谱列表
+        setMessage('正在检查图谱...');
+        const response = await fetch(`${API_BASE_URL}/api/graphs?userId=${userId}`);
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch graphs');
+        }
+
+        const graphs = await response.json();
+
+        // 2. 如果有图谱，重定向到列表页
+        if (graphs.length > 0) {
+          setStatus('redirecting');
+          setMessage('正在跳转到图谱列表...');
+          router.push(`/graphs?userId=${userId}`);
+          return;
+        }
+
+        // 3. 如果没有图谱，自动创建第一个（一键快速开始）
+        setStatus('creating');
+        setMessage('正在为您创建第一个图谱...');
+
+        const createResponse = await fetch(`${API_BASE_URL}/api/graphs?userId=${userId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: '我的第一个图谱' }),
+        });
+
+        if (!createResponse.ok) {
+          throw new Error('Failed to create graph');
+        }
+
+        const newGraph = await createResponse.json();
+
+        // 4. 直接进入新创建的图谱
+        setStatus('redirecting');
+        setMessage('正在进入图谱编辑器...');
+        router.push(`/graph/${newGraph.id}?userId=${userId}`);
+
+      } catch (error) {
+        console.error('Failed to initialize:', error);
+        setMessage('加载失败，请刷新页面重试');
+      }
     }
 
-    // Restore grid enabled state
-    const savedGrid = localStorage.getItem(STORAGE_KEY_GRID_ENABLED);
-    if (savedGrid !== null) {
-      setGridEnabled(savedGrid === 'true');
-    }
-  }, []); // Empty deps = run once on mount
-
-  const handleNodeSelect = useCallback((nodeId: string | null) => {
-    setSelectedNodeId(nodeId);
-  }, []);
-
-  const handleClosePanel = useCallback(() => {
-    setSelectedNodeId(null);
-  }, []);
-
-  const handleLayoutChange = useCallback((mode: LayoutMode) => {
-    setIsLayoutLoading(true);
-    setLayoutMode(mode);
-    // Persist to localStorage
-    localStorage.setItem(STORAGE_KEY_LAYOUT_MODE, mode);
-
-    // Clear loading state after transition duration (matches animation)
-    setTimeout(() => {
-      setIsLayoutLoading(false);
-    }, LAYOUT_TRANSITION_MS);
-  }, []);
-
-  const handleGridToggle = useCallback((enabled: boolean) => {
-    setGridEnabled(enabled);
-    // Persist to localStorage
-    localStorage.setItem(STORAGE_KEY_GRID_ENABLED, String(enabled));
-  }, []);
-
-  // Story 2.2: Toggle dependency mode for edge creation
-  const handleDependencyModeToggle = useCallback(() => {
-    setIsDependencyMode((prev) => !prev);
-  }, []);
-
-  // Story 1.4 MED-12: Handle user hover on avatar (could highlight their cursor)
-  const handleUserHover = useCallback((userId: string | null) => {
-    logger.debug('User hover', { userId });
-  }, []);
-
-  // Story 1.4 MED-12: Handle user click on avatar (could pan to their position)
-  const handleUserClick = useCallback((userId: string) => {
-    logger.debug('Find user', { userId });
-  }, []);
+    initializeUserGraphs();
+  }, [router, userId]);
 
   return (
-    <CollaborationUIProvider
-      onUserHoverExternal={handleUserHover}
-      onUserClickExternal={handleUserClick}
-    >
-      {/* Story 2.4: GraphProvider enables notification click navigation */}
-      <GraphProvider graph={graph} graphId={DEMO_GRAPH_ID} onNodeSelect={handleNodeSelect}>
-        <div className="flex flex-col h-screen">
-          {/* Top Bar - Story 1.4 MED-12: Now uses Context for remoteUsers */}
-          <TopBar
-            projectName="未命名项目"
-            currentLayout={layoutMode}
-            onLayoutChange={handleLayoutChange}
-            onGridToggle={handleGridToggle}
-            gridEnabled={gridEnabled}
-            isLoading={isLayoutLoading}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-          />
-
-          {/* Main content area with three columns */}
-          <div className="flex flex-1 overflow-hidden">
-            {/* Left Sidebar - Component Library + Story 2.2: Dependency Mode */}
-            <LeftSidebar
-              isDependencyMode={isDependencyMode}
-              onDependencyModeToggle={handleDependencyModeToggle}
-            />
-
-            {/* Center Canvas - Story 1.4 MED-12: Uses Context to report remote users */}
-            {/* Story 2.2: Pass dependency mode for edge creation */}
-            <main className="flex-1 relative overflow-hidden">
-              <ViewContainer
-                graphId={DEMO_GRAPH_ID}
-                user={DEMO_USER}
-                collaboration={collab}
-                onNodeSelect={handleNodeSelect}
-                onLayoutChange={handleLayoutChange}
-                onGridToggle={handleGridToggle}
-                currentLayout={layoutMode}
-                gridEnabled={gridEnabled}
-                onGraphReady={setGraph}
-                isDependencyMode={isDependencyMode}
-                onExitDependencyMode={() => setIsDependencyMode(false)}
-              />
-            </main>
-
-            {/* Right Sidebar - Property Panel */}
-            <RightSidebar
-              selectedNodeId={selectedNodeId}
-              graph={graph}
-              graphId={DEMO_GRAPH_ID}
-              yDoc={collab.yDoc}
-              creatorName={DEMO_USER.name}
-              onClose={handleClosePanel}
-            />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="text-center">
+        {/* Logo/Icon */}
+        <div className="relative mb-8">
+          <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl 
+                        flex items-center justify-center mx-auto shadow-2xl shadow-blue-500/30">
+            <Folder className="w-12 h-12 text-white" />
           </div>
+          {status === 'creating' && (
+            <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-500 
+                          rounded-full flex items-center justify-center animate-bounce">
+              <Sparkles className="w-4 h-4 text-white" />
+            </div>
+          )}
         </div>
-      </GraphProvider>
-    </CollaborationUIProvider>
+
+        {/* Loading spinner */}
+        <div className="relative mb-6">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
+        </div>
+
+        {/* Status message */}
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">
+          {status === 'loading' && '欢迎回来'}
+          {status === 'creating' && '正在初始化'}
+          {status === 'redirecting' && '准备就绪'}
+        </h2>
+        <p className="text-gray-500">{message}</p>
+
+        {/* User info */}
+        <div className="mt-8 px-4 py-2 bg-white/50 rounded-full inline-block">
+          <span className="text-sm text-gray-500">
+            用户：<span className="font-medium text-gray-700">{userId}</span>
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-500">加载中...</p>
+        </div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
+  );
+}
+

@@ -1,58 +1,73 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { prisma } from '@cdm/database';
 
-const DEMO_USER_ID = 'demo-user-1';
-const DEMO_PROJECT_ID = 'demo-project-1';
-export const DEMO_GRAPH_ID = 'demo-graph-1';
-
 /**
- * Seeds minimal demo data so that the frontend's default graphId
- * (see apps/web/app/page.tsx) always exists in the database.
- *
- * This prevents P2003 foreign key errors when creating nodes during demos.
+ * 用户和项目懒加载服务
+ * 
+ * 改进说明：
+ * - 移除 OnModuleInit 自动种子数据逻辑
+ * - 改为按需创建用户和项目
+ * - 用户首次创建图谱时自动初始化
  */
 @Injectable()
-export class DemoSeedService implements OnModuleInit {
+export class DemoSeedService {
   private readonly logger = new Logger(DemoSeedService.name);
 
-  async onModuleInit() {
-    try {
-      await prisma.$transaction(async (tx) => {
-        await tx.user.upsert({
-          where: { id: DEMO_USER_ID },
-          update: {},
-          create: {
-            id: DEMO_USER_ID,
-            email: 'demo@example.com',
-            name: 'Demo User',
-          },
-        });
+  /**
+   * 确保用户存在，如不存在则创建
+   * @param userId 用户ID
+   * @returns 用户信息
+   */
+  async ensureUser(userId: string) {
+    const user = await prisma.user.upsert({
+      where: { id: userId },
+      update: {},
+      create: {
+        id: userId,
+        email: `${userId}@example.com`,
+        name: `User ${userId}`,
+      },
+    });
+    this.logger.log(`User ${userId} ready`);
+    return user;
+  }
 
-        await tx.project.upsert({
-          where: { id: DEMO_PROJECT_ID },
-          update: {},
-          create: {
-            id: DEMO_PROJECT_ID,
-            name: 'Demo Project',
-            ownerId: DEMO_USER_ID,
-          },
-        });
+  /**
+   * 获取或创建用户的默认项目
+   * 每个用户只有一个默认项目，首次创建图谱时自动初始化
+   * 
+   * @param userId 用户ID
+   * @returns 项目ID
+   */
+  async getOrCreateDefaultProject(userId: string): Promise<string> {
+    // 确保用户存在
+    await this.ensureUser(userId);
 
-        await tx.graph.upsert({
-          where: { id: DEMO_GRAPH_ID },
-          update: {},
-          create: {
-            id: DEMO_GRAPH_ID,
-            name: 'Demo Graph',
-            projectId: DEMO_PROJECT_ID,
-            data: {},
-          },
-        });
+    // 查找用户的第一个项目（作为默认项目）
+    let project = await prisma.project.findFirst({
+      where: { ownerId: userId },
+    });
+
+    // 如果不存在，创建默认项目
+    if (!project) {
+      project = await prisma.project.create({
+        data: {
+          name: `${userId}的工作空间`,
+          ownerId: userId,
+        },
       });
-
-      this.logger.log(`Demo data ready (graphId=${DEMO_GRAPH_ID})`);
-    } catch (error) {
-      this.logger.error('Failed to seed demo data', error);
+      this.logger.log(`Created default project for user ${userId}: ${project.id}`);
     }
+
+    return project.id;
+  }
+
+  /**
+   * 获取用户信息（如不存在返回null）
+   */
+  async getUser(userId: string) {
+    return prisma.user.findUnique({
+      where: { id: userId },
+    });
   }
 }

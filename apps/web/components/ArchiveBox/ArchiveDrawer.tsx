@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Archive,
     X,
@@ -62,6 +63,7 @@ export function ArchiveDrawer({
     const [isLoading, setIsLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [restoringIds, setRestoringIds] = useState<Set<string>>(new Set());
+    const [mounted, setMounted] = useState(false);
 
     // Fetch archived nodes
     const fetchArchivedNodes = useCallback(async () => {
@@ -90,6 +92,10 @@ export function ArchiveDrawer({
             fetchArchivedNodes();
         }
     }, [isOpen, fetchArchivedNodes]);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Restore node
     const handleRestore = async (nodeId: string) => {
@@ -122,9 +128,9 @@ export function ArchiveDrawer({
             node.tags.some((t) => t.includes(searchQuery.toLowerCase()))
     );
 
-    if (!isOpen) return null;
+    if (!isOpen || !mounted) return null;
 
-    return (
+    return createPortal(
         <>
             {/* Backdrop */}
             <div
@@ -248,7 +254,8 @@ export function ArchiveDrawer({
                     共 {archivedNodes.length} 个归档节点
                 </div>
             </div>
-        </>
+        </>,
+        document.body
     );
 }
 
