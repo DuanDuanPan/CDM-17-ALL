@@ -3,12 +3,14 @@
 /**
  * Story 2.1: Task Node Form
  * Form for Task-specific properties (status, assignee, dueDate, priority)
+ * Story 2.8: Added knowledge resource association
  */
 
 import { useState, useEffect } from 'react';
-import { Calendar, User, Flag, Send, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import type { TaskProps, AssignmentStatus } from '@cdm/types';
+import { Calendar, User, Flag, Send, CheckCircle, XCircle, AlertCircle, BookOpen, Plus, X, FileText, Link as LinkIcon, Video } from 'lucide-react';
+import type { TaskProps, AssignmentStatus, KnowledgeReference } from '@cdm/types';
 import { useToast } from '@cdm/ui';
+import { KnowledgeSearchDialog } from '@/components/Knowledge';
 
 export interface TaskFormProps {
   nodeId: string;
@@ -30,9 +32,11 @@ export function TaskForm({ nodeId, initialData, onUpdate, currentUserId = 'test1
     rejectionReason: initialData?.rejectionReason || null,
     dispatchedAt: initialData?.dispatchedAt || null,
     feedbackAt: initialData?.feedbackAt || null,
+    knowledgeRefs: initialData?.knowledgeRefs || [], // Story 2.8
   });
 
   const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [showKnowledgeSearch, setShowKnowledgeSearch] = useState(false); // Story 2.8
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { addToast } = useToast();
@@ -50,6 +54,7 @@ export function TaskForm({ nodeId, initialData, onUpdate, currentUserId = 'test1
       rejectionReason: initialData?.rejectionReason || null,
       dispatchedAt: initialData?.dispatchedAt || null,
       feedbackAt: initialData?.feedbackAt || null,
+      knowledgeRefs: initialData?.knowledgeRefs || [], // Story 2.8
     });
   }, [initialData]);
 
@@ -423,6 +428,86 @@ export function TaskForm({ nodeId, initialData, onUpdate, currentUserId = 'test1
           </div>
         )}
       </div>
+
+      {/* Story 2.8: Knowledge Resources Section */}
+      <div className="mt-6 pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+            <BookOpen className="w-4 h-4" />
+            📚 关联知识
+          </h3>
+          <button
+            type="button"
+            onClick={() => setShowKnowledgeSearch(true)}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            关联
+          </button>
+        </div>
+
+        {/* Knowledge List */}
+        {formData.knowledgeRefs && formData.knowledgeRefs.length > 0 ? (
+          <div className="space-y-2">
+            {formData.knowledgeRefs.map((ref) => (
+              <div
+                key={ref.id}
+                className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 bg-white shadow-sm hover:shadow-md transition-all group"
+              >
+                {/* Icon */}
+                <div className="w-8 h-8 flex items-center justify-center rounded-md bg-blue-50 text-blue-600 flex-shrink-0">
+                  {ref.type === 'document' && <FileText className="w-4 h-4" />}
+                  {ref.type === 'link' && <LinkIcon className="w-4 h-4" />}
+                  {ref.type === 'video' && <Video className="w-4 h-4" />}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 line-clamp-1">{ref.title}</p>
+                  {ref.summary && (
+                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{ref.summary}</p>
+                  )}
+                </div>
+
+                {/* Remove Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updatedRefs = formData.knowledgeRefs?.filter((k) => k.id !== ref.id) || [];
+                    handleFieldChange('knowledgeRefs', updatedRefs);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded transition-all flex-shrink-0"
+                  title="移除关联"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-4 text-xs text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+            暂无关联知识，点击"关联"添加
+          </div>
+        )}
+      </div>
+
+      {/* Story 2.8: Knowledge Search Dialog */}
+      <KnowledgeSearchDialog
+        open={showKnowledgeSearch}
+        onOpenChange={setShowKnowledgeSearch}
+        onSelect={(knowledge: KnowledgeReference) => {
+          // Check for duplicates
+          const existingRefs = formData.knowledgeRefs || [];
+          if (existingRefs.some((ref) => ref.id === knowledge.id)) {
+            addToast({ type: 'warning', title: '提示', description: '该知识资源已关联' });
+            return;
+          }
+          // Add new knowledge reference
+          const updatedRefs = [...existingRefs, knowledge];
+          handleFieldChange('knowledgeRefs', updatedRefs);
+          addToast({ type: 'success', title: '关联成功', description: `已关联: ${knowledge.title}` });
+        }}
+      />
 
       {/* Reject Reason Dialog */}
       {showRejectDialog && (

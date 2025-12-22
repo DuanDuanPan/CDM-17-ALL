@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { TaskProps } from '@cdm/types';
+import { Prisma } from '@cdm/database';
 import { NodeTaskRepository } from '../repositories/node-task.repository';
 import { NotificationService } from '../../notification/notification.service';
 
@@ -20,6 +21,14 @@ export class TaskService {
   }
 
   async upsertProps(nodeId: string, props: TaskProps) {
+    const getJsonValue = <T>(
+      value: T | null | undefined
+    ): Prisma.InputJsonValue | typeof Prisma.DbNull | undefined => {
+      if (value === null) return Prisma.DbNull;
+      if (value === undefined) return undefined;
+      return value as unknown as Prisma.InputJsonValue;
+    };
+
     const data = {
       status: props.status || 'todo',
       assigneeId: props.assigneeId || null,
@@ -28,6 +37,7 @@ export class TaskService {
       customStage: props.customStage || null,
       progress: typeof props.progress === 'number' ? props.progress : null,
       priority: props.priority || 'medium',
+      knowledgeRefs: getJsonValue(props.knowledgeRefs),
     };
     return this.taskRepo.upsert(nodeId, data);
   }

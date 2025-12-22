@@ -124,6 +124,9 @@ model NodeTask {
   dispatchedAt     DateTime? // 下发时间
   feedbackAt       DateTime? // 反馈时间
 
+  // Story 2.8: Knowledge association
+  knowledgeRefs   Json?
+
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }

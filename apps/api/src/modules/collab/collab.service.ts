@@ -2,6 +2,8 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { Server as HocuspocusServer } from '@hocuspocus/server';
 import * as Y from 'yjs';
+import { prisma } from '@cdm/database';
+import { NodeType } from '@cdm/types';
 
 /**
  * CollabService - Real-time Collaboration Service
@@ -80,21 +82,127 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                     // documentName format: "graph:<graphId>"
                     const graphId = documentName.replace('graph:', '');
 
-                    // TODO: Implement Prisma integration when database module is connected
-                    // const prisma = new PrismaClient();
-                    // const graph = await prisma.graph.findUnique({ where: { id: graphId } });
-                    //
-                    // MED-7: Explicitly handle null yjsState (new document scenario)
-                    // if (graph?.yjsState) {
-                    //   const update = new Uint8Array(graph.yjsState);
-                    //   Y.applyUpdate(document, update);
-                    //   Logger.log(`Document ${documentName} loaded from DB (graphId: ${graphId})`, 'CollabService');
-                    // } else {
-                    //   // New document or no persisted state - Yjs starts with empty state
-                    //   Logger.log(`New document ${documentName}, starting with empty state`, 'CollabService');
-                    // }
+                    // 1. Try to load yjsState from graph table
+                    const graph = await prisma.graph.findUnique({
+                        where: { id: graphId },
+                        include: {
+                            nodes: {
+                                include: {
+                                    taskProps: true,
+                                    requirementProps: true,
+                                    pbsProps: true,
+                                    dataProps: true,
+                                }
+                            },
+                            edges: true,
+                        }
+                    });
 
-                    Logger.log(`Document ${documentName} loaded (graphId: ${graphId})`, 'CollabService');
+                    if (!graph) {
+                        Logger.warn(`Graph ${graphId} not found in database`, 'CollabService');
+                        return;
+                    }
+
+                    // 2. If yjsState exists, load it
+                    if (graph.yjsState && graph.yjsState.length > 0) {
+                        const update = new Uint8Array(graph.yjsState);
+                        Y.applyUpdate(document, update);
+                        Logger.log(`Document ${documentName} loaded from DB (graphId: ${graphId})`, 'CollabService');
+                    } else {
+                        // 3. Fallback: Initialize Yjs from Relational Data (Nodes/Edges tables)
+                        // This handles cases where data was created via API/Seeds but Yjs state is empty
+                        Logger.log(`Initializing Yjs document from Relational Data for ${graphId}`, 'CollabService');
+
+                        const yNodes = document.getMap('nodes');
+                        const yEdges = document.getMap('edges');
+                        const yMeta = document.getMap('meta');
+
+                        document.transact(() => {
+                            // Sync Nodes
+                            if (graph.nodes) {
+                                for (const node of graph.nodes) {
+                                    const props = node.taskProps || node.requirementProps || node.pbsProps || node.dataProps || {};
+                                    const yNode = {
+                                        id: node.id,
+                                        x: node.x,
+                                        y: node.y,
+                                        label: node.label,
+                                        parentId: node.parentId,
+                                        width: node.width,
+                                        height: node.height,
+                                        nodeType: node.type as NodeType,
+                                        props: props,
+                                        tags: node.tags,
+                                        isArchived: node.isArchived,
+                                        archivedAt: node.archivedAt ? node.archivedAt.toISOString() : null,
+                                        createdAt: node.createdAt.toISOString(),
+                                        updatedAt: node.updatedAt.toISOString(),
+                                        metadata: (node.metadata as any) || {},
+                                        mindmapType: 'topic', // Default to topic
+                                    };
+                                    yNodes.set(node.id, yNode);
+                                }
+                            }
+
+                            // Sync Edges from database
+                            if (graph.edges) {
+                                for (const edge of graph.edges) {
+                                    const yEdge = {
+                                        id: edge.id,
+                                        source: edge.sourceId,
+                                        target: edge.targetId,
+                                        type: edge.type,
+                                        metadata: (edge.metadata as any) || {},
+                                    };
+                                    yEdges.set(edge.id, yEdge);
+                                }
+                            }
+
+                            // CRITICAL FIX: Auto-generate hierarchical edges based on parentId
+                            // When Edge table is empty but nodes have parentId relationships,
+                            // we need to create the edges for X6 to render parent-child lines
+                            if (graph.nodes) {
+                                const existingEdgePairs = new Set<string>();
+
+                                // Collect existing edges (source->target pairs)
+                                yEdges.forEach((edgeData: any) => {
+                                    existingEdgePairs.add(`${edgeData.source}->${edgeData.target}`);
+                                });
+
+                                // Generate edges for parentId relationships that don't have edges
+                                for (const node of graph.nodes) {
+                                    if (node.parentId) {
+                                        const edgePair = `${node.parentId}->${node.id}`;
+
+                                        // Only create if edge doesn't already exist
+                                        if (!existingEdgePairs.has(edgePair)) {
+                                            const generatedEdgeId = `edge-${node.parentId}-${node.id}`;
+                                            const yEdge = {
+                                                id: generatedEdgeId,
+                                                source: node.parentId,
+                                                target: node.id,
+                                                type: 'hierarchical',
+                                                metadata: { kind: 'hierarchical' },
+                                            };
+                                            yEdges.set(generatedEdgeId, yEdge);
+                                            existingEdgePairs.add(edgePair);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Sync Meta
+                            if (graph.data && (graph.data as any).layoutMode) {
+                                yMeta.set('layoutMode', (graph.data as any).layoutMode);
+                            }
+                        });
+
+                        // Count generated edges for logging
+                        let edgeCount = 0;
+                        yEdges.forEach(() => edgeCount++);
+                        Logger.log(`Initialized ${graph.nodes?.length || 0} nodes and ${edgeCount} edges from relational DB`, 'CollabService');
+                    }
+
                 } catch (error) {
                     Logger.error(`Failed to load document ${documentName}:`, error, 'CollabService');
                     // Continue with empty document on error - Yjs handles this gracefully
@@ -115,12 +223,10 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                     const graphId = documentName.replace('graph:', '');
                     const state = Y.encodeStateAsUpdate(document);
 
-                    // TODO: Implement Prisma integration when database module is connected
-                    // const prisma = new PrismaClient();
-                    // await prisma.graph.update({
-                    //   where: { id: graphId },
-                    //   data: { yjsState: Buffer.from(state) },
-                    // });
+                    await prisma.graph.update({
+                        where: { id: graphId },
+                        data: { yjsState: Buffer.from(state) },
+                    });
 
                     Logger.log(
                         `Document ${documentName} stored (graphId: ${graphId}, size: ${state.byteLength} bytes)`,

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { prisma } from '@cdm/database';
+import { prisma, type Prisma } from '@cdm/database';
 
 @Injectable()
 export class NodeTaskRepository {
@@ -13,6 +13,7 @@ export class NodeTaskRepository {
       customStage?: string | null;
       progress?: number | null;
       priority?: string | null;
+      knowledgeRefs?: Prisma.InputJsonValue | Prisma.NullTypes.DbNull;
     }
   ) {
     return prisma.nodeTask.upsert({

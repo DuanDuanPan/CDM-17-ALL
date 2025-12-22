@@ -45,6 +45,9 @@ export interface TaskProps extends BaseNodeProps {
   rejectionReason?: string | null; // 驳回理由
   dispatchedAt?: string | null; // 下发时间 (ISO 8601)
   feedbackAt?: string | null; // 接收/驳回时间 (ISO 8601)
+
+  // Story 2.8: Knowledge association
+  knowledgeRefs?: KnowledgeReference[]; // 关联的知识资源列表
 }
 
 // Requirement Node Properties
@@ -69,6 +72,15 @@ export interface ProductReference {
   productName: string;
   productCode?: string;
   category?: string;
+}
+
+// Story 2.8: Knowledge Reference for linking knowledge resources to tasks
+export interface KnowledgeReference {
+  id: string;                                    // UUID
+  title: string;                                 // "Design Guidelines 2024"
+  type: 'document' | 'link' | 'video';           // Resource type
+  url?: string;                                  // External link or file path
+  summary?: string;                              // Brief description
 }
 
 // PBS (Product Breakdown Structure) Node Properties
@@ -112,6 +124,7 @@ export const NODE_PROP_KEYS_BY_TYPE: Record<NodeType, readonly string[]> = {
     'rejectionReason',
     'dispatchedAt',
     'feedbackAt',
+    'knowledgeRefs', // Story 2.8: Knowledge association
   ],
   [NodeType.REQUIREMENT]: ['reqType', 'acceptanceCriteria', 'priority'],
   [NodeType.PBS]: ['code', 'version', 'ownerId', 'indicators', 'productRef'],
@@ -236,6 +249,15 @@ export interface NodeTypeChangeResponse extends NodeResponse {
 // Zod Schemas (API Validation)
 // =========================
 
+// Story 2.8: Knowledge Reference Schema
+export const KnowledgeReferenceSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  type: z.enum(['document', 'link', 'video']),
+  url: z.string().optional(),
+  summary: z.string().optional(),
+});
+
 export const TaskPropsSchema = z
   .object({
     status: z.enum(['todo', 'in-progress', 'done']).optional(),
@@ -251,6 +273,8 @@ export const TaskPropsSchema = z
     rejectionReason: z.string().nullable().optional(),
     dispatchedAt: z.string().nullable().optional(),
     feedbackAt: z.string().nullable().optional(),
+    // Story 2.8: Knowledge association
+    knowledgeRefs: z.array(KnowledgeReferenceSchema).optional(),
   })
   .strict();
 

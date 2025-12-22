@@ -57,7 +57,7 @@ development_status:
   2-5-data-organization-search: done  # All CRITICAL/HIGH/MEDIUM issues fixed; reconnection logic added
   2-6-multi-select-clipboard: done  # Multi-select, Copy/Cut/Paste, Keyboard shortcuts, Context menu, Toolbar
   2-7-pbs-node-enhancement: done  # All code review issues fixed; PBS Indicators, Product Library (Mock), Node Visual
-  2-8-knowledge-link-recommendation-mock: backlog
+  2-8-knowledge-link-recommendation-mock: review # Tests Passed
   2-9-app-node-type: backlog
   epic-2-retrospective: optional
 

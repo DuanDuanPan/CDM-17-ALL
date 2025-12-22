@@ -12,6 +12,7 @@ import { CommonHeader } from './CommonHeader';
 import { getFormComponent } from './PropertyPanelRegistry';
 import { TagEditor } from './TagEditor';
 import { useConfirmDialog } from '@cdm/ui';
+import { KnowledgeRecommendation } from '@/components/Knowledge'; // Story 2.8
 
 export interface PropertyPanelProps {
   nodeId: string | null;
@@ -174,6 +175,12 @@ export function PropertyPanel({
               currentUserId={currentUserId}
             />
           </div>
+
+          {/* Story 2.8: Knowledge Recommendation (AC1.1 - visible for any selected node) */}
+          <KnowledgeRecommendation
+            nodeId={nodeId}
+            nodeTitle={nodeData.label}
+          />
         </div>
       </div>
 
