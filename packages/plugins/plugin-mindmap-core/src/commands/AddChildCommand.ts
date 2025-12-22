@@ -1,5 +1,5 @@
 import { Graph, Node } from '@antv/x6';
-import { MindNodeData } from '@cdm/types';
+import { MindNodeData, NodeType } from '@cdm/types';
 
 /**
  * AddChildCommand - Create a child node
@@ -27,6 +27,7 @@ export class AddChildCommand {
         label: '',
         isEditing: true,
         type: 'subtopic',
+        nodeType: NodeType.ORDINARY, // Fix: Explicitly set semantic type for clipboard compatibility
         parentId: selectedNode.id, // Set parent ID for layout algorithm
         creator: parentData.creator,
       } as MindNodeData,

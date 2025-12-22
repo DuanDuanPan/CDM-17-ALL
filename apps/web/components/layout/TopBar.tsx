@@ -17,6 +17,7 @@ import { GlobalSearchDialog } from '@/components/CommandPalette/GlobalSearchDial
 import { ArchiveDrawer } from '@/components/ArchiveBox/ArchiveDrawer';
 
 export interface TopBarProps {
+  userId?: string; // Story 2.4: Current user ID for notifications
   projectName?: string;
   currentLayout?: LayoutMode;
   onLayoutChange?: (mode: LayoutMode) => void;
@@ -36,6 +37,7 @@ export interface TopBarProps {
  * instead of being passed via props.
  */
 export function TopBar({
+  userId = 'test1', // Default to test1 if not provided
   projectName = '未命名项目',
   currentLayout = 'mindmap',
   onLayoutChange,
@@ -68,7 +70,7 @@ export function TopBar({
     refresh,
     isLoading: notificationsLoading,
   } = useNotifications({
-    userId: 'test1', // 默认查看 test1 的通知
+    userId, // Use dynamic userId passed from props
     // Disable WebSocket in development to prevent console spam when backend isn't running
     // The hook will automatically fall back to polling
     enableWebSocket: process.env.NEXT_PUBLIC_ENABLE_WS === 'true',

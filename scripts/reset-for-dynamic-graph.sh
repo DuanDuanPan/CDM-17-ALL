@@ -40,8 +40,8 @@ echo ""
 echo "🔄 正在清理数据..."
 
 # 执行清理SQL
-cd "$(dirname "$0")/.."
-npx prisma db execute --stdin << 'SQL'
+cd "$(dirname "$0")/../packages/database"
+npx dotenv -e ../../.env -- prisma db execute --schema=prisma/schema.prisma --stdin << 'SQL'
 -- 按照外键依赖顺序清空表
 TRUNCATE TABLE "Notification" CASCADE;
 TRUNCATE TABLE "Edge" CASCADE;

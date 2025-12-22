@@ -129,6 +129,7 @@ function GraphPageContent() {
             <GraphProvider graph={graph} graphId={graphId} onNodeSelect={handleNodeSelect}>
                 <div className="flex flex-col h-screen">
                     <TopBar
+                        userId={userId} // Story 2.4: Pass current user for notifications
                         projectName="CDM图谱"
                         currentLayout={layoutMode}
                         onLayoutChange={handleLayoutChange}
@@ -167,6 +168,7 @@ function GraphPageContent() {
                             graphId={graphId}
                             yDoc={collab.yDoc}
                             creatorName={CURRENT_USER.name}
+                            currentUserId={userId} // Pass current user ID
                             onClose={handleClosePanel}
                         />
                     </div>

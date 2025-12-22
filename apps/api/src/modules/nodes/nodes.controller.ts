@@ -160,28 +160,32 @@ export class NodesController {
 
   /**
    * Dispatch task to assignee
-   * POST /api/nodes/:id:dispatch
+   * POST /api/nodes/:id:dispatch?userId=xxx
    * Story 2.4 AC#1
    */
   @Post(':id\\:dispatch')
-  async dispatchTask(@Param('id') nodeId: string) {
-    const user = { id: 'test1' }; // TODO: Replace with @CurrentUser() after Clerk integration
-    return this.taskService.dispatchTask(nodeId, user.id);
+  async dispatchTask(
+    @Param('id') nodeId: string,
+    @Query('userId') userId?: string
+  ) {
+    const dispatchingUserId = userId || 'test1';
+    return this.taskService.dispatchTask(nodeId, dispatchingUserId);
   }
 
   /**
    * Accept or reject dispatched task
-   * POST /api/nodes/:id:feedback
+   * POST /api/nodes/:id:feedback?userId=xxx
    * Story 2.4 AC#2, AC#3
    * [AI-Review][MEDIUM-5] Fixed: Using FeedbackTaskDto for proper validation
    */
   @Post(':id\\:feedback')
   async feedbackTask(
     @Param('id') nodeId: string,
-    @Body() body: FeedbackTaskDto
+    @Body() body: FeedbackTaskDto,
+    @Query('userId') userId?: string
   ) {
-    const user = { id: 'test1' }; // TODO: Replace with @CurrentUser() after Clerk integration
-    return this.taskService.feedbackTask(nodeId, user.id, body.action, body.reason);
+    const feedbackUserId = userId || 'test1';
+    return this.taskService.feedbackTask(nodeId, feedbackUserId, body.action, body.reason);
   }
 }
 

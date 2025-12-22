@@ -14,9 +14,10 @@ export interface TaskFormProps {
   nodeId: string;
   initialData?: TaskProps;
   onUpdate?: (data: TaskProps) => void;
+  currentUserId?: string; // Current operating user
 }
 
-export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
+export function TaskForm({ nodeId, initialData, onUpdate, currentUserId = 'test1' }: TaskFormProps) {
   const [formData, setFormData] = useState<TaskProps>({
     status: initialData?.status || 'todo',
     priority: initialData?.priority || 'medium',
@@ -34,8 +35,6 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Mock current user - TODO: Replace with Clerk auth
-  const currentUserId = 'test1';
   const { addToast } = useToast();
 
   useEffect(() => {
@@ -71,7 +70,7 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/nodes/${nodeId}:dispatch`, {
+      const response = await fetch(`/api/nodes/${nodeId}:dispatch?userId=${encodeURIComponent(currentUserId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -115,7 +114,7 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
   const handleAccept = async () => {
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/nodes/${nodeId}:feedback`, {
+      const response = await fetch(`/api/nodes/${nodeId}:feedback?userId=${encodeURIComponent(currentUserId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'accept' }),
@@ -164,7 +163,7 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/nodes/${nodeId}:feedback`, {
+      const response = await fetch(`/api/nodes/${nodeId}:feedback?userId=${encodeURIComponent(currentUserId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reject', reason }),

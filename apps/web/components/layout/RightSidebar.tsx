@@ -28,7 +28,8 @@ export interface RightSidebarProps {
   graph: Graph | null;  // X6 Graph reference for Yjs sync
   graphId: string;
   yDoc?: Y.Doc | null; // Yjs doc for sync when graph is not available
-  creatorName?: string;
+  creatorName?: string; // Default creator name for new nodes
+  currentUserId?: string; // Current operating user
   onClose?: () => void;
 }
 
@@ -80,6 +81,7 @@ export function RightSidebar({
   graphId,
   yDoc = null,
   creatorName,
+  currentUserId = 'test1',
   onClose,
 }: RightSidebarProps) {
   const resolvedCreatorName = creatorName || DEFAULT_CREATOR_NAME;
@@ -520,6 +522,7 @@ export function RightSidebar({
       onPropsUpdate={handlePropsUpdate}
       onTagsUpdate={handleTagsUpdate}
       onArchiveToggle={handleArchiveToggle}
+      currentUserId={currentUserId}
     />
   );
 }

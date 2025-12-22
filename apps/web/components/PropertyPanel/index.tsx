@@ -21,6 +21,7 @@ export interface PropertyPanelProps {
   onPropsUpdate?: (nodeId: string, nodeType: NodeType, props: any) => void;
   onTagsUpdate?: (nodeId: string, tags: string[]) => void;
   onArchiveToggle?: (nodeId: string, nextIsArchived: boolean) => void;
+  currentUserId?: string; // Current operating user
 }
 
 export function PropertyPanel({
@@ -31,6 +32,7 @@ export function PropertyPanel({
   onPropsUpdate,
   onTagsUpdate,
   onArchiveToggle,
+  currentUserId = 'test1',
 }: PropertyPanelProps) {
   const [currentType, setCurrentType] = useState<NodeType>(nodeData?.type || NodeType.ORDINARY);
   const { showConfirm } = useConfirmDialog();
@@ -61,7 +63,7 @@ export function PropertyPanel({
   const handleArchiveToggle = () => {
     if (!onArchiveToggle) return;
     const nextIsArchived = !nodeData.isArchived;
-    
+
     if (nextIsArchived) {
       // Show confirmation dialog for archive action
       showConfirm({
@@ -169,6 +171,7 @@ export function PropertyPanel({
               nodeId={nodeId}
               initialData={nodeData.props}
               onUpdate={handlePropsUpdate}
+              currentUserId={currentUserId}
             />
           </div>
         </div>

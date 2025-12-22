@@ -47,6 +47,7 @@ describe('Mindmap Commands', () => {
       expect(child.getPosition().x).toBe(300);
       expect(child.getPosition().y).toBe(100);
       expect((child.getData() as any).isEditing).toBe(true);
+      expect((child.getData() as any).nodeType).toBe(NodeType.ORDINARY); // Fix: Ensure semantic type is set for clipboard compatibility
 
       const edges = graph.getOutgoingEdges(root) ?? [];
       expect(edges.length).toBe(1);
