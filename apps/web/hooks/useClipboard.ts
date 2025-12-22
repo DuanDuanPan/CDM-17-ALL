@@ -12,6 +12,7 @@ import { nanoid } from 'nanoid';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import type { UndoManager } from 'yjs';
+import { archiveNode } from '@/lib/api/nodes';
 import {
     ClipboardData,
     ClipboardNodeData,
@@ -111,11 +112,34 @@ export function useClipboard({
             return null;
         }
 
-        const selectedIds = new Set(selectedNodes.map(n => n.id));
+        // Expanded selection: includes explicitly selected nodes + all their descendants
+        const allNodesMap = new Map<string, Node>();
+        selectedNodes.forEach(node => allNodesMap.set(node.id, node));
+
+        // Recursively find descendants
+        // We use X6 cells because we need position/size info which might not be in Yjs yet if freshly created
+        const allCells = graphRef.current.getCells();
+        let changed = true;
+        while (changed) {
+            changed = false;
+            allCells.forEach(cell => {
+                if (cell.isNode() && !allNodesMap.has(cell.id)) {
+                    const data = cell.getData() || {};
+                    const parentId = data.parentId;
+                    if (parentId && allNodesMap.has(parentId)) {
+                        allNodesMap.set(cell.id, cell as Node);
+                        changed = true;
+                    }
+                }
+            });
+        }
+
+        const nodesToCopy = Array.from(allNodesMap.values());
+        const selectedIds = new Set(nodesToCopy.map(n => n.id));
 
         // Calculate bounding box
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        selectedNodes.forEach(node => {
+        nodesToCopy.forEach(node => {
             const { x, y } = node.getPosition();
             const { width, height } = node.getSize();
             minX = Math.min(minX, x);
@@ -134,7 +158,7 @@ export function useClipboard({
         };
 
         // Serialize nodes (relative to center)
-        const nodes: ClipboardNodeData[] = selectedNodes.map(node => {
+        const nodes: ClipboardNodeData[] = nodesToCopy.map(node => {
             const { x, y } = node.getPosition();
             const { width, height } = node.getSize();
             const data = node.getData() || {};
@@ -209,9 +233,9 @@ export function useClipboard({
     }, [serializeSelection]);
 
     /**
-     * Cut = Copy + Delete (with undo support)
-     * AC4.1: Cut is equivalent to Copy + Delete
-     * AC4.2: Must be undoable via Yjs UndoManager
+     * Cut = Copy + Soft Delete (Archive)
+     * AC4.1: Cut is equivalent to Copy + Archive
+     * AC4.2: Undoable via Yjs
      */
     const cut = useCallback(async () => {
         if (!graphRef.current || !yDoc) return;
@@ -227,29 +251,43 @@ export function useClipboard({
             const jsonStr = JSON.stringify(data);
             await navigator.clipboard.writeText(jsonStr);
 
-            // Delete via Yjs for undo support (AC4.2)
+            // Soft delete (archive) via Yjs
             undoManager?.stopCapturing();
             const yNodes = yDoc.getMap('nodes');
-            const yEdges = yDoc.getMap('edges');
 
             yDoc.transact(() => {
-                // Delete nodes
+                const now = new Date().toISOString();
                 selectedNodes.forEach(node => {
-                    yNodes.delete(node.id);
+                    const existing = yNodes.get(node.id) as any;
+                    if (existing) {
+                        yNodes.set(node.id, {
+                            ...existing,
+                            isArchived: true,
+                            archivedAt: now,
+                            updatedAt: now
+                        });
+                        // Trigger backend archive
+                        archiveNode(node.id).catch(err =>
+                            console.error(`[Clipboard] Failed to archive node ${node.id} on server during cut`, err)
+                        );
+                    }
                 });
-                // Delete edges between selected nodes
-                data.edges.forEach(edge => {
-                    // Find edge by source-target pattern
-                    const edgeId = `${edge.sourceOriginalId}-${edge.targetOriginalId}`;
-                    yEdges.delete(edgeId);
-                });
+                // Note: We don't need to explicitly delete edges; X6/UI should hide edges connected to hidden nodes.
+                // If we needed to archive edges, we'd do it here.
             });
 
-            // Also remove from X6 graph (will be synced from Yjs observer)
-            graphRef.current.removeCells(selectedNodes);
+            // Update X6 local state (hide nodes)
+            // graphRef.current.removeCells(selectedNodes); // Don't remove, hide them
+            selectedNodes.forEach(node => {
+                node.setVisible(false);
+                // Also hide connected edges
+                const edges = graphRef.current?.getConnectedEdges(node);
+                edges?.forEach(edge => edge.setVisible(false));
+            });
+
             clearSelection();
 
-            toast.success(`已剪切 ${data.nodes.length} 个节点`);
+            toast.success(`已归档 ${data.nodes.length} 个节点`);
         } catch (err) {
             console.error('[Clipboard] Cut failed:', err);
             toast.error('剪切失败');
@@ -411,7 +449,7 @@ export function useClipboard({
                         const mappedSource = idMap.get(e.sourceOriginalId);
                         const mappedTarget = idMap.get(e.targetOriginalId);
                         return (mappedSource === parentId && mappedTarget === childId) ||
-                               (mappedSource === childId && mappedTarget === parentId);
+                            (mappedSource === childId && mappedTarget === parentId);
                     });
 
                     if (!edgeExists) {
@@ -469,12 +507,8 @@ export function useClipboard({
     }, []);
 
     /**
-     * Delete selected nodes and all their descendants
-     * Story 2.6: Support Delete key to remove selected nodes and children
-     * - Finds all descendant nodes recursively
-     * - Deletes all associated edges
-     * - Uses Yjs transaction for undo support
-     * - Protects center-node from deletion
+     * Soft delete selected nodes and all their descendants
+     * Story 2.6: Support Delete key to archive selected nodes and children
      */
     const deleteNodes = useCallback(() => {
         if (!graphRef.current || !yDoc || selectedNodes.length === 0) {
@@ -482,12 +516,11 @@ export function useClipboard({
         }
 
         const yNodes = yDoc.getMap('nodes');
-        const yEdges = yDoc.getMap('edges');
 
         // Collect selected node IDs
         const selectedIds = new Set(selectedNodes.map(n => n.id));
 
-        // Protect center-node from deletion
+        // Protect center-node
         if (selectedIds.has('center-node')) {
             toast.warning('无法删除根节点');
             return;
@@ -500,8 +533,6 @@ export function useClipboard({
 
             while (queue.length > 0) {
                 const currentId = queue.shift()!;
-
-                // Find all nodes whose parentId equals currentId
                 yNodes.forEach((nodeData, nodeId) => {
                     const data = nodeData as { parentId?: string };
                     if (data.parentId === currentId && !descendants.has(nodeId) && !selectedIds.has(nodeId)) {
@@ -510,49 +541,55 @@ export function useClipboard({
                     }
                 });
             }
-
             return descendants;
         };
 
         const descendantIds = findAllDescendants(selectedIds);
+        const allNodesToArchive = new Set([...selectedIds, ...descendantIds]);
 
-        // Combine: selected nodes + all descendants
-        const allNodesToDelete = new Set([...selectedIds, ...descendantIds]);
-
-        // Find all edges connected to nodes being deleted
-        const edgesToDelete: string[] = [];
-        yEdges.forEach((edgeData, edgeId) => {
-            const edge = edgeData as { source?: string; target?: string };
-            if (
-                (edge.source && allNodesToDelete.has(edge.source)) ||
-                (edge.target && allNodesToDelete.has(edge.target))
-            ) {
-                edgesToDelete.push(edgeId);
-            }
-        });
-
-        // Delete in Yjs transaction (supports Undo)
+        // Soft delete in Yjs transaction
         undoManager?.stopCapturing();
         yDoc.transact(() => {
-            // Delete nodes
-            allNodesToDelete.forEach(nodeId => {
-                yNodes.delete(nodeId);
-            });
-            // Delete edges
-            edgesToDelete.forEach(edgeId => {
-                yEdges.delete(edgeId);
+            const now = new Date().toISOString();
+            allNodesToArchive.forEach(nodeId => {
+                const existing = yNodes.get(nodeId) as any;
+                if (existing) {
+                    yNodes.set(nodeId, {
+                        ...existing,
+                        isArchived: true,
+                        archivedAt: now,
+                        updatedAt: now
+                    });
+                    // Trigger backend archive
+                    archiveNode(nodeId).catch(err =>
+                        console.error(`[Clipboard] Failed to archive node ${nodeId} on server during delete`, err)
+                    );
+                }
             });
         });
 
-        // Clear selection
+        // Update X6 visibility locally
+        if (graphRef.current) {
+            const cellsToHide: any[] = [];
+            allNodesToArchive.forEach(id => {
+                const cell = graphRef.current!.getCellById(id);
+                if (cell) {
+                    cellsToHide.push(cell);
+                    const edges = graphRef.current!.getConnectedEdges(cell as Node);
+                    edges?.forEach(edge => cellsToHide.push(edge));
+                }
+            });
+            cellsToHide.forEach(cell => cell.setVisible(false));
+            graphRef.current.cleanSelection();
+        }
+
         clearSelection();
 
-        // Show feedback
         const childCount = descendantIds.size;
         if (childCount > 0) {
-            toast.success(`已删除 ${selectedIds.size} 个节点及 ${childCount} 个子节点`);
+            toast.success(`已归档 ${selectedIds.size} 个节点及 ${childCount} 个子节点`);
         } else {
-            toast.success(`已删除 ${selectedIds.size} 个节点`);
+            toast.success(`已归档 ${selectedIds.size} 个节点`);
         }
     }, [yDoc, undoManager, selectedNodes, clearSelection]);
 
