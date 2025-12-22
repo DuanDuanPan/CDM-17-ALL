@@ -285,8 +285,9 @@ export const PBSPropsSchema = z
     version: z.string().nullable().optional(),
     ownerId: z.string().nullable().optional(),
     // Story 2.7: PBS Indicators and Product Library
-    indicators: z.array(PBSIndicatorSchema).optional(),
-    productRef: ProductReferenceSchema.optional(),
+    // HIGH-1 Fix: Support null to allow explicit clearing of these fields (matching PBSProps interface)
+    indicators: z.array(PBSIndicatorSchema).nullable().optional(),
+    productRef: ProductReferenceSchema.nullable().optional(),
   })
   .strict();
 
