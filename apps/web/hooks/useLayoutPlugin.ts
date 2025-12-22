@@ -38,6 +38,14 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
       graph.options.interacting = { nodeMovable };
     }
 
+    // Story 1.3 + Story 2.6 FIX: Also control Selection plugin's movable option
+    // This prevents dragging selected nodes in mindmap/logic modes
+    if (nodeMovable) {
+      graph.enableSelectionMovable();
+    } else {
+      graph.disableSelectionMovable();
+    }
+
     // Apply initial layout
     layoutPlugin.changeLayout(currentMode, false).catch((err) => {
       console.error('Failed to apply initial layout:', err);
@@ -64,6 +72,14 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
       };
     } else {
       graph.options.interacting = { nodeMovable };
+    }
+
+    // Story 1.3 + Story 2.6 FIX: Also control Selection plugin's movable option
+    // This prevents dragging selected nodes in mindmap/logic modes
+    if (nodeMovable) {
+      graph.enableSelectionMovable();
+    } else {
+      graph.disableSelectionMovable();
     }
     layoutPlugin.changeLayout(currentMode, true).catch((err) => {
       console.error('Failed to change layout:', err);
