@@ -16,7 +16,7 @@ import {
   ValidationArguments,
   Validate,
 } from 'class-validator';
-import { NodeType, type NodeProps } from '@cdm/types';
+import { NodeType, type NodeProps, NODE_PROP_KEYS_BY_TYPE } from '@cdm/types';
 
 /**
  * [AI-Review-2][HIGH-3] Custom validator for type-specific node properties
@@ -38,19 +38,7 @@ class NodePropsValidator implements ValidatorConstraintInterface {
       return false;
     }
 
-    const allowedKeys: Record<NodeType, string[]> = {
-      [NodeType.ORDINARY]: [],
-      [NodeType.TASK]: [
-        'status', 'assigneeId', 'dueDate', 'priority', 'startDate', 'customStage', 'progress',
-        // Story 2.4: Task dispatch & feedback fields
-        'assignmentStatus', 'ownerId', 'rejectionReason', 'dispatchedAt', 'feedbackAt'
-      ],
-      [NodeType.REQUIREMENT]: ['reqType', 'acceptanceCriteria', 'priority'],
-      [NodeType.PBS]: ['code', 'version', 'ownerId'],
-      [NodeType.DATA]: ['dataType', 'version', 'secretLevel', 'storagePath'],
-    };
-
-    const allowed = allowedKeys[nodeType] || [];
+    const allowed = NODE_PROP_KEYS_BY_TYPE[nodeType] || [];
     const propsKeys = Object.keys(props);
 
     // All provided keys must be in allowed list

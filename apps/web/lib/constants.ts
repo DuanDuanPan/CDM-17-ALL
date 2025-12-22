@@ -34,6 +34,9 @@ export const STORAGE_KEY_LAYOUT_MODE = 'cdm:layoutMode';
 /** LocalStorage key for persisted grid enabled state */
 export const STORAGE_KEY_GRID_ENABLED = 'cdm:gridEnabled';
 
+/** LocalStorage key for product search history */
+export const STORAGE_KEY_PRODUCT_SEARCH_HISTORY = 'cdm:productSearchHistory';
+
 // ============================================================================
 // Node Defaults
 // ============================================================================

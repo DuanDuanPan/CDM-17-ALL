@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PropertyPanel } from '@/components/PropertyPanel';
-import { NodeType, type EnhancedNodeData, type NodeProps } from '@cdm/types';
+import { NodeType, type EnhancedNodeData, type NodeProps, sanitizeNodeProps } from '@cdm/types';
 import type { Graph, Node } from '@antv/x6';
 import type * as Y from 'yjs';
 import { syncLogger as logger } from '@/lib/logger';
@@ -446,22 +446,23 @@ export function RightSidebar({
 
   // Handle properties update - sync to both API and X6/Yjs
   const handlePropsUpdate = useCallback(async (nodeId: string, nodeType: NodeType, props: NodeProps) => {
+    const sanitizedProps = sanitizeNodeProps(nodeType, props as Record<string, unknown>) as NodeProps;
     const now = new Date().toISOString();
     // Optimistic update
     if (nodeData) {
       setNodeData({
         ...nodeData,
-        props,
+        props: sanitizedProps,
         createdAt: nodeData.createdAt ?? now,
         updatedAt: now,
       });
     }
 
     // Sync to X6 Graph → triggers Yjs sync via GraphSyncManager
-    syncToGraph(nodeId, { type: nodeType, props });
+    syncToGraph(nodeId, { type: nodeType, props: sanitizedProps });
 
     // Persist to backend API (debounced)
-    schedulePropsPersist(nodeId, nodeType, props);
+    schedulePropsPersist(nodeId, nodeType, sanitizedProps);
   }, [nodeData, syncToGraph, schedulePropsPersist]);
 
   const handleTagsUpdate = useCallback(

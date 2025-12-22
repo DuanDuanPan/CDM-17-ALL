@@ -60,4 +60,8 @@ export { Repository } from './Repository';
 export { Database, db } from './Database';
 
 // Re-export Prisma generated types (available after prisma generate)
-export type { User, Project, Graph, Node, Edge, Notification, Prisma } from '@prisma/client';
+export type { User, Project, Graph, Node, Edge, Notification, NodePBS, NodeTask, NodeRequirement, NodeData } from '@prisma/client';
+
+// HIGH-1 Fix: Export Prisma namespace as both type and value for DbNull access
+export { Prisma } from '@prisma/client';
+

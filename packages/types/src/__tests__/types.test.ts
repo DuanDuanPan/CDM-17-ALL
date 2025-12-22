@@ -13,7 +13,7 @@ import {
 } from '../edge-types';
 // Story 2.3: Import task types for multi-view synchronization
 import type { TaskProps, TaskStatus } from '../node-types';
-import { TaskPropsSchema, NodeType } from '../node-types';
+import { TaskPropsSchema, NodeType, sanitizeNodeProps } from '../node-types';
 
 describe('Type definitions', () => {
   it('should create a valid NodeData object', () => {
@@ -238,6 +238,51 @@ describe('Edge Types (Story 2.2)', () => {
         expect(result.success).toBe(true);
       });
     });
+  });
+});
+
+describe('sanitizeNodeProps', () => {
+  it('filters DATA props to allowed keys', () => {
+    const raw = {
+      dataType: 'document',
+      version: 'v1.0.1',
+      secretLevel: 'internal',
+      storagePath: '/tmp/file',
+      code: 'PBS-001',
+      ownerId: 'user-1',
+      status: 'todo',
+    };
+    const sanitized = sanitizeNodeProps(NodeType.DATA, raw);
+    expect(sanitized).toEqual({
+      dataType: 'document',
+      version: 'v1.0.1',
+      secretLevel: 'internal',
+      storagePath: '/tmp/file',
+    });
+  });
+
+  it('filters PBS props to allowed keys', () => {
+    const raw = {
+      code: 'PBS-001',
+      version: 'v1.0.0',
+      ownerId: 'owner-1',
+      indicators: [{ id: 'i1', name: 'Mass', targetValue: '10' }],
+      productRef: { productId: 'p1', productName: 'Engine' },
+      dataType: 'document',
+    };
+    const sanitized = sanitizeNodeProps(NodeType.PBS, raw);
+    expect(sanitized).toEqual({
+      code: 'PBS-001',
+      version: 'v1.0.0',
+      ownerId: 'owner-1',
+      indicators: [{ id: 'i1', name: 'Mass', targetValue: '10' }],
+      productRef: { productId: 'p1', productName: 'Engine' },
+    });
+  });
+
+  it('returns empty object for ORDINARY nodes', () => {
+    const sanitized = sanitizeNodeProps(NodeType.ORDINARY, { any: 'value' });
+    expect(sanitized).toEqual({});
   });
 });
 

@@ -54,11 +54,32 @@ export interface RequirementProps extends BaseNodeProps {
   priority?: 'must' | 'should' | 'could' | 'wont' | null; // MoSCoW
 }
 
+// Story 2.7: PBS Indicator for technical parameters
+export interface PBSIndicator {
+  id: string;           // nanoid generated
+  name: string;         // E.g., "Weight", "Power" (质量, 功率)
+  unit?: string;        // E.g., "kg", "W"
+  targetValue: string;  // Target requirement
+  actualValue?: string; // Actual measured value
+}
+
+// Story 2.7: Product Reference for linking to product library
+export interface ProductReference {
+  productId: string;
+  productName: string;
+  productCode?: string;
+  category?: string;
+}
+
 // PBS (Product Breakdown Structure) Node Properties
 export interface PBSProps extends BaseNodeProps {
   code?: string | null; // e.g., 'PBS-001'
   version?: string | null; // e.g., 'v1.0.0'
   ownerId?: string | null;
+  // Story 2.7: PBS Indicators and Product Library
+  // HIGH-1 Fix: Support null to allow explicit clearing of these fields
+  indicators?: PBSIndicator[] | null;     // 技术指标数组
+  productRef?: ProductReference | null;   // 产品库引用
 }
 
 // Data Type Enum for DATA nodes
@@ -74,6 +95,48 @@ export interface DataProps extends BaseNodeProps {
 
 // Union type for all node properties
 export type NodeProps = TaskProps | RequirementProps | PBSProps | DataProps | Record<string, never>;
+
+// Allowed prop keys per node type (shared by frontend and backend)
+export const NODE_PROP_KEYS_BY_TYPE: Record<NodeType, readonly string[]> = {
+  [NodeType.ORDINARY]: [],
+  [NodeType.TASK]: [
+    'status',
+    'assigneeId',
+    'startDate',
+    'dueDate',
+    'priority',
+    'customStage',
+    'progress',
+    'assignmentStatus',
+    'ownerId',
+    'rejectionReason',
+    'dispatchedAt',
+    'feedbackAt',
+  ],
+  [NodeType.REQUIREMENT]: ['reqType', 'acceptanceCriteria', 'priority'],
+  [NodeType.PBS]: ['code', 'version', 'ownerId', 'indicators', 'productRef'],
+  [NodeType.DATA]: ['dataType', 'version', 'secretLevel', 'storagePath'],
+};
+
+/**
+ * Sanitize props by node type: drop any keys not allowed for that type.
+ */
+export function sanitizeNodeProps(
+  nodeType: NodeType | undefined,
+  props: Record<string, unknown> | null | undefined
+): Record<string, unknown> {
+  if (!props || typeof props !== 'object') return {};
+  const type = nodeType ?? NodeType.ORDINARY;
+  const allowed = NODE_PROP_KEYS_BY_TYPE[type] || [];
+  if (allowed.length === 0) return {};
+  const sanitized: Record<string, unknown> = {};
+  for (const key of allowed) {
+    if (Object.prototype.hasOwnProperty.call(props, key)) {
+      sanitized[key] = (props as Record<string, unknown>)[key];
+    }
+  }
+  return sanitized;
+}
 
 // Enhanced Node Data with polymorphic properties
 export interface EnhancedNodeData {
@@ -199,11 +262,31 @@ export const RequirementPropsSchema = z
   })
   .strict();
 
+// Story 2.7: PBS Indicator Schema
+export const PBSIndicatorSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  unit: z.string().optional(),
+  targetValue: z.string(),
+  actualValue: z.string().optional(),
+});
+
+// Story 2.7: Product Reference Schema
+export const ProductReferenceSchema = z.object({
+  productId: z.string(),
+  productName: z.string(),
+  productCode: z.string().optional(),
+  category: z.string().optional(),
+});
+
 export const PBSPropsSchema = z
   .object({
     code: z.string().nullable().optional(),
     version: z.string().nullable().optional(),
     ownerId: z.string().nullable().optional(),
+    // Story 2.7: PBS Indicators and Product Library
+    indicators: z.array(PBSIndicatorSchema).optional(),
+    productRef: ProductReferenceSchema.optional(),
   })
   .strict();
 

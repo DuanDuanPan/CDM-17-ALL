@@ -1,14 +1,15 @@
-import { CreateNodeDto, NodeProps, NodeResponse, NodeType } from '@cdm/types';
+import { CreateNodeDto, NodeProps, NodeResponse, NodeType, sanitizeNodeProps } from '@cdm/types';
 
 /**
  * Sanitize props before sending to API
  * - Converts empty strings to null for nullable fields
  * - Removes undefined values
  */
-function sanitizeProps(props: NodeProps): NodeProps {
-  const sanitized: any = {};
+function sanitizeProps(props: NodeProps, nodeType?: NodeType): NodeProps {
+  const filtered = sanitizeNodeProps(nodeType ?? NodeType.ORDINARY, props as Record<string, unknown>);
+  const sanitized: Record<string, unknown> = {};
 
-  for (const [key, value] of Object.entries(props)) {
+  for (const [key, value] of Object.entries(filtered)) {
     // Skip undefined values
     if (value === undefined) continue;
 
@@ -20,7 +21,7 @@ function sanitizeProps(props: NodeProps): NodeProps {
     }
   }
 
-  return sanitized;
+  return sanitized as NodeProps;
 }
 
 export async function fetchNode(nodeId: string): Promise<NodeResponse | null> {
@@ -118,7 +119,7 @@ export async function unarchiveNode(nodeId: string): Promise<boolean> {
 }
 
 export async function updateNodeProps(nodeId: string, type: NodeType, props: NodeProps): Promise<boolean> {
-  const sanitizedProps = sanitizeProps(props);
+  const sanitizedProps = sanitizeProps(props, type);
   const payload = { type, props: sanitizedProps };
   const response = await fetch(`/api/nodes/${nodeId}/properties`, {
     method: 'PATCH',

@@ -24,6 +24,7 @@ import {
     CLIPBOARD_SOURCE,
     MAX_CLIPBOARD_NODES,
     NodeType,
+    sanitizeNodeProps,
 } from '@cdm/types';
 import type { EdgeKind, DependencyType } from '@cdm/types';
 
@@ -165,18 +166,21 @@ export function useClipboard({
             const { x, y } = node.getPosition();
             const { width, height } = node.getSize();
             const data = node.getData() || {};
+            const nodeType = (data.nodeType || data.type || NodeType.ORDINARY) as NodeType;
+            const rawProps = (data.props || data.metadata || {}) as Record<string, unknown>;
+            const sanitizedProps = sanitizeNodeProps(nodeType, rawProps);
 
             return {
                 originalId: node.id,
                 label: data.label || node.getAttrByPath('text/text') as string || '',
-                type: (data.nodeType || data.type || NodeType.ORDINARY) as NodeType,
+                type: nodeType,
                 x: x - center.x, // Relative position
                 y: y - center.y,
                 width,
                 height,
                 parentOriginalId: data.parentId,
                 description: data.description,
-                metadata: data.props || data.metadata || {},
+                metadata: sanitizedProps,
                 tags: data.tags || [],
             };
         });
@@ -349,9 +353,24 @@ export function useClipboard({
             const parentChildRelations: Array<{ parentId: string; childId: string }> = [];
 
             // Story 2.6 Fix: Determine paste target parent
-            // If a single node is selected at paste time, use it as the parent for "orphan" pasted nodes
-            // (nodes whose original parent was not in the clipboard)
+            // If a single node is selected at paste time, use it as the parent for "orphan" pasted nodes.
+            // Otherwise, fall back to the current root so pasted nodes participate in auto-layout.
             const pasteTargetParentId = selectedNodes.length === 1 ? selectedNodes[0].id : undefined;
+            const fallbackParentId = pasteTargetParentId ?? (() => {
+                const graph = graphRef.current;
+                if (!graph) return undefined;
+                const nodes = graph.getNodes();
+                const rootNode = nodes.find((node) => {
+                    const data = node.getData() || {};
+                    return data.type === 'root' || data.mindmapType === 'root';
+                });
+                if (rootNode) return rootNode.id;
+                const topLevelNode = nodes.find((node) => {
+                    const data = node.getData() || {};
+                    return !data.parentId;
+                });
+                return topLevelNode?.id;
+            })();
 
             yDoc.transact(() => {
                 // Create nodes with new IDs (AC3.3: preserve relative positions)
@@ -371,16 +390,14 @@ export function useClipboard({
                         const mappedParentId = idMap.get(nodeData.parentOriginalId);
                         if (mappedParentId) {
                             resolvedParentId = mappedParentId;
-                        } else if (pasteTargetParentId) {
-                            // Parent wasn't copied - use the selected node as the new parent
-                            // This is the expected behavior: paste as child of selected node
-                            resolvedParentId = pasteTargetParentId;
+                        } else if (fallbackParentId) {
+                            // Parent wasn't copied - attach to selection or root so layout includes the node
+                            resolvedParentId = fallbackParentId;
                         }
                         // If no paste target and original parent not in clipboard, leave orphaned
-                    } else if (pasteTargetParentId) {
-                        // Node had no parent originally, but we have a paste target
-                        // Make it a child of the paste target
-                        resolvedParentId = pasteTargetParentId;
+                    } else if (fallbackParentId) {
+                        // Node had no parent originally; attach to selection or root
+                        resolvedParentId = fallbackParentId;
                     }
 
                     // Track parent-child relationship for edge creation
@@ -393,11 +410,11 @@ export function useClipboard({
                     // nodeId, createdAt, updatedAt are managed by the database, not the props JSON
                     const now = new Date().toISOString();
                     let updatedProps: Record<string, unknown> | undefined;
-                    if (nodeData.metadata && typeof nodeData.metadata === 'object') {
-                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                        const { nodeId: _nodeId, createdAt: _createdAt, updatedAt: _updatedAt, ...cleanProps } = nodeData.metadata as Record<string, unknown>;
-                        updatedProps = Object.keys(cleanProps).length > 0 ? cleanProps : undefined;
-                    }
+                    const rawProps = nodeData.metadata && typeof nodeData.metadata === 'object'
+                        ? (nodeData.metadata as Record<string, unknown>)
+                        : {};
+                    const sanitizedProps = sanitizeNodeProps(nodeData.type, rawProps);
+                    updatedProps = Object.keys(sanitizedProps).length > 0 ? sanitizedProps : undefined;
 
                     const newNode = {
                         id: newId,

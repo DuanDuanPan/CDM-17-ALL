@@ -187,8 +187,15 @@ export function MindNode({ node }: MindNodeProps) {
     const priority = (data.props as RequirementProps)?.priority;
     if (priority) pill = { ...pill!, label: priority.charAt(0).toUpperCase() + priority.slice(1) };
   } else if (nodeType === NodeType.PBS) {
-    const version = (data.props as PBSProps)?.version;
-    if (version) pill = { ...pill!, label: version };
+    const pbsProps = data.props as PBSProps;
+    const productCode = pbsProps?.productRef?.productCode;
+    const version = pbsProps?.version;
+    // Story 2.7: Prefer productCode from linked product, with indigo styling
+    if (productCode) {
+      pill = { bg: 'bg-indigo-100', text: 'text-indigo-700', label: productCode };
+    } else if (version) {
+      pill = { ...pill!, label: version };
+    }
   } else if (nodeType === NodeType.DATA) {
     const secretLevel = (data.props as DataProps)?.secretLevel;
     if (secretLevel) pill = { ...pill!, label: secretLevel.charAt(0).toUpperCase() + secretLevel.slice(1) };
@@ -468,12 +475,12 @@ export function MindNode({ node }: MindNodeProps) {
           {showAssignmentIndicator && (
             <div
               className={`flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-medium leading-none flex-shrink-0 ${assignmentStatus === 'accepted'
-                  ? 'bg-green-100 text-green-700'
-                  : assignmentStatus === 'dispatched'
-                    ? 'bg-yellow-100 text-yellow-700'
-                    : assignmentStatus === 'rejected'
-                      ? 'bg-red-100 text-red-700'
-                      : ''
+                ? 'bg-green-100 text-green-700'
+                : assignmentStatus === 'dispatched'
+                  ? 'bg-yellow-100 text-yellow-700'
+                  : assignmentStatus === 'rejected'
+                    ? 'bg-red-100 text-red-700'
+                    : ''
                 }`}
               title={
                 assignmentStatus === 'accepted'

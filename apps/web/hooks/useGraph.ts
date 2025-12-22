@@ -104,12 +104,23 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
     graphRef.current = graph;
     setIsReady(true);
 
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      const debugWindow = window as Window & { __cdmGraph?: Graph };
+      debugWindow.__cdmGraph = graph;
+    }
+
     // Cleanup function to prevent double-instantiation in React Strict Mode
     return () => {
       if (graphRef.current) {
         const graphToDispose = graphRef.current;
         graphRef.current = null;
         setIsReady(false);
+        if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+          const debugWindow = window as Window & { __cdmGraph?: Graph };
+          if (debugWindow.__cdmGraph === graphToDispose) {
+            delete debugWindow.__cdmGraph;
+          }
+        }
         // Defer disposal to avoid React unmount during render (ReactShapeView unmount warning)
         setTimeout(() => {
           try {

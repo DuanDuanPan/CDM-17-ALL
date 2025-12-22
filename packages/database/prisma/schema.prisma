@@ -147,6 +147,10 @@ model NodePBS {
   code     String? // e.g., "PBS-001"
   version  String? @default("v1.0.0")
   ownerId  String?
+  
+  // Story 2.7: PBS Indicators and Product Library Reference
+  indicators Json?  // Array of PBSIndicator: [{ id, name, unit, targetValue, actualValue }]
+  productRef Json?  // ProductReference: { productId, productName, productCode, category }
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

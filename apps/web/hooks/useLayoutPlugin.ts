@@ -132,7 +132,7 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     [graph, isReady, currentMode, addToast]
   );
 
-  // Recalculate layout when graph structure changes (nodes added/removed)
+  // Recalculate layout when graph structure changes (nodes added/removed/visibility changed)
   useEffect(() => {
     if (!graph || !isReady || currentMode === 'free') return;
 
@@ -155,10 +155,15 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     graph.on('node:added', handleGraphChange);
     graph.on('node:removed', handleGraphChange);
 
+    // Story 2.7: Listen for node visibility changes (archive/restore)
+    // When a node is archived (hidden) or restored (shown), recalculate layout
+    graph.on('node:change:visible', handleGraphChange);
+
     return () => {
       if (graph && typeof graph.off === 'function') {
         graph.off('node:added', handleGraphChange);
         graph.off('node:removed', handleGraphChange);
+        graph.off('node:change:visible', handleGraphChange);
       }
     };
   }, [graph, isReady, currentMode, addToast]);

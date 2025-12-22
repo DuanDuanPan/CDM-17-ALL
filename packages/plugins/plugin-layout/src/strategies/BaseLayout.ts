@@ -93,11 +93,14 @@ export abstract class BaseLayout {
 
   /**
    * Get root node of the graph
+   * Story 2.7: Excludes archived nodes from root selection
    */
   protected getRootNode(): Node | null {
     const nodes = this.graph.getNodes();
     const rootNode = nodes.find((node) => {
       const data = node.getData();
+      // Story 2.7: Skip archived nodes - they should not be the root
+      if (data?.isArchived) return false;
       return data?.type === 'root' || !data?.parentId;
     });
     return rootNode || null;
@@ -123,8 +126,11 @@ export abstract class BaseLayout {
       visited.add(id);
 
       // Try to find children by parentId first
+      // Story 2.7: Filter out archived nodes - they should not be included in layout
       let children = this.graph.getNodes().filter((n) => {
         const data = n.getData();
+        // Skip archived nodes completely
+        if (data?.isArchived) return false;
         return data?.parentId === id;
       });
 
@@ -140,7 +146,8 @@ export abstract class BaseLayout {
           );
           children = hierarchicalEdges
             .map((edge) => this.graph.getCellById(edge.getTargetCellId()) as Node)
-            .filter((child) => child != null);
+            // Story 2.7: Also filter out archived nodes from edge-based children
+            .filter((child) => child != null && !child.getData()?.isArchived);
         }
       }
 

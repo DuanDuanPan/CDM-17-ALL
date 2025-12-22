@@ -22,11 +22,32 @@ export class NetworkLayout extends BaseLayout {
 
     /**
      * Apply Dagre layout to the graph
+     * Story 2.7: Filters out archived nodes from layout calculation
      */
     override async apply(animate: boolean = true): Promise<void> {
         const model = this.graph.model;
-        const nodes = model.getNodes();
-        const edges = model.getEdges();
+
+        // Story 2.7: Filter out archived nodes from layout calculation
+        const allNodes = model.getNodes();
+        const nodes = allNodes.filter((node) => {
+            const data = node.getData();
+            return !data?.isArchived;
+        });
+
+        const allEdges = model.getEdges();
+        // Story 2.7: Also filter out edges connected to archived nodes
+        const archivedNodeIds = new Set(
+            allNodes
+                .filter((node) => node.getData()?.isArchived)
+                .map((node) => node.id)
+        );
+        const edges = allEdges.filter((edge) => {
+            const sourceId = edge.getSourceCellId();
+            const targetId = edge.getTargetCellId();
+            return sourceId && targetId &&
+                !archivedNodeIds.has(sourceId) &&
+                !archivedNodeIds.has(targetId);
+        });
 
         if (nodes.length === 0) return;
 
@@ -46,14 +67,13 @@ export class NetworkLayout extends BaseLayout {
         // Default to assigning a new object as a label for each new edge.
         g.setDefaultEdgeLabel(() => ({}));
 
-        // Add nodes to dagre graph
+        // Add visible nodes to dagre graph
         nodes.forEach((node) => {
             const size = node.getSize();
             g.setNode(node.id, { width: size.width, height: size.height });
         });
 
-        // Add edges to dagre graph
-        // We include ALL edges to respect dependencies
+        // Add edges between visible nodes to dagre graph
         edges.forEach((edge) => {
             const sourceId = edge.getSourceCellId();
             const targetId = edge.getTargetCellId();
