@@ -1,18 +1,22 @@
 /**
  * Story 2.4: Graph Context
  * Provides graph instance and navigation methods to child components
+ * Story 2.7: Extended with Yjs document for collaborative archive/restore sync
  */
 
 'use client';
 
 import { createContext, useContext, useCallback, type ReactNode } from 'react';
 import type { Graph } from '@antv/x6';
+import type * as Y from 'yjs';
 
 export interface GraphContextValue {
     /** X6 Graph instance */
     graph: Graph | null;
     /** Current graph ID */
     graphId: string | null;
+    /** Yjs document for collaborative operations (Story 2.7) */
+    yDoc: Y.Doc | null;
     /** Navigate to a specific node by ID */
     navigateToNode: (nodeId: string) => void;
     /** Select a specific node by ID */
@@ -25,10 +29,11 @@ export interface GraphProviderProps {
     children: ReactNode;
     graph: Graph | null;
     graphId: string;
+    yDoc?: Y.Doc | null;
     onNodeSelect?: (nodeId: string | null) => void;
 }
 
-export function GraphProvider({ children, graph, graphId, onNodeSelect }: GraphProviderProps) {
+export function GraphProvider({ children, graph, graphId, yDoc = null, onNodeSelect }: GraphProviderProps) {
     /**
      * Navigate to a node: center the graph viewport on the node and select it
      */
@@ -77,7 +82,7 @@ export function GraphProvider({ children, graph, graphId, onNodeSelect }: GraphP
     }, [graph, onNodeSelect]);
 
     return (
-        <GraphContext.Provider value={{ graph, graphId, navigateToNode, selectNode }}>
+        <GraphContext.Provider value={{ graph, graphId, yDoc, navigateToNode, selectNode }}>
             {children}
         </GraphContext.Provider>
     );

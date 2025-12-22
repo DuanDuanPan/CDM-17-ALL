@@ -442,6 +442,7 @@ export class GraphSyncManager {
     /**
      * Apply node data from Yjs to X6 graph
      * Story 2.1: Now applies type-specific properties
+     * Story 2.7: Now handles visibility based on isArchived state
      */
     private applyNodeToGraph(data: YjsNodeData): void {
         if (!this.graph) return;
@@ -473,16 +474,41 @@ export class GraphSyncManager {
                 isArchived: data.isArchived,
                 archivedAt: data.archivedAt,
             });
-            logger.debug('Updated existing node', { id: data.id, mindmapType, nodeType: data.nodeType });
+
+            // Story 2.7: Handle visibility based on isArchived state (multi-client sync)
+            if (data.isArchived) {
+                existingNode.hide();
+                // Also hide connected edges
+                const edges = this.graph.getConnectedEdges(existingNode);
+                edges?.forEach(edge => edge.hide());
+            } else {
+                // When unarchiving, show the node
+                existingNode.show();
+                // Show connected edges only if BOTH endpoints are visible
+                const edges = this.graph.getConnectedEdges(existingNode);
+                edges?.forEach(edge => {
+                    const source = edge.getSourceCell();
+                    const target = edge.getTargetCell();
+                    if (source?.isVisible() && target?.isVisible()) {
+                        edge.show();
+                    }
+                });
+            }
+
+            logger.debug('Updated existing node', { id: data.id, mindmapType, nodeType: data.nodeType, isArchived: data.isArchived });
         } else if (!existingCell) {
             // Add new node with mind-node shape for proper rendering
-            this.graph.addNode({
+            // Story 2.7: Check if node should be visible based on archive status
+            const shouldBeVisible = !data.isArchived;
+
+            const newNode = this.graph.addNode({
                 shape: 'mind-node', // Critical: use mind-node shape for proper React component rendering
                 id: data.id,
                 x: data.x,
                 y: data.y,
                 width: 120,
                 height: 50,
+                visible: shouldBeVisible, // Story 2.7: Set initial visibility
                 data: {
                     label: data.label,
                     type: mindmapType,
@@ -502,7 +528,13 @@ export class GraphSyncManager {
                     archivedAt: data.archivedAt,
                 },
             });
-            logger.debug('Added new node', { id: data.id, mindmapType, nodeType: data.nodeType });
+
+            // Story 2.7: Ensure visibility is set correctly after creation
+            if (!shouldBeVisible) {
+                newNode.hide();
+            }
+
+            logger.debug('Added new node', { id: data.id, mindmapType, nodeType: data.nodeType, isArchived: data.isArchived });
         }
     }
 

@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import type { UndoManager } from 'yjs';
 import { archiveNode } from '@/lib/api/nodes';
+import { useConfirmDialog } from '@cdm/ui';
 import {
     ClipboardData,
     ClipboardNodeData,
@@ -52,8 +53,10 @@ export interface UseClipboardReturn {
     paste: (position?: { x: number; y: number }) => Promise<void>;
     /** Check if clipboard has valid paste data */
     canPaste: () => Promise<boolean>;
-    /** Delete selected nodes and all their descendants (Story 2.6) */
+    /** Soft delete (archive) selected nodes and all their descendants (Story 2.6) */
     deleteNodes: () => void;
+    /** Permanently delete selected nodes and all their descendants (Story 2.7) */
+    hardDeleteNodes: () => void;
 }
 
 /**
@@ -593,11 +596,115 @@ export function useClipboard({
         }
     }, [yDoc, undoManager, selectedNodes, clearSelection]);
 
+    /**
+     * Permanently delete selected nodes and all their descendants
+     * Story 2.7: Support Shift+Delete for permanent deletion with multi-client sync
+     */
+    const { showConfirm } = useConfirmDialog();
+
+    const hardDeleteNodes = useCallback(() => {
+        if (!graphRef.current || !yDoc || selectedNodes.length === 0) {
+            return;
+        }
+
+        const yNodes = yDoc.getMap('nodes');
+        const yEdges = yDoc.getMap('edges');
+
+        // Collect selected node IDs
+        const selectedIds = new Set(selectedNodes.map(n => n.id));
+
+        // Protect center-node
+        if (selectedIds.has('center-node')) {
+            toast.warning('无法删除根节点');
+            return;
+        }
+
+        // Find all descendants (children, grandchildren, etc.)
+        const findAllDescendants = (parentIds: Set<string>): Set<string> => {
+            const descendants = new Set<string>();
+            const queue = [...parentIds];
+
+            while (queue.length > 0) {
+                const currentId = queue.shift()!;
+                yNodes.forEach((nodeData, nodeId) => {
+                    const data = nodeData as { parentId?: string };
+                    if (data.parentId === currentId && !descendants.has(nodeId) && !selectedIds.has(nodeId)) {
+                        descendants.add(nodeId);
+                        queue.push(nodeId);
+                    }
+                });
+            }
+            return descendants;
+        };
+
+        const descendantIds = findAllDescendants(selectedIds);
+        const allNodesToDelete = new Set([...selectedIds, ...descendantIds]);
+        const totalCount = allNodesToDelete.size;
+
+        // Show confirmation dialog
+        showConfirm({
+            title: '确认永久删除',
+            description: `将永久删除 ${selectedIds.size} 个节点${descendantIds.size > 0 ? `及 ${descendantIds.size} 个子节点` : ''}。此操作无法撤销。`,
+            confirmText: '永久删除',
+            cancelText: '取消',
+            variant: 'danger',
+            onConfirm: async () => {
+                // 1. Find all edges to delete
+                const edgesToDelete = new Set<string>();
+                yEdges.forEach((edgeData, edgeId) => {
+                    const edge = edgeData as { source: string; target: string };
+                    if (allNodesToDelete.has(edge.source) || allNodesToDelete.has(edge.target)) {
+                        edgesToDelete.add(edgeId);
+                    }
+                });
+
+                // 2. Call backend API to delete nodes
+                try {
+                    await Promise.all(
+                        Array.from(allNodesToDelete).map(id =>
+                            fetch(`/api/nodes/${id}`, { method: 'DELETE' })
+                        )
+                    );
+                } catch (error) {
+                    console.error('[Clipboard] Failed to delete nodes on server:', error);
+                    toast.error('删除失败，请稍后重试');
+                    return;
+                }
+
+                // 3. Delete from Yjs to sync to other clients
+                yDoc.transact(() => {
+                    // Delete edges first
+                    edgesToDelete.forEach(edgeId => {
+                        yEdges.delete(edgeId);
+                    });
+                    // Then delete nodes
+                    allNodesToDelete.forEach(nodeId => {
+                        yNodes.delete(nodeId);
+                    });
+                });
+
+                // 4. Clear selection (X6 cells will be removed by GraphSyncManager)
+                if (graphRef.current) {
+                    graphRef.current.cleanSelection();
+                }
+                clearSelection();
+
+                // 5. Show success message
+                if (descendantIds.size > 0) {
+                    toast.success(`已永久删除 ${selectedIds.size} 个节点及 ${descendantIds.size} 个子节点`);
+                } else {
+                    toast.success(`已永久删除 ${selectedIds.size} 个节点`);
+                }
+            },
+        });
+    }, [yDoc, selectedNodes, clearSelection, showConfirm]);
+
     return {
         copy,
         cut,
         paste,
         canPaste,
         deleteNodes,
+        hardDeleteNodes,
     };
 }

@@ -177,7 +177,8 @@ export function GraphComponent({
     } = collaboration ?? fallbackCollab;
 
     // Story 2.6: Clipboard operations (depends on yDoc for undo support)
-    const { copy, cut, paste, deleteNodes } = useClipboard({
+    // Story 2.7: Added hardDeleteNodes for permanent deletion
+    const { copy, cut, paste, deleteNodes, hardDeleteNodes } = useClipboard({
         graph,
         graphId,
         yDoc,
@@ -188,11 +189,13 @@ export function GraphComponent({
     });
 
     // Story 2.6: Register clipboard keyboard shortcuts
+    // Story 2.7: Added hardDeleteNodes for Shift+Delete shortcut
     useClipboardShortcuts({
         copy,
         cut,
         paste,
         deleteNodes,
+        hardDeleteNodes,
         hasSelection,
         isEditing,
         enabled: isReady,
@@ -477,12 +480,9 @@ export function GraphComponent({
                     createSiblingOrChildNode(graph, node);
                     break;
 
-                case 'Delete':
-                case 'Backspace':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    removeNode(graph, node);
-                    break;
+                // Story 2.7: Delete/Backspace is now handled by useClipboardShortcuts
+                // to properly support both archive (Delete) and hard delete (Shift+Delete)
+                // See useClipboardShortcuts for the unified delete handling
 
                 case ' ': // Space
                     e.preventDefault();

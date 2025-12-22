@@ -1,11 +1,12 @@
 /**
  * Story 2.1: Nodes Controller
  * Story 2.5: Extended with search, tags, and archive endpoints
+ * Story 2.7: Added hard delete endpoint
  * REST API endpoints for node operations with polymorphic type support
  * [AI-Review][MEDIUM-2] Fixed: Added explicit return types
  */
 
-import { Controller, Get, Post, Patch, Param, Body, Query, HttpCode, HttpStatus, UsePipes } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, HttpCode, HttpStatus, UsePipes } from '@nestjs/common';
 import { NodesService } from './nodes.service';
 import { TaskService } from './services/task.service';
 import {
@@ -152,6 +153,17 @@ export class NodesController {
   @Post(':id\\:unarchive')
   async unarchiveNode(@Param('id') id: string): Promise<NodeResponse> {
     return this.nodesService.unarchive(id);
+  }
+
+  /**
+   * Permanently delete node
+   * DELETE /api/nodes/:id
+   * Story 2.7: Hard delete (cannot be undone)
+   */
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  async deleteNode(@Param('id') id: string): Promise<{ success: boolean; deletedCount: number }> {
+    return this.nodesService.hardDelete(id);
   }
 
   // ============================

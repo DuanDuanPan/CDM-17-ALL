@@ -126,7 +126,7 @@ function GraphPageContent() {
             onUserHoverExternal={handleUserHover}
             onUserClickExternal={handleUserClick}
         >
-            <GraphProvider graph={graph} graphId={graphId} onNodeSelect={handleNodeSelect}>
+            <GraphProvider graph={graph} graphId={graphId} yDoc={collab.yDoc} onNodeSelect={handleNodeSelect}>
                 <div className="flex flex-col h-screen">
                     <TopBar
                         userId={userId} // Story 2.4: Pass current user for notifications

@@ -92,6 +92,16 @@ export class NodeRepository {
   }
 
   /**
+   * Story 2.7: Hard delete node (permanent removal)
+   * Note: Prisma cascade will automatically delete related edges
+   */
+  async delete(nodeId: string): Promise<void> {
+    await prisma.node.delete({
+      where: { id: nodeId },
+    });
+  }
+
+  /**
    * Story 2.5: Search nodes with keyword, tags, and archive filtering
    * @param query Search parameters
    * @returns Matching nodes with graph info and total count

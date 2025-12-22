@@ -15,8 +15,10 @@ export interface UseClipboardShortcutsOptions {
     cut: () => Promise<void>;
     /** Paste function from useClipboard (position optional for keyboard paste) */
     paste: (position?: { x: number; y: number }) => Promise<void>;
-    /** Delete function from useClipboard (Story 2.6) */
+    /** Soft delete (archive) function from useClipboard (Story 2.6) */
     deleteNodes: () => void;
+    /** Permanent delete function from useClipboard (Story 2.7) */
+    hardDeleteNodes: () => void;
     /** Whether there is at least one selected node */
     hasSelection: boolean;
     /** Whether editing is active (node label editing) */
@@ -52,6 +54,7 @@ export function useClipboardShortcuts({
     cut,
     paste,
     deleteNodes,
+    hardDeleteNodes,
     hasSelection,
     isEditing = false,
     enabled = true,
@@ -62,6 +65,7 @@ export function useClipboardShortcuts({
     const cutRef = useRef(cut);
     const pasteRef = useRef(paste);
     const deleteNodesRef = useRef(deleteNodes);
+    const hardDeleteNodesRef = useRef(hardDeleteNodes);
     const hasSelectionRef = useRef(hasSelection);
     const isEditingRef = useRef(isEditing);
     const enabledRef = useRef(enabled);
@@ -72,10 +76,11 @@ export function useClipboardShortcuts({
         cutRef.current = cut;
         pasteRef.current = paste;
         deleteNodesRef.current = deleteNodes;
+        hardDeleteNodesRef.current = hardDeleteNodes;
         hasSelectionRef.current = hasSelection;
         isEditingRef.current = isEditing;
         enabledRef.current = enabled;
-    }, [copy, cut, paste, deleteNodes, hasSelection, isEditing, enabled]);
+    }, [copy, cut, paste, deleteNodes, hardDeleteNodes, hasSelection, isEditing, enabled]);
 
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
         // Skip if disabled
@@ -94,12 +99,19 @@ export function useClipboardShortcuts({
             return;
         }
 
-        // Handle Delete/Backspace WITHOUT modifier (for multi-select deletion)
+        // Handle Delete/Backspace (for multi-select deletion)
+        // Story 2.7: Shift+Delete = permanent delete, Delete = archive
         if (e.key === 'Delete' || e.key === 'Backspace') {
             if (hasSelectionRef.current) {
                 e.preventDefault();
                 e.stopPropagation();
-                deleteNodesRef.current();
+                if (e.shiftKey) {
+                    // Shift+Delete: Permanent delete (with confirmation)
+                    hardDeleteNodesRef.current();
+                } else {
+                    // Delete: Soft delete (archive)
+                    deleteNodesRef.current();
+                }
             }
             return;
         }

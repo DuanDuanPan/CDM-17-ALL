@@ -84,15 +84,13 @@ export function TopBar({
     [navigateToNode]
   );
 
+  // Story 2.7: Simplified - ArchiveDrawer now handles Yjs sync and X6 visibility
+  // This callback only needs to navigate to the restored node
   const handleArchiveRestore = useCallback(
     (nodeId: string) => {
-      const cell = graph?.getCellById(nodeId);
-      if (cell && cell.isNode()) {
-        cell.show();
-      }
       navigateToNode?.(nodeId);
     },
-    [graph, navigateToNode]
+    [navigateToNode]
   );
 
   return (

@@ -20,6 +20,8 @@ describe('NodesService', () => {
     findByIdWithProps: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    search: jest.fn(),   // Story 2.7: Added for hardDelete tests
+    delete: jest.fn(),   // Story 2.7: Added for hardDelete tests
   };
   const mockTaskService = { initialize: jest.fn(), upsertProps: jest.fn() };
   const mockRequirementService = { initialize: jest.fn(), upsertProps: jest.fn() };
@@ -218,6 +220,56 @@ describe('NodesService', () => {
         y: 20,
       });
       expect(result.label).toBe('Updated');
+    });
+  });
+
+  // ============================
+  // Story 2.7: Hard Delete Tests
+  // ============================
+  describe('hardDelete', () => {
+    it('throws when node not found', async () => {
+      mockNodeRepo.findById.mockResolvedValue(null);
+      await expect(service.hardDelete('missing')).rejects.toThrow(NotFoundException);
+    });
+
+    it('deletes single node without children', async () => {
+      const mockNode = { id: 'node-1', graphId: 'graph-1' };
+      mockNodeRepo.findById.mockResolvedValue(mockNode);
+      mockNodeRepo.search.mockResolvedValue({ results: [], total: 0 });
+      mockNodeRepo.delete = jest.fn().mockResolvedValue(undefined);
+
+      const result = await service.hardDelete('node-1');
+
+      expect(mockNodeRepo.delete).toHaveBeenCalledWith('node-1');
+      expect(result.success).toBe(true);
+      expect(result.deletedCount).toBe(1);
+    });
+
+    it('deletes node with all descendants', async () => {
+      const mockNode = { id: 'parent-1', graphId: 'graph-1' };
+      const mockChildren = [
+        { id: 'child-1', parentId: 'parent-1', graphId: 'graph-1', graph: { id: 'graph-1', name: 'Test' } },
+        { id: 'child-2', parentId: 'parent-1', graphId: 'graph-1', graph: { id: 'graph-1', name: 'Test' } },
+      ];
+      const mockGrandchildren = [
+        { id: 'grandchild-1', parentId: 'child-1', graphId: 'graph-1', graph: { id: 'graph-1', name: 'Test' } },
+      ];
+
+      mockNodeRepo.findById.mockResolvedValue(mockNode);
+      // First call returns children of parent-1, second call for child-1 returns grandchild, others return empty
+      mockNodeRepo.search
+        .mockResolvedValueOnce({ results: [...mockChildren, ...mockGrandchildren], total: 3 })
+        .mockResolvedValueOnce({ results: [...mockChildren, ...mockGrandchildren], total: 3 })
+        .mockResolvedValueOnce({ results: [...mockChildren, ...mockGrandchildren], total: 3 })
+        .mockResolvedValueOnce({ results: [...mockChildren, ...mockGrandchildren], total: 3 });
+      mockNodeRepo.delete = jest.fn().mockResolvedValue(undefined);
+
+      const result = await service.hardDelete('parent-1');
+
+      expect(result.success).toBe(true);
+      // Should delete parent + 2 children + 1 grandchild = 4 nodes
+      expect(result.deletedCount).toBeGreaterThanOrEqual(1);
+      expect(mockNodeRepo.delete).toHaveBeenCalled();
     });
   });
 });

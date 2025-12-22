@@ -45,6 +45,7 @@ export interface SearchResultItem {
     matchType: SearchMatchType;      // 匹配类型
     matchHighlight?: string;         // 高亮匹配的片段
     relevanceScore?: number;         // 相关度评分
+    archivedAt?: string | null;      // 归档时间
 }
 
 /**

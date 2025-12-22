@@ -264,6 +264,7 @@ export class NodesService {
       y: node.y,
       matchType: this.determineMatchType(node, query),
       matchHighlight: this.createHighlight(node, query.q),
+      archivedAt: (node as { archivedAt?: Date | null }).archivedAt?.toISOString() ?? null,
     }));
 
     return {
@@ -325,6 +326,49 @@ export class NodesService {
   }
 
   /**
+   * Permanently delete node and its children
+   * Story 2.7: Hard delete (cannot be undone)
+   * @param nodeId - Node ID to delete
+   * @returns Success status
+   */
+  async hardDelete(nodeId: string): Promise<{ success: boolean; deletedCount: number }> {
+    const node = await this.nodeRepo.findById(nodeId);
+    if (!node) {
+      throw new NotFoundException(`Node ${nodeId} not found`);
+    }
+
+    // Recursively collect all descendant IDs
+    const getAllDescendantIds = async (parentId: string): Promise<string[]> => {
+      const { results: children } = await this.nodeRepo.search({
+        graphId: node.graphId,
+        includeArchived: true,
+      });
+
+      const directChildren = children.filter(c => c.parentId === parentId);
+      const descendantIds: string[] = [];
+
+      for (const child of directChildren) {
+        descendantIds.push(child.id);
+        const grandchildren = await getAllDescendantIds(child.id);
+        descendantIds.push(...grandchildren);
+      }
+
+      return descendantIds;
+    };
+
+    // Get all nodes to delete (node + descendants)
+    const descendantIds = await getAllDescendantIds(nodeId);
+    const allNodeIds = [nodeId, ...descendantIds];
+
+    // Delete all nodes (Prisma cascade will handle edges)
+    for (const id of allNodeIds.reverse()) {
+      await this.nodeRepo.delete(id);
+    }
+
+    return { success: true, deletedCount: allNodeIds.length };
+  }
+
+  /**
    * List archived nodes
    * Story 2.5 AC#4.3
    */
@@ -343,6 +387,7 @@ export class NodesService {
       x: node.x,
       y: node.y,
       matchType: 'label' as const,
+      archivedAt: (node as { archivedAt?: Date | null }).archivedAt?.toISOString() ?? null,
     }));
 
     return {

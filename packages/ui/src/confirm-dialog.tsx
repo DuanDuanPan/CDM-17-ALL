@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from './utils';
 
 export interface ConfirmDialogOptions {
@@ -89,8 +90,8 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
         <ConfirmDialogContext.Provider value={{ showConfirm }}>
             {children}
 
-            {dialogOptions && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
+            {dialogOptions && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center">
                     {/* Backdrop */}
                     <div
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -138,7 +139,8 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </ConfirmDialogContext.Provider>
     );
