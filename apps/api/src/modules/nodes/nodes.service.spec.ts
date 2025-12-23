@@ -12,6 +12,8 @@ import { TaskService } from './services/task.service';
 import { RequirementService } from './services/requirement.service';
 import { PBSService } from './services/pbs.service';
 import { DataService } from './services/data.service';
+import { AppService } from './services/app.service'; // Story 2.9
+import { AppExecutorService } from '../app-library/app-executor.service';
 
 describe('NodesService', () => {
   let service: NodesService;
@@ -27,6 +29,8 @@ describe('NodesService', () => {
   const mockRequirementService = { initialize: jest.fn(), upsertProps: jest.fn() };
   const mockPBSService = { initialize: jest.fn(), upsertProps: jest.fn() };
   const mockDataService = { initialize: jest.fn(), upsertProps: jest.fn() };
+  const mockAppService = { initialize: jest.fn(), upsertProps: jest.fn(), getProps: jest.fn() }; // Story 2.9
+  const mockAppExecutor = { execute: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -37,6 +41,8 @@ describe('NodesService', () => {
         { provide: RequirementService, useValue: mockRequirementService },
         { provide: PBSService, useValue: mockPBSService },
         { provide: DataService, useValue: mockDataService },
+        { provide: AppService, useValue: mockAppService }, // Story 2.9
+        { provide: AppExecutorService, useValue: mockAppExecutor },
       ],
     }).compile();
 
@@ -62,6 +68,7 @@ describe('NodesService', () => {
         requirementProps: null,
         pbsProps: null,
         dataProps: null,
+        appProps: null, // Story 2.9
       };
 
       mockNodeRepo.create.mockResolvedValue(mockNode);
@@ -102,6 +109,7 @@ describe('NodesService', () => {
         requirementProps: null,
         pbsProps: null,
         dataProps: null,
+        appProps: null, // Story 2.9
       };
 
       mockNodeRepo.findByIdWithProps.mockResolvedValue(mockNode);
@@ -140,6 +148,7 @@ describe('NodesService', () => {
         requirementProps: null,
         pbsProps: null,
         dataProps: null,
+        appProps: null, // Story 2.9
       };
 
       mockNodeRepo.findById.mockResolvedValue(existing);
@@ -180,6 +189,7 @@ describe('NodesService', () => {
         requirementProps: null,
         pbsProps: null,
         dataProps: null,
+        appProps: null, // Story 2.9
       });
 
       await service.updateNodeProps('node-1', {
@@ -210,6 +220,7 @@ describe('NodesService', () => {
         requirementProps: null,
         pbsProps: null,
         dataProps: null,
+        appProps: null, // Story 2.9
       });
 
       const result = await service.updateNode('node-1', { label: 'Updated', x: 10, y: 20 });
@@ -270,6 +281,128 @@ describe('NodesService', () => {
       // Should delete parent + 2 children + 1 grandchild = 4 nodes
       expect(result.deletedCount).toBeGreaterThanOrEqual(1);
       expect(mockNodeRepo.delete).toHaveBeenCalled();
+    });
+  });
+
+  // ============================
+  // Story 2.9: APP Node Tests
+  // ============================
+  describe('APP Node Type (Story 2.9)', () => {
+    it('initializes APP extension when type changes to APP', async () => {
+      const existing = {
+        id: 'node-1',
+        type: NodeType.ORDINARY,
+      };
+      const updated = {
+        ...existing,
+        type: NodeType.APP,
+        label: 'App Node',
+        graphId: 'graph-1',
+        x: 0,
+        y: 0,
+        width: 120,
+        height: 40,
+        creatorName: 'Mock User',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        taskProps: null,
+        requirementProps: null,
+        pbsProps: null,
+        dataProps: null,
+        appProps: { nodeId: 'node-1', appSourceType: 'library', executionStatus: 'idle' },
+      };
+
+      mockNodeRepo.findById.mockResolvedValue(existing);
+      mockNodeRepo.update.mockResolvedValue(updated);
+      mockNodeRepo.findByIdWithProps.mockResolvedValue(updated);
+
+      const result = await service.updateNodeType('node-1', { type: NodeType.APP });
+
+      expect(mockAppService.initialize).toHaveBeenCalledWith('node-1');
+      expect(result.oldType).toBe(NodeType.ORDINARY);
+      expect(result.newType).toBe(NodeType.APP);
+    });
+
+    it('returns APP props when getting node with props', async () => {
+      const mockAppNode = {
+        id: 'node-1',
+        label: 'Industrial App',
+        type: NodeType.APP,
+        graphId: 'graph-1',
+        x: 100,
+        y: 200,
+        width: 120,
+        height: 50,
+        creatorName: 'Mock User',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        taskProps: null,
+        requirementProps: null,
+        pbsProps: null,
+        dataProps: null,
+        appProps: {
+          nodeId: 'node-1',
+          appSourceType: 'library',
+          libraryAppId: 'app-001',
+          libraryAppName: 'CFD Solver',
+          executionStatus: 'success',
+          inputs: [{ id: 'i1', key: 'mesh', type: 'file', label: 'Mesh File' }],
+          outputs: [{ id: 'o1', key: 'result', type: 'file', label: 'Result' }],
+        },
+      };
+
+      mockNodeRepo.findByIdWithProps.mockResolvedValue(mockAppNode);
+
+      const result = await service.getNodeWithProps('node-1');
+
+      expect(result.type).toBe(NodeType.APP);
+      expect(result.props).toMatchObject({
+        appSourceType: 'library',
+        libraryAppId: 'app-001',
+        libraryAppName: 'CFD Solver',
+        executionStatus: 'success',
+      });
+    });
+
+    it('upserts APP props correctly', async () => {
+      mockNodeRepo.findById.mockResolvedValue({
+        id: 'node-1',
+        type: NodeType.APP,
+      });
+      mockNodeRepo.findByIdWithProps.mockResolvedValue({
+        id: 'node-1',
+        label: 'App Node',
+        type: NodeType.APP,
+        graphId: 'graph-1',
+        x: 0,
+        y: 0,
+        width: 120,
+        height: 40,
+        creatorName: 'Mock User',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        taskProps: null,
+        requirementProps: null,
+        pbsProps: null,
+        dataProps: null,
+        appProps: {
+          nodeId: 'node-1',
+          appSourceType: 'library',
+          libraryAppId: 'app-002',
+          executionStatus: 'running',
+        },
+      });
+
+      await service.updateNodeProps('node-1', {
+        type: NodeType.APP,
+        props: {
+          appSourceType: 'library',
+          libraryAppId: 'app-002',
+          executionStatus: 'running',
+        },
+      });
+
+      expect(mockAppService.upsertProps).toHaveBeenCalled();
     });
   });
 });

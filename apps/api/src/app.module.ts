@@ -9,6 +9,7 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { GraphsModule } from './modules/graphs/graphs.module'; // Dynamic Graph ID
 import { ProductLibraryModule } from './modules/product-library'; // Story 2.7
 import { KnowledgeLibraryModule } from './modules/knowledge-library'; // Story 2.8
+import { AppLibraryModule } from './modules/app-library'; // Story 2.9
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { KnowledgeLibraryModule } from './modules/knowledge-library'; // Story 2
     GraphsModule, // Dynamic Graph ID management
     ProductLibraryModule, // Story 2.7: Mock product library for PBS nodes
     KnowledgeLibraryModule, // Story 2.8: Mock knowledge library for Task nodes
+    AppLibraryModule, // Story 2.9: APP node library and execution services
   ],
   controllers: [AppController],
   providers: [AppService],

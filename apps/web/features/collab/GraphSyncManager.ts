@@ -68,6 +68,10 @@ export interface YjsMetaData {
  *
  * Story 1.4: Real-time Collaboration Engine
  */
+
+// Origin marker for local UI transactions - used to distinguish from remote sync
+const LOCAL_ORIGIN = 'graph-sync-local';
+
 export class GraphSyncManager {
     private graph: Graph | null = null;
     private yDoc: Y.Doc | null = null;
@@ -221,17 +225,37 @@ export class GraphSyncManager {
 
         // Observe node changes
         this.yNodes.observe((event) => {
-            if (!this.graph) return;
+            if (!this.graph) {
+                logger.warn('yNodes.observe: graph is null, skipping');
+                return;
+            }
+            // Important: Ignore transactions originating from local UI.
+            // Local → Remote sync already originates from X6 graph events.
+            // Re-applying local Yjs changes back into X6 causes data overwrite and can wipe UI-only fields
+            // (e.g. `isEditing`, `isSelected`), breaking keyboard edit mode.
+            // Note: We check origin instead of transaction.local because Hocuspocus Provider may
+            // apply remote updates in a way that still appears as "local" transaction internally.
+            if (event.transaction.origin === LOCAL_ORIGIN) {
+                logger.debug('yNodes.observe: skipping local UI transaction');
+                return;
+            }
+
+            logger.debug('yNodes.observe: processing remote transaction', {
+                changesCount: event.changes.keys.size,
+                origin: event.transaction.origin,
+            });
 
             this.isRemoteUpdate = true;
             try {
                 event.changes.keys.forEach((change, nodeId) => {
+                    logger.debug('yNodes.observe: processing change', { nodeId, action: change.action });
                     if (change.action === 'add' || change.action === 'update') {
                         const nodeData = this.yNodes?.get(nodeId);
                         if (nodeData) {
                             this.applyNodeToGraph(nodeData);
                         }
                     } else if (change.action === 'delete') {
+                        logger.info('yNodes.observe: REMOTE DELETE detected', { nodeId });
                         this.removeNodeFromGraph(nodeId);
                     }
                 });
@@ -242,17 +266,31 @@ export class GraphSyncManager {
 
         // Observe edge changes
         this.yEdges.observe((event) => {
-            if (!this.graph) return;
+            if (!this.graph) {
+                logger.warn('yEdges.observe: graph is null, skipping');
+                return;
+            }
+            // Same as nodes: ignore local UI transactions to prevent redundant apply + potential overwrite.
+            if (event.transaction.origin === LOCAL_ORIGIN) {
+                logger.debug('yEdges.observe: skipping local UI transaction');
+                return;
+            }
+
+            logger.debug('yEdges.observe: processing remote transaction', {
+                changesCount: event.changes.keys.size,
+            });
 
             this.isRemoteUpdate = true;
             try {
                 event.changes.keys.forEach((change, edgeId) => {
+                    logger.debug('yEdges.observe: processing change', { edgeId, action: change.action });
                     if (change.action === 'add' || change.action === 'update') {
                         const edgeData = this.yEdges?.get(edgeId);
                         if (edgeData) {
                             this.applyEdgeToGraph(edgeData);
                         }
                     } else if (change.action === 'delete') {
+                        logger.info('yEdges.observe: REMOTE DELETE detected', { edgeId });
                         this.removeEdgeFromGraph(edgeId);
                     }
                 });
@@ -356,7 +394,7 @@ export class GraphSyncManager {
 
         this.yDoc.transact(() => {
             this.yNodes?.set(node.id, yjsNodeData);
-        });
+        }, LOCAL_ORIGIN);
     }
 
     /**
@@ -380,7 +418,7 @@ export class GraphSyncManager {
                 y: position.y,
                 mindmapType,
             });
-        });
+        }, LOCAL_ORIGIN);
     }
 
     /**
@@ -391,7 +429,7 @@ export class GraphSyncManager {
 
         this.yDoc.transact(() => {
             this.yNodes?.delete(nodeId);
-        });
+        }, LOCAL_ORIGIN);
         logger.debug('Removed node from Yjs', { nodeId });
     }
 
@@ -422,7 +460,7 @@ export class GraphSyncManager {
 
         this.yDoc.transact(() => {
             this.yEdges?.set(edge.id, yjsEdgeData);
-        });
+        }, LOCAL_ORIGIN);
     }
 
     /**
@@ -433,7 +471,7 @@ export class GraphSyncManager {
 
         this.yDoc.transact(() => {
             this.yEdges?.delete(edgeId);
-        });
+        }, LOCAL_ORIGIN);
         logger.debug('Removed edge from Yjs', { edgeId });
     }
 
@@ -713,7 +751,7 @@ export class GraphSyncManager {
 
         this.yDoc.transact(() => {
             this.yMeta?.set('layoutMode', mode);
-        });
+        }, LOCAL_ORIGIN);
     }
 
     /**
@@ -764,7 +802,7 @@ export class GraphSyncManager {
 
                 this.yNodes?.set(node.id, yjsNodeData);
             });
-        });
+        }, LOCAL_ORIGIN);
     }
 
     /**

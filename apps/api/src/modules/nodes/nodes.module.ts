@@ -13,14 +13,17 @@ import { NodeTaskRepository } from './repositories/node-task.repository';
 import { NodeRequirementRepository } from './repositories/node-requirement.repository';
 import { NodePBSRepository } from './repositories/node-pbs.repository';
 import { NodeDataRepository } from './repositories/node-data.repository';
+import { NodeAppRepository } from './repositories/node-app.repository'; // Story 2.9
 import { TaskService } from './services/task.service';
 import { RequirementService } from './services/requirement.service';
 import { PBSService } from './services/pbs.service';
 import { DataService } from './services/data.service';
+import { AppService } from './services/app.service'; // Story 2.9
 import { NotificationModule } from '../notification/notification.module';
+import { AppLibraryModule } from '../app-library';
 
 @Module({
-  imports: [NotificationModule], // Story 2.4: Import for task dispatch notifications
+  imports: [NotificationModule, AppLibraryModule], // Story 2.4: Import for task dispatch notifications
   controllers: [NodesController, TagsController], // Story 2.5: Added TagsController
   providers: [
     NodesService,
@@ -29,10 +32,12 @@ import { NotificationModule } from '../notification/notification.module';
     NodeRequirementRepository,
     NodePBSRepository,
     NodeDataRepository,
+    NodeAppRepository, // Story 2.9
     TaskService,
     RequirementService,
     PBSService,
     DataService,
+    AppService, // Story 2.9: APP node service
   ],
   exports: [NodesService],
 })

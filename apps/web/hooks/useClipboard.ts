@@ -258,43 +258,76 @@ export function useClipboard({
             const jsonStr = JSON.stringify(data);
             await navigator.clipboard.writeText(jsonStr);
 
-            // Soft delete (archive) via Yjs
+            // Soft delete (archive) via Yjs - including all descendants
             undoManager?.stopCapturing();
             const yNodes = yDoc.getMap('nodes');
 
+            // Collect selected node IDs
+            const selectedIds = new Set(selectedNodes.map(n => n.id));
+
+            // Find all descendants (children, grandchildren, etc.) - same logic as deleteNodes
+            const findAllDescendants = (parentIds: Set<string>): Set<string> => {
+                const descendants = new Set<string>();
+                const queue = [...parentIds];
+
+                while (queue.length > 0) {
+                    const currentId = queue.shift()!;
+                    yNodes.forEach((nodeData, nodeId) => {
+                        const nodeDataTyped = nodeData as { parentId?: string };
+                        if (nodeDataTyped.parentId === currentId && !descendants.has(nodeId) && !selectedIds.has(nodeId)) {
+                            descendants.add(nodeId);
+                            queue.push(nodeId);
+                        }
+                    });
+                }
+                return descendants;
+            };
+
+            const descendantIds = findAllDescendants(selectedIds);
+            const allNodesToArchive = new Set([...selectedIds, ...descendantIds]);
+
             yDoc.transact(() => {
                 const now = new Date().toISOString();
-                selectedNodes.forEach(node => {
-                    const existing = yNodes.get(node.id) as any;
+                allNodesToArchive.forEach(nodeId => {
+                    const existing = yNodes.get(nodeId) as any;
                     if (existing) {
-                        yNodes.set(node.id, {
+                        yNodes.set(nodeId, {
                             ...existing,
                             isArchived: true,
                             archivedAt: now,
                             updatedAt: now
                         });
                         // Trigger backend archive
-                        archiveNode(node.id).catch(err =>
-                            console.error(`[Clipboard] Failed to archive node ${node.id} on server during cut`, err)
+                        archiveNode(nodeId).catch(err =>
+                            console.error(`[Clipboard] Failed to archive node ${nodeId} on server during cut`, err)
                         );
                     }
                 });
                 // Note: We don't need to explicitly delete edges; X6/UI should hide edges connected to hidden nodes.
-                // If we needed to archive edges, we'd do it here.
             });
 
-            // Update X6 local state (hide nodes)
-            // graphRef.current.removeCells(selectedNodes); // Don't remove, hide them
-            selectedNodes.forEach(node => {
-                node.setVisible(false);
-                // Also hide connected edges
-                const edges = graphRef.current?.getConnectedEdges(node);
-                edges?.forEach(edge => edge.setVisible(false));
-            });
+            // Update X6 local state (hide nodes and all their connected edges)
+            if (graphRef.current) {
+                const cellsToHide: any[] = [];
+                allNodesToArchive.forEach(nodeId => {
+                    const cell = graphRef.current!.getCellById(nodeId);
+                    if (cell) {
+                        cellsToHide.push(cell);
+                        const edges = graphRef.current!.getConnectedEdges(cell as Node);
+                        edges?.forEach(edge => cellsToHide.push(edge));
+                    }
+                });
+                cellsToHide.forEach(cell => cell.setVisible(false));
+            }
 
             clearSelection();
 
-            toast.success(`已归档 ${data.nodes.length} 个节点`);
+            const childCount = descendantIds.size;
+            if (childCount > 0) {
+                toast.success(`已剪切 ${selectedIds.size} 个节点及 ${childCount} 个子节点`);
+            } else {
+                toast.success(`已剪切 ${selectedIds.size} 个节点`);
+            }
         } catch (err) {
             console.error('[Clipboard] Cut failed:', err);
             toast.error('剪切失败');
@@ -700,8 +733,26 @@ export function useClipboard({
                     });
                 });
 
-                // 4. Clear selection (X6 cells will be removed by GraphSyncManager)
+                // 4. Manually remove cells from X6 Graph
+                // IMPORTANT: GraphSyncManager's observe callback skips transactions with
+                // LOCAL_ORIGIN marker (from GraphSyncManager itself), but propagates changes
+                // from other sources (like this clipboard hook). However, we still manually
+                // remove cells here for immediate UI feedback before Yjs sync completes.
                 if (graphRef.current) {
+                    // Remove edges first to avoid dangling references
+                    edgesToDelete.forEach(edgeId => {
+                        const cell = graphRef.current!.getCellById(edgeId);
+                        if (cell) {
+                            graphRef.current!.removeCell(cell);
+                        }
+                    });
+                    // Then remove nodes
+                    allNodesToDelete.forEach(nodeId => {
+                        const cell = graphRef.current!.getCellById(nodeId);
+                        if (cell) {
+                            graphRef.current!.removeCell(cell);
+                        }
+                    });
                     graphRef.current.cleanSelection();
                 }
                 clearSelection();

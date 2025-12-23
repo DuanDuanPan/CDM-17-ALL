@@ -278,6 +278,44 @@ export function GraphComponent({
         [graph, isConnected, updateCursor]
     );
 
+    // Global Space-to-edit: allow editing even when graph container isn't focused,
+    // but never steal space from form inputs or contenteditable fields.
+    useEffect(() => {
+        if (!graph || !isReady) return;
+
+        const handleGlobalSpace = (e: KeyboardEvent) => {
+            if (e.defaultPrevented) return;
+            if (!(e.key === ' ' || e.code === 'Space')) return;
+
+            const target = e.target as HTMLElement | null;
+            if (
+                target &&
+                (target.tagName === 'INPUT' ||
+                    target.tagName === 'TEXTAREA' ||
+                    target.tagName === 'SELECT' ||
+                    target.isContentEditable)
+            ) {
+                return;
+            }
+
+            const selectedNodes = graph.getSelectedCells().filter((cell) => cell.isNode());
+            if (selectedNodes.length !== 1) return;
+
+            const node = selectedNodes[0] as Node;
+            const nodeData = node.getData() || {};
+            if (nodeData.isEditing) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+            node.setData({ ...nodeData, isEditing: true });
+        };
+
+        window.addEventListener('keydown', handleGlobalSpace);
+        return () => {
+            window.removeEventListener('keydown', handleGlobalSpace);
+        };
+    }, [graph, isReady]);
+
     // Story 1.4: Update selected node in awareness
     useEffect(() => {
         if (!graph || !isReady || !isConnected) return;

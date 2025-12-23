@@ -14,6 +14,7 @@ export enum NodeType {
   REQUIREMENT = 'REQUIREMENT',
   PBS = 'PBS',
   DATA = 'DATA',
+  APP = 'APP', // Story 2.9: APP 节点类型
 }
 
 // Task Status Enum - for type safety across views
@@ -105,8 +106,69 @@ export interface DataProps extends BaseNodeProps {
   storagePath?: string | null;
 }
 
+// ===========================
+// Story 2.9: APP Node Types
+// ===========================
+
+/**
+ * Story 2.9: APP 节点的应用来源类型
+ */
+export type AppSourceType = 'local' | 'remote' | 'library';
+
+/**
+ * Story 2.9: APP 执行状态
+ */
+export type AppExecutionStatus = 'idle' | 'running' | 'success' | 'error';
+
+/**
+ * Story 2.9: APP 输入参数配置
+ */
+export interface AppInput {
+  id: string;                    // nanoid 生成
+  key: string;                   // 参数名称 (e.g., "Orbit Altitude")
+  value?: string;                // 参数值
+  type: 'text' | 'number' | 'file';  // 参数类型
+  required?: boolean;            // 是否必填
+  fileId?: string;               // 如果 type='file'，关联上传文件的 ID
+  fileName?: string;             // 上传文件名
+}
+
+/**
+ * Story 2.9: APP 输出结果配置
+ */
+export interface AppOutput {
+  id: string;                    // nanoid 生成
+  key: string;                   // 输出名称 (e.g., "Trajectory File")
+  type: 'text' | 'file';         // 输出类型
+  value?: string;                // 文本值或文件 URL
+  fileName?: string;             // 输出文件名
+  mimeType?: string;             // 文件 MIME 类型 (用于预览)
+  generatedAt?: string;          // 生成时间 (ISO 8601)
+}
+
+/**
+ * Story 2.9: APP 节点属性
+ */
+export interface AppProps extends BaseNodeProps {
+  // 来源配置
+  appSourceType?: AppSourceType;      // 应用来源类型
+  appPath?: string | null;            // 本地应用路径 (local)
+  appUrl?: string | null;             // 远程应用 URL (remote)
+  libraryAppId?: string | null;       // 应用库 ID (library)
+  libraryAppName?: string | null;     // 应用库名称 (显示用)
+
+  // I/O 配置
+  inputs?: AppInput[];                // 输入参数列表
+  outputs?: AppOutput[];              // 输出结果列表
+
+  // 执行状态 (transient, 通常不持久化)
+  executionStatus?: AppExecutionStatus;
+  lastExecutedAt?: string | null;     // 上次执行时间
+  errorMessage?: string | null;       // 错误信息
+}
+
 // Union type for all node properties
-export type NodeProps = TaskProps | RequirementProps | PBSProps | DataProps | Record<string, never>;
+export type NodeProps = TaskProps | RequirementProps | PBSProps | DataProps | AppProps | Record<string, never>;
 
 // Allowed prop keys per node type (shared by frontend and backend)
 export const NODE_PROP_KEYS_BY_TYPE: Record<NodeType, readonly string[]> = {
@@ -129,6 +191,18 @@ export const NODE_PROP_KEYS_BY_TYPE: Record<NodeType, readonly string[]> = {
   [NodeType.REQUIREMENT]: ['reqType', 'acceptanceCriteria', 'priority'],
   [NodeType.PBS]: ['code', 'version', 'ownerId', 'indicators', 'productRef'],
   [NodeType.DATA]: ['dataType', 'version', 'secretLevel', 'storagePath'],
+  [NodeType.APP]: [  // Story 2.9: APP 节点属性
+    'appSourceType',
+    'appPath',
+    'appUrl',
+    'libraryAppId',
+    'libraryAppName',
+    'inputs',
+    'outputs',
+    'executionStatus',
+    'lastExecutedAt',
+    'errorMessage',
+  ],
 };
 
 /**
@@ -324,10 +398,50 @@ export const DataPropsSchema = z
   })
   .strict();
 
+// ===========================
+// Story 2.9: APP Node Schemas
+// ===========================
+
+export const AppInputSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  value: z.string().optional(),
+  type: z.enum(['text', 'number', 'file']),
+  required: z.boolean().optional(),
+  fileId: z.string().optional(),
+  fileName: z.string().optional(),
+});
+
+export const AppOutputSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  type: z.enum(['text', 'file']),
+  value: z.string().optional(),
+  fileName: z.string().optional(),
+  mimeType: z.string().optional(),
+  generatedAt: z.string().optional(),
+});
+
+export const AppPropsSchema = z
+  .object({
+    appSourceType: z.enum(['local', 'remote', 'library']).optional(),
+    appPath: z.string().nullable().optional(),
+    appUrl: z.string().nullable().optional(),
+    libraryAppId: z.string().nullable().optional(),
+    libraryAppName: z.string().nullable().optional(),
+    inputs: z.array(AppInputSchema).optional(),
+    outputs: z.array(AppOutputSchema).optional(),
+    executionStatus: z.enum(['idle', 'running', 'success', 'error']).optional(),
+    lastExecutedAt: z.string().nullable().optional(),
+    errorMessage: z.string().nullable().optional(),
+  })
+  .strict();
+
 export const UpdateNodePropsSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal(NodeType.TASK), props: TaskPropsSchema }),
   z.object({ type: z.literal(NodeType.REQUIREMENT), props: RequirementPropsSchema }),
   z.object({ type: z.literal(NodeType.PBS), props: PBSPropsSchema }),
   z.object({ type: z.literal(NodeType.DATA), props: DataPropsSchema }),
+  z.object({ type: z.literal(NodeType.APP), props: AppPropsSchema }), // Story 2.9
   z.object({ type: z.literal(NodeType.ORDINARY), props: z.record(z.never()).optional() }),
 ]);

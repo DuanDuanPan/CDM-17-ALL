@@ -16,7 +16,7 @@ import {
   ValidationArguments,
   Validate,
 } from 'class-validator';
-import { NodeType, type NodeProps, NODE_PROP_KEYS_BY_TYPE } from '@cdm/types';
+import { NodeType, type NodeProps, NODE_PROP_KEYS_BY_TYPE, type AppInput, type AppOutput, type AppSourceType } from '@cdm/types';
 
 /**
  * [AI-Review-2][HIGH-3] Custom validator for type-specific node properties
@@ -142,6 +142,39 @@ export class UpdateNodePropsDto {
   @IsObject()
   @Validate(NodePropsValidator)
   props!: NodeProps;
+}
+
+// ============================
+// Story 2.9: APP Execution DTO
+// ============================
+
+export class ExecuteAppNodeDto {
+  @IsEnum(['local', 'remote', 'library'] as const)
+  appSourceType!: AppSourceType;
+
+  @IsString()
+  @IsOptional()
+  appPath?: string;
+
+  @IsString()
+  @IsOptional()
+  appUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  libraryAppId?: string;
+
+  @IsString()
+  @IsOptional()
+  libraryAppName?: string;
+
+  @IsArray()
+  @IsOptional()
+  inputs?: AppInput[];
+
+  @IsArray()
+  @IsOptional()
+  outputs?: AppOutput[];
 }
 
 /**

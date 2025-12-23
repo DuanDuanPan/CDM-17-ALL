@@ -49,6 +49,8 @@ const createMockGraph = () => {
             nodes.delete(cell.id);
             edges.delete(cell.id);
         }),
+        // Story 2.7: Mock getConnectedEdges for archive visibility handling
+        getConnectedEdges: vi.fn(() => []),
         _eventHandlers: eventHandlers,
         _nodes: nodes,
         _edges: edges,
@@ -64,6 +66,10 @@ const createMockNode = (id: string, x: number, y: number, data: any = {}) => ({
     setPosition: vi.fn(),
     getData: () => data,
     setData: vi.fn(),
+    // Story 2.7: Visibility methods for archive support
+    show: vi.fn(),
+    hide: vi.fn(),
+    isVisible: () => true,
 });
 
 // Helper to create a mock Edge
@@ -80,6 +86,8 @@ describe('GraphSyncManager', () => {
     let syncManager: GraphSyncManager;
     let mockGraph: ReturnType<typeof createMockGraph>;
     let yDoc: Y.Doc;
+
+    const waitForMicrotask = async () => new Promise((resolve) => setTimeout(resolve, 0));
 
     beforeEach(() => {
         syncManager = new GraphSyncManager();
@@ -175,14 +183,36 @@ describe('GraphSyncManager', () => {
     });
 
     describe('Remote → Local sync', () => {
-        it('should add node to graph when added in yjs', async () => {
+        it('should ignore local UI yjs node changes with LOCAL_ORIGIN (no local echo apply)', async () => {
             syncManager.initialize(mockGraph as any, yDoc);
 
             const yNodes = yDoc.getMap<YjsNodeData>('nodes');
 
-            // Add node to yjs
+            // Transactions with LOCAL_ORIGIN (simulating local UI operations) should be ignored.
+            // This uses the same origin marker as GraphSyncManager's internal transact calls.
             yDoc.transact(() => {
-                yNodes.set('remote-node-1', {
+                yNodes.set('local-node-1', {
+                    id: 'local-node-1',
+                    x: 10,
+                    y: 20,
+                    label: 'Local Node',
+                    mindmapType: 'topic',
+                });
+            }, 'graph-sync-local'); // LOCAL_ORIGIN marker
+
+            await waitForMicrotask();
+
+            expect(mockGraph.addNode).not.toHaveBeenCalled();
+        });
+
+        it('should add node to graph when added remotely (via applyUpdate)', async () => {
+            syncManager.initialize(mockGraph as any, yDoc);
+
+            // Simulate remote update by applying an update from another doc (transaction.local = false)
+            const remoteDoc = new Y.Doc();
+            const remoteNodes = remoteDoc.getMap<YjsNodeData>('nodes');
+            remoteDoc.transact(() => {
+                remoteNodes.set('remote-node-1', {
                     id: 'remote-node-1',
                     x: 300,
                     y: 400,
@@ -190,9 +220,10 @@ describe('GraphSyncManager', () => {
                     mindmapType: 'subtopic',
                 });
             });
+            Y.applyUpdate(yDoc, Y.encodeStateAsUpdate(remoteDoc));
 
             // Wait for observer to fire
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await waitForMicrotask();
 
             // Check graph.addNode was called
             expect(mockGraph.addNode).toHaveBeenCalledWith(
@@ -208,18 +239,17 @@ describe('GraphSyncManager', () => {
             );
         });
 
-        it('should update existing node position when changed in yjs', async () => {
+        it('should update existing node position when changed remotely (via applyUpdate)', async () => {
             syncManager.initialize(mockGraph as any, yDoc);
 
             // First add a node to the graph's internal map
             const existingNode = createMockNode('existing-node', 100, 100, { label: 'Test' });
             mockGraph._nodes.set('existing-node', existingNode);
-
-            const yNodes = yDoc.getMap<YjsNodeData>('nodes');
-
-            // Update node in yjs
-            yDoc.transact(() => {
-                yNodes.set('existing-node', {
+            // Apply remote update for the node
+            const remoteDoc = new Y.Doc();
+            const remoteNodes = remoteDoc.getMap<YjsNodeData>('nodes');
+            remoteDoc.transact(() => {
+                remoteNodes.set('existing-node', {
                     id: 'existing-node',
                     x: 500,
                     y: 600,
@@ -227,9 +257,10 @@ describe('GraphSyncManager', () => {
                     mindmapType: 'topic',
                 });
             });
+            Y.applyUpdate(yDoc, Y.encodeStateAsUpdate(remoteDoc));
 
             // Wait for observer to fire
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await waitForMicrotask();
 
             // Check setPosition was called (without silent:true - loop prevention is handled by isRemoteUpdate flag)
             expect(existingNode.setPosition).toHaveBeenCalledWith(500, 600);

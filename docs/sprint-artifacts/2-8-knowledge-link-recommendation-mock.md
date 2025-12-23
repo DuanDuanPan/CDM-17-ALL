@@ -1,6 +1,6 @@
 # Story 2.8: 知识关联与推荐 (Knowledge Link & Recommendation - Mock)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -362,6 +362,7 @@ Antigravity (Claude Sonnet 4)
 | 2025-12-23 | Fixed 3 MEDIUM issues: E2E assertions, API hardcoding, relative path | Antigravity |
 | 2025-12-23 | Code review complete - Approved with minor issues | Antigravity |
 | 2025-12-22 | Story implementation complete - Knowledge association and recommendation mock | AI Agent |
+| 2025-12-23 | Marked as done after validation | Antigravity |
 
 ### File List
 - `packages/types/src/node-types.ts` (Modified: added KnowledgeReference, KnowledgeReferenceSchema, updated TaskProps)

@@ -125,6 +125,7 @@ export function PropertyPanel({
                 <option value={NodeType.REQUIREMENT}>需求 (Requirement)</option>
                 <option value={NodeType.PBS}>研发对象 (PBS)</option>
                 <option value={NodeType.DATA}>数据 (Data)</option>
+                <option value={NodeType.APP}>工业应用 (APP)</option>
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
@@ -169,7 +170,7 @@ export function PropertyPanel({
           <div>
             <h3 className="text-sm font-semibold text-gray-700 mb-3">类型属性</h3>
             <FormComponent
-              key={`form-${nodeId}-${nodeData.updatedAt ?? ''}-${JSON.stringify(nodeData.props ?? {})}`}
+              key={`form-${nodeId}-${currentType}`}
               nodeId={nodeId}
               initialData={nodeData.props}
               onUpdate={handlePropsUpdate}

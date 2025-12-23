@@ -12,13 +12,14 @@ datasource db {
 
 // Core Models for CDM Mindmap Application
 
-// Node Type Enum - Story 2.1
+// Node Type Enum - Story 2.1, Story 2.9
 enum NodeType {
   ORDINARY
   TASK
   REQUIREMENT
   PBS
   DATA
+  APP // Story 2.9: APP 节点类型
 }
 
 model User {
@@ -92,6 +93,7 @@ model Node {
   requirementProps NodeRequirement?
   pbsProps         NodePBS?
   dataProps        NodeData?
+  appProps         NodeApp? // Story 2.9: APP 节点属性
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -167,6 +169,26 @@ model NodeData {
   version      String? @default("v1.0.0") // semantic version
   secretLevel  String? @default("public") // public, internal, secret
   storagePath  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Story 2.9: APP 节点扩展表
+model NodeApp {
+  nodeId  String   @id
+  node    Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  appSourceType   String?  @default("library") // local, remote, library
+  appPath         String?  // 本地应用路径
+  appUrl          String?  // 远程应用 URL
+  libraryAppId    String?  // 应用库 ID
+  libraryAppName  String?  // 应用库名称
+  inputs          Json?    // AppInput[] 数组
+  outputs         Json?    // AppOutput[] 数组
+  executionStatus String?  @default("idle") // idle, running, success, error
+  lastExecutedAt  DateTime?
+  errorMessage    String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

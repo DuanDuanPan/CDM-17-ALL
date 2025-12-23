@@ -26,6 +26,7 @@ import {
   UpdateNodePropsDto,
   FeedbackTaskDto,
   TagUpdateRequestDto,
+  ExecuteAppNodeDto,
 } from './nodes.request.dto';
 import { ZodValidationPipe } from '../../pipes/zod-validation.pipe';
 
@@ -114,6 +115,16 @@ export class NodesController {
   @UsePipes(new ZodValidationPipe(UpdateNodePropsSchema))
   async updateNodeProperties(@Param('id') id: string, @Body() dto: UpdateNodePropsDto): Promise<NodeResponse> {
     return this.nodesService.updateNodeProps(id, dto);
+  }
+
+  /**
+   * Execute APP node
+   * POST /api/nodes/:id/execute
+   * Story 2.9 AC4.1, AC4.2
+   */
+  @Post(':id/execute')
+  async executeAppNode(@Param('id') id: string, @Body() dto: ExecuteAppNodeDto) {
+    return this.nodesService.executeAppNode(id, dto);
   }
 
   // ============================

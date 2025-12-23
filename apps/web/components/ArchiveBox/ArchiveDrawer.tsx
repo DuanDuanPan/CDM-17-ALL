@@ -254,15 +254,18 @@ export function ArchiveDrawer({
                     ));
 
                     // 2. Delete from Yjs to sync to other clients
+                    // Also collect edgeIds for X6 removal
+                    const edgeIdsToDelete: string[] = [];
                     if (yDoc) {
                         const yNodes = yDoc.getMap<YjsNodeData>('nodes');
                         const yEdges = yDoc.getMap('edges');
 
                         yDoc.transact(() => {
-                            // First, delete related edges
+                            // First, delete related edges and collect their IDs
                             yEdges.forEach((edgeData, edgeId) => {
                                 const edge = edgeData as { source: string; target: string };
                                 if (nodeIds.includes(edge.source) || nodeIds.includes(edge.target)) {
+                                    edgeIdsToDelete.push(edgeId);
                                     yEdges.delete(edgeId);
                                 }
                             });
@@ -273,7 +276,29 @@ export function ArchiveDrawer({
                         });
                     }
 
-                    // 3. Update local component state
+                    // 3. Manually remove cells from X6 Graph
+                    // IMPORTANT: GraphSyncManager's observe callback skips transactions with
+                    // LOCAL_ORIGIN marker (from GraphSyncManager itself), but propagates changes
+                    // from other sources (like this ArchiveDrawer). However, we still manually
+                    // remove cells here for immediate UI feedback before Yjs sync completes.
+                    if (graph) {
+                        // Remove edges first to avoid dangling references
+                        edgeIdsToDelete.forEach(edgeId => {
+                            const cell = graph.getCellById(edgeId);
+                            if (cell) {
+                                graph.removeCell(cell);
+                            }
+                        });
+                        // Then remove nodes
+                        nodeIds.forEach(nodeId => {
+                            const cell = graph.getCellById(nodeId);
+                            if (cell) {
+                                graph.removeCell(cell);
+                            }
+                        });
+                    }
+
+                    // 4. Update local component state
                     setArchivedNodes(prev => prev.filter(n => !nodeIds.includes(n.id)));
                     setSelectedIds(prev => {
                         const next = new Set(prev);

@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2025-12-22 - Story 2.6 complete; Multi-Select & Clipboard implemented with full test coverage
+last_updated: 2025-12-23 - Story 2.9 review; DB reset + NodeApp migration applied
 
 development_status:
   epic-1: done
@@ -57,8 +57,8 @@ development_status:
   2-5-data-organization-search: done  # All CRITICAL/HIGH/MEDIUM issues fixed; reconnection logic added
   2-6-multi-select-clipboard: done  # Multi-select, Copy/Cut/Paste, Keyboard shortcuts, Context menu, Toolbar
   2-7-pbs-node-enhancement: done  # All code review issues fixed; PBS Indicators, Product Library (Mock), Node Visual
-  2-8-knowledge-link-recommendation-mock: review # Tests Passed
-  2-9-app-node-type: backlog
+  2-8-knowledge-link-recommendation-mock: done # Tests Passed & Feature Implemented
+  2-9-app-node-type: review  # App node execution + I/O implemented; DB reset + migration applied
   epic-2-retrospective: optional
 
   epic-4: backlog

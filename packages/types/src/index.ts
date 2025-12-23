@@ -82,3 +82,6 @@ export * from './search-types';
 // Story 2.6: Export clipboard types for multi-select & copy/cut/paste
 export * from './clipboard-types';
 
+// Story 2.9: Export app library types for APP nodes
+export * from './app-library';
+

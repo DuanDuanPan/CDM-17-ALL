@@ -6,6 +6,7 @@
 
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  AppProps, // Story 2.9
   DataProps,
   NodeResponse,
   NodeType,
@@ -24,12 +25,15 @@ import {
   UpdateNodeDto,
   UpdateNodeTypeDto,
   UpdateNodePropsDto,
+  ExecuteAppNodeDto,
 } from './nodes.request.dto';
 import { NodeRepository, NodeUpdateData, NodeWithGraph } from './repositories/node.repository';
 import { TaskService } from './services/task.service';
 import { RequirementService } from './services/requirement.service';
 import { PBSService } from './services/pbs.service';
 import { DataService } from './services/data.service';
+import { AppService } from './services/app.service'; // Story 2.9
+import { AppExecutorService } from '../app-library/app-executor.service';
 
 const DEFAULT_CREATOR_NAME = 'Mock User';
 
@@ -40,7 +44,9 @@ export class NodesService {
     private readonly taskService: TaskService,
     private readonly requirementService: RequirementService,
     private readonly pbsService: PBSService,
-    private readonly dataService: DataService
+    private readonly dataService: DataService,
+    private readonly appService: AppService, // Story 2.9
+    private readonly appExecutor: AppExecutorService,
   ) { }
 
   private normalizeTags(tags: string[]): string[] {
@@ -93,6 +99,44 @@ export class NodesService {
   }
 
   /**
+   * Execute APP node and return mock outputs
+   * Story 2.9 AC4.1, AC4.2
+   */
+  async executeAppNode(nodeId: string, dto: ExecuteAppNodeDto) {
+    const node = await this.nodeRepo.findByIdWithProps(nodeId);
+    if (!node) {
+      throw new NotFoundException(`Node ${nodeId} not found`);
+    }
+    if ((node.type as unknown as NodeType) !== NodeType.APP) {
+      throw new BadRequestException(`Node ${nodeId} is not an APP node`);
+    }
+
+    if (dto.appSourceType === 'local' && !dto.appPath) {
+      throw new BadRequestException('未配置本地应用路径');
+    }
+    if (dto.appSourceType === 'remote' && !dto.appUrl) {
+      throw new BadRequestException('未配置远程服务 URL');
+    }
+    if (dto.appSourceType === 'library' && !dto.libraryAppId) {
+      throw new BadRequestException('未选择应用库应用');
+    }
+
+    const existingProps = (node.appProps || {}) as AppProps;
+    const appProps: AppProps = {
+      ...existingProps,
+      appSourceType: dto.appSourceType ?? existingProps.appSourceType,
+      appPath: dto.appPath ?? existingProps.appPath ?? null,
+      appUrl: dto.appUrl ?? existingProps.appUrl ?? null,
+      libraryAppId: dto.libraryAppId ?? existingProps.libraryAppId ?? null,
+      libraryAppName: dto.libraryAppName ?? existingProps.libraryAppName ?? null,
+      inputs: dto.inputs ?? existingProps.inputs ?? [],
+      outputs: dto.outputs ?? existingProps.outputs ?? [],
+    };
+
+    return this.appExecutor.execute(nodeId, appProps);
+  }
+
+  /**
    * Get node with its type-specific properties
    * Story 2.1 AC#6, AC#7, AC#8
    */
@@ -115,6 +159,9 @@ export class NodesService {
         break;
       case NodeType.DATA:
         props = node.dataProps || {};
+        break;
+      case NodeType.APP: // Story 2.9
+        props = node.appProps || {};
         break;
       case NodeType.ORDINARY:
       default:
@@ -213,6 +260,9 @@ export class NodesService {
       case NodeType.DATA:
         await this.dataService.initialize(nodeId);
         break;
+      case NodeType.APP: // Story 2.9
+        await this.appService.initialize(nodeId);
+        break;
       case NodeType.ORDINARY:
       default:
         break;
@@ -232,6 +282,9 @@ export class NodesService {
         break;
       case NodeType.DATA:
         await this.dataService.upsertProps(nodeId, props as DataProps);
+        break;
+      case NodeType.APP: // Story 2.9
+        await this.appService.upsertProps(nodeId, props as AppProps);
         break;
       case NodeType.ORDINARY:
       default:

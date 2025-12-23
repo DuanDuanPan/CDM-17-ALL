@@ -32,21 +32,25 @@ export interface NodeUpdateData {
  * Story 2.2: Added explicit return types to fix TypeScript portability issues
  * with Prisma client type inference.
  * Story 2.5: Extended to include tags, isArchived, archivedAt, description
+ * Story 2.9: Added appProps for APP node type
  */
 export interface NodeWithProps extends Node {
   taskProps: unknown | null;
   requirementProps: unknown | null;
   pbsProps: unknown | null;
   dataProps: unknown | null;
+  appProps: unknown | null; // Story 2.9
 }
 
 // Story 2.5: Extended node with graph name for search results
+// Story 2.9: Added appProps for APP node type
 export interface NodeWithGraph extends Node {
   graph: { id: string; name: string };
   taskProps?: unknown | null;
   requirementProps?: unknown | null;
   pbsProps?: unknown | null;
   dataProps?: unknown | null;
+  appProps?: unknown | null; // Story 2.9
 }
 
 @Injectable()
@@ -63,6 +67,7 @@ export class NodeRepository {
         requirementProps: true,
         pbsProps: true,
         dataProps: true,
+        appProps: true, // Story 2.9
       },
     }) as Promise<NodeWithProps | null>;
   }

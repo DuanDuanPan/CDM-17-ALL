@@ -9,15 +9,15 @@ import {
   Database,
   MoreHorizontal,
   Lock,
-  User,
-  Send,
   AlertCircle,
-  Clock
+  Clock,
+  Grid3X3, // Story 2.9: APP node icon
+  Play, // Story 2.9: APP execution
+  Loader2, // Story 2.9: APP running state
 } from 'lucide-react';
-import { NodeType, type TaskProps, type RequirementProps, type PBSProps, type DataProps } from '@cdm/types';
+import { NodeType, type TaskProps, type RequirementProps, type PBSProps, type DataProps, type AppProps, type AppOutput, type AppExecutionStatus } from '@cdm/types';
 import type { MindNodeData } from '@cdm/types';
-import { updateNode } from '@/lib/api/nodes';
-import { graphLogger as logger } from '@/lib/logger';
+import { updateNode, updateNodeProps } from '@/lib/api/nodes';
 
 type MindNodeOperation = 'addChild' | 'addSibling';
 
@@ -106,6 +106,16 @@ const getTypeConfig = (type: NodeType, isDone: boolean = false) => {
         icon: <Database className="w-5 h-5 text-amber-500" />,
         pill: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Internal' }
       };
+    // Story 2.9: APP node styling
+    case NodeType.APP:
+      return {
+        borderColor: 'border-cyan-400',
+        bgColor: 'bg-white/90',
+        shadowColor: 'shadow-cyan-500/20',
+        accentColor: 'text-cyan-600',
+        icon: <Grid3X3 className="w-5 h-5 text-cyan-500" />,
+        pill: { bg: 'bg-cyan-100', text: 'text-cyan-700', label: 'App' }
+      };
     default: // ORDINARY
       return {
         borderColor: 'border-gray-200',
@@ -141,6 +151,8 @@ export function MindNode({ node }: MindNodeProps) {
 
   // Story 2.6 Fix: State for tags to trigger re-render when tags change
   const [tags, setTags] = useState<string[]>(() => getData().tags ?? []);
+  // Story 2.9: Local-only execution state (do not sync running status)
+  const [appRunning, setAppRunning] = useState(false);
 
   // Sync state with node data
   useEffect(() => {
@@ -151,6 +163,9 @@ export function MindNode({ node }: MindNodeProps) {
       setIsSelected(!!data.isSelected);
       // Story 2.6 Fix: Always update tags to ensure UI reflects changes
       setTags(data.tags ?? []);
+      if (data.nodeType !== NodeType.APP) {
+        setAppRunning(false);
+      }
       if (!data.isEditing) {
         setLabel(data.label ?? '');
         setDescription(data.description ?? '');
@@ -199,6 +214,21 @@ export function MindNode({ node }: MindNodeProps) {
   } else if (nodeType === NodeType.DATA) {
     const secretLevel = (data.props as DataProps)?.secretLevel;
     if (secretLevel) pill = { ...pill!, label: secretLevel.charAt(0).toUpperCase() + secretLevel.slice(1) };
+  } else if (nodeType === NodeType.APP) {
+    // Story 2.9: APP node execution status pill
+    const appProps = data.props as AppProps;
+    const executionStatus: AppExecutionStatus | undefined = appRunning ? 'running' : appProps?.executionStatus;
+    const appName = appProps?.libraryAppName;
+
+    if (executionStatus === 'running') {
+      pill = { bg: 'bg-yellow-100', text: 'text-yellow-700', label: '执行中' };
+    } else if (executionStatus === 'success') {
+      pill = { bg: 'bg-green-100', text: 'text-green-700', label: '成功' };
+    } else if (executionStatus === 'error') {
+      pill = { bg: 'bg-red-100', text: 'text-red-700', label: '失败' };
+    } else if (appName) {
+      pill = { ...pill!, label: appName };
+    }
   }
 
   // Auto-resize logic - OPTIMIZED FOR FIXED WIDTH
@@ -251,6 +281,12 @@ export function MindNode({ node }: MindNodeProps) {
       document.getElementById('graph-container')?.focus();
     });
   }, []);
+
+  const startEditing = useCallback(() => {
+    const prevData = getData();
+    setIsEditing(true);
+    node.setData({ ...prevData, isEditing: true } as Partial<MindNodeData>);
+  }, [getData, node]);
 
   const commit = useCallback(() => {
     // Dispatch batch-stop event to finalize undo grouping (if this node was just created)
@@ -328,6 +364,89 @@ export function MindNode({ node }: MindNodeProps) {
     }
   };
 
+  const handleAppExecute = useCallback(
+    async (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      if (appRunning) return;
+      const data = getData();
+      if ((data.nodeType || NodeType.ORDINARY) !== NodeType.APP) return;
+
+      const appProps = (data.props as AppProps) || {};
+      setAppRunning(true);
+
+      if (appProps.appSourceType === 'local' && appProps.appPath) {
+        window.alert(
+          `本地应用启动请求 (Mock):\n${appProps.appPath}\n\n需要 OS 协议处理器支持。`
+        );
+      }
+
+      try {
+        const response = await fetch(`/api/nodes/${node.id}/execute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            appSourceType: appProps.appSourceType ?? 'library',
+            appPath: appProps.appPath,
+            appUrl: appProps.appUrl,
+            libraryAppId: appProps.libraryAppId,
+            libraryAppName: appProps.libraryAppName,
+            inputs: appProps.inputs || [],
+            outputs: appProps.outputs || [],
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`执行失败：${response.status}`);
+        }
+
+        const result: { outputs: AppOutput[]; error?: string; executedAt: string } = await response.json();
+        if (result?.error) {
+          throw new Error(result.error);
+        }
+
+        const successProps: AppProps = {
+          ...appProps,
+          outputs: result.outputs || [],
+          executionStatus: 'success' as AppExecutionStatus,
+          lastExecutedAt: result.executedAt ?? new Date().toISOString(),
+          errorMessage: null,
+        };
+
+        const prevData = node.getData() || {};
+        node.setData({
+          ...prevData,
+          props: successProps,
+          updatedAt: new Date().toISOString(),
+        } as Partial<MindNodeData>);
+
+        updateNodeProps(node.id, NodeType.APP, successProps).catch((err) => {
+          console.error('[MindNode] Failed to persist APP execution props:', err);
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '执行失败';
+        const errorProps: AppProps = {
+          ...appProps,
+          executionStatus: 'error' as AppExecutionStatus,
+          errorMessage: message,
+          lastExecutedAt: new Date().toISOString(),
+        };
+        const prevData = node.getData() || {};
+        node.setData({
+          ...prevData,
+          props: errorProps,
+          updatedAt: new Date().toISOString(),
+        } as Partial<MindNodeData>);
+
+        updateNodeProps(node.id, NodeType.APP, errorProps).catch((err) => {
+          console.error('[MindNode] Failed to persist APP execution props:', err);
+        });
+      } finally {
+        setAppRunning(false);
+      }
+    },
+    [appRunning, getData, node]
+  );
+
   const containerClasses = `
     relative flex flex-col w-full h-full transition-all duration-200
     ${styles.bgColor} backdrop-blur-sm
@@ -344,7 +463,7 @@ export function MindNode({ node }: MindNodeProps) {
       <div
         ref={containerRef}
         className={containerClasses}
-        onDoubleClick={() => { setIsEditing(true); node.setData({ isEditing: true }); }}
+        onDoubleClick={startEditing}
       >
         {/* Measures */}
         <div ref={titleMeasureRef} className="absolute opacity-0 pointer-events-none text-sm font-medium px-2 text-center w-full break-words">
@@ -375,7 +494,7 @@ export function MindNode({ node }: MindNodeProps) {
     <div
       ref={containerRef}
       className={containerClasses}
-      onDoubleClick={() => { setIsEditing(true); node.setData({ isEditing: true }); }}
+      onDoubleClick={startEditing}
       title={label} // Native tooltip for full text
     >
       {/* === HEADER (Icon + Title) === */}
@@ -430,9 +549,9 @@ export function MindNode({ node }: MindNodeProps) {
       {/* === FOOTER (Pill + Tags + Assignment + ID) === */}
       <div className="w-full flex items-center justify-between mt-1.5 pt-1.5 border-t border-gray-100">
         {/* Left: Status Pill + Tags */}
-        <div className="flex items-center gap-1 overflow-hidden">
+        <div className="flex items-center gap-1 overflow-hidden min-w-0">
           {pill ? (
-            <div className={`px-1.5 py-0.5 rounded text-[9px] font-medium leading-none flex-shrink-0 ${pill.bg} ${pill.text}`}>
+            <div className={`px-1.5 py-0.5 rounded text-[9px] font-medium leading-none truncate ${pill.bg} ${pill.text}`} title={pill.label}>
               {pill.label}
             </div>
           ) : <div />}
@@ -504,8 +623,28 @@ export function MindNode({ node }: MindNodeProps) {
           )}
         </div>
 
-        {/* Right: Meta ID (Always visible for engineering context) */}
-        <div className="flex items-center gap-1">
+        {/* Right: Meta ID + APP Execute Button */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Story 2.9: APP node execute button (AC1.2) */}
+          {nodeType === NodeType.APP && (
+            <button
+              onClick={handleAppExecute}
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors text-[9px] ${appRunning
+                  ? 'text-yellow-700 bg-yellow-100 cursor-wait'
+                  : 'text-cyan-700 bg-cyan-50 hover:bg-cyan-100'
+                }`}
+              title={appRunning ? '执行中...' : '启动应用'}
+              aria-label="启动应用"
+              disabled={appRunning}
+            >
+              {appRunning ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Play className="w-3 h-3" />
+              )}
+              <span>启动</span>
+            </button>
+          )}
           <span className="text-[9px] font-mono text-gray-400">{node.id.slice(0, 6).toUpperCase()}</span>
           {nodeType === NodeType.DATA && <Lock className="w-2.5 h-2.5 text-gray-300" />}
         </div>
