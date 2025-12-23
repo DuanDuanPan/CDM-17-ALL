@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2025-12-23 - Story 2.9 review; DB reset + NodeApp migration applied
+last_updated: 2025-12-23 - Story 3.6 done; ESLint infrastructure fixed
 
 development_status:
   epic-1: done
@@ -49,7 +49,7 @@ development_status:
   1-4-real-time-collaboration-engine: done
   epic-1-retrospective: completed
 
-  epic-2: in-progress
+  epic-2: done
   2-1-task-conversion-properties: done  # All HIGH issues fixed; 2 LOW/MEDIUM deferred
   2-2-task-dependency-network: done  # All tasks complete, tests added; 4 minor issues deferred
   2-3-multi-view-synchronization: done
@@ -58,7 +58,7 @@ development_status:
   2-6-multi-select-clipboard: done  # Multi-select, Copy/Cut/Paste, Keyboard shortcuts, Context menu, Toolbar
   2-7-pbs-node-enhancement: done  # All code review issues fixed; PBS Indicators, Product Library (Mock), Node Visual
   2-8-knowledge-link-recommendation-mock: done # Tests Passed & Feature Implemented
-  2-9-app-node-type: review  # App node execution + I/O implemented; DB reset + migration applied
+  2-9-app-node-type: done  # App node execution + I/O implemented; DB reset + migration applied
   epic-2-retrospective: optional
 
   epic-4: backlog
@@ -86,4 +86,5 @@ development_status:
   3-3-secure-version-history: backlog
   3-4-secure-export-share: backlog
   3-5-performance-optimization: ready-for-dev
+  3-6-infrastructure-lint-fix: done  # ESLint 9 Flat Config migrated; All 5 packages pass
   epic-3-retrospective: optional

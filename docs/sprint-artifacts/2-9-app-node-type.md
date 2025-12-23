@@ -1,6 +1,6 @@
 # Story 2.9: APP 节点类型与工业软件集成 (APP Node Type)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

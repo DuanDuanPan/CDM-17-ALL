@@ -318,7 +318,7 @@ export function useGanttData(yDoc: Y.Doc | null): UseGanttDataReturn {
       }
 
       // Map parent ID regarding Root node
-      let finalParentId = ganttParentId ?? (rootNodeId || '0');
+      const finalParentId = ganttParentId ?? (rootNodeId || '0');
 
       const isExpanded =
         ganttState.expandedRows.has('__all__') ||

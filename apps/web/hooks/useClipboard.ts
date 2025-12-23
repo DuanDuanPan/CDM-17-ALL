@@ -442,12 +442,11 @@ export function useClipboard({
                     // Story 2.6 Fix: Copy props but remove database-managed fields
                     // nodeId, createdAt, updatedAt are managed by the database, not the props JSON
                     const now = new Date().toISOString();
-                    let updatedProps: Record<string, unknown> | undefined;
                     const rawProps = nodeData.metadata && typeof nodeData.metadata === 'object'
                         ? (nodeData.metadata as Record<string, unknown>)
                         : {};
                     const sanitizedProps = sanitizeNodeProps(nodeData.type, rawProps);
-                    updatedProps = Object.keys(sanitizedProps).length > 0 ? sanitizedProps : undefined;
+                    const updatedProps = Object.keys(sanitizedProps).length > 0 ? sanitizedProps : undefined;
 
                     const newNode = {
                         id: newId,

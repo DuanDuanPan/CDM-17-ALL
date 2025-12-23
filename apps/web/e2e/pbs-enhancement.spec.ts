@@ -291,7 +291,7 @@ test.describe('Product Library Search (Front-end)', () => {
             await page.waitForTimeout(500);
 
             // HIGH-2 Fix: Use actual mock product names from product-library.controller.ts
-            const searchInput = page.locator('input[placeholder*=\"产品名称\"]');
+            const searchInput = page.locator('input[placeholder*="产品名称"]');
             await searchInput.fill('Solar');
             await page.waitForTimeout(300);
 

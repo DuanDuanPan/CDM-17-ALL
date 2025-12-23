@@ -147,7 +147,7 @@ function GanttChartBase({
     // Dynamic import for dhtmlx-gantt (client-side only)
     const initGantt = async () => {
       const { gantt } = await import('dhtmlx-gantt');
-      // @ts-ignore - CSS import for dhtmlx-gantt
+      // @ts-expect-error - CSS import for dhtmlx-gantt
       await import('dhtmlx-gantt/codebase/dhtmlxgantt.css');
 
       ganttRef.current = gantt;
