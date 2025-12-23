@@ -59,7 +59,7 @@ development_status:
   2-7-pbs-node-enhancement: done  # All code review issues fixed; PBS Indicators, Product Library (Mock), Node Visual
   2-8-knowledge-link-recommendation-mock: done # Tests Passed & Feature Implemented
   2-9-app-node-type: done  # App node execution + I/O implemented; DB reset + migration applied
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   epic-4: backlog
   4-1-approval-driven-workflow: backlog
