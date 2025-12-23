@@ -85,3 +85,5 @@ export * from './clipboard-types';
 // Story 2.9: Export app library types for APP nodes
 export * from './app-library';
 
+// Story 4.1: Export approval workflow types
+export * from './approval';

@@ -116,13 +116,36 @@ export function useClipboard({
             return null;
         }
 
+
         // Expanded selection: includes explicitly selected nodes + all their descendants
         const allNodesMap = new Map<string, Node>();
         selectedNodes.forEach(node => allNodesMap.set(node.id, node));
 
-        // Recursively find descendants
-        // We use X6 cells because we need position/size info which might not be in Yjs yet if freshly created
+        // Build a parent-child map from hierarchical edges for more reliable hierarchy detection
+        // This fixes issues where data.parentId might not be synced correctly to X6 node data
         const allCells = graphRef.current.getCells();
+        const graphEdgesForHierarchy = graphRef.current.getEdges();
+
+        // Map: parentId -> Set of childIds (from hierarchical edges)
+        const hierarchicalChildren = new Map<string, Set<string>>();
+        graphEdgesForHierarchy.forEach(edge => {
+            const edgeData = edge.getData() || {};
+            const metadata = edgeData.metadata || {};
+            // Only consider hierarchical edges (not dependency edges)
+            if (metadata.kind === 'dependency') return;
+
+            const sourceId = edge.getSourceCellId();
+            const targetId = edge.getTargetCellId();
+            if (sourceId && targetId) {
+                // Source is parent, target is child for hierarchical edges
+                if (!hierarchicalChildren.has(sourceId)) {
+                    hierarchicalChildren.set(sourceId, new Set());
+                }
+                hierarchicalChildren.get(sourceId)!.add(targetId);
+            }
+        });
+
+        // Recursively find descendants using BOTH data.parentId AND hierarchical edges
         let changed = true;
         while (changed) {
             changed = false;
@@ -130,9 +153,23 @@ export function useClipboard({
                 if (cell.isNode() && !allNodesMap.has(cell.id)) {
                     const data = cell.getData() || {};
                     const parentId = data.parentId;
+
+                    // Method 1: Check via data.parentId
                     if (parentId && allNodesMap.has(parentId)) {
                         allNodesMap.set(cell.id, cell as Node);
                         changed = true;
+                        return;
+                    }
+
+                    // Method 2: Check via hierarchical edges (more reliable for pasted nodes)
+                    // If any selected node has this node as a child via hierarchical edge
+                    for (const [potentialParentId] of allNodesMap) {
+                        const children = hierarchicalChildren.get(potentialParentId);
+                        if (children && children.has(cell.id)) {
+                            allNodesMap.set(cell.id, cell as Node);
+                            changed = true;
+                            return;
+                        }
                     }
                 }
             });
@@ -481,13 +518,19 @@ export function useClipboard({
                         const edgeId = nanoid();
                         newEdgeIds.push(edgeId);
 
+                        // Fix: Use correct YjsEdgeData structure with type and metadata fields
+                        // GraphSyncManager expects: type ('hierarchical' | 'reference'), metadata: { kind, dependencyType }
                         yEdges.set(edgeId, {
                             id: edgeId,
                             source: newSourceId,
                             target: newTargetId,
-                            kind: edgeData.kind,
-                            dependencyType: edgeData.dependencyType,
-                            label: edgeData.label,
+                            // Legacy 'type' field for backward compatibility
+                            type: edgeData.kind === 'dependency' ? 'reference' : 'hierarchical',
+                            // Story 2.2: Edge metadata for polymorphic edges
+                            metadata: {
+                                kind: edgeData.kind,
+                                dependencyType: edgeData.dependencyType,
+                            },
                             graphId: graphId,
                         });
                     }
@@ -496,15 +539,19 @@ export function useClipboard({
                 // Story 2.6 Fix: Create hierarchical edges for parent-child relationships
                 // This ensures pasted nodes are properly connected to their parents
                 parentChildRelations.forEach(({ parentId, childId }) => {
-                    // Check if edge already exists in clipboard edges (avoid duplicates)
-                    const edgeExists = data.edges.some(e => {
+                    // Fix: Check if a HIERARCHICAL edge already exists (not dependency edge)
+                    // Dependency edges (FS/SS/FF/SF) represent logical relationships between siblings,
+                    // NOT parent-child structure. We must create hierarchical edges for actual hierarchy.
+                    const hierarchicalEdgeExists = data.edges.some(e => {
+                        // Only consider hierarchical edges, skip dependency edges
+                        if (e.kind === 'dependency') return false;
                         const mappedSource = idMap.get(e.sourceOriginalId);
                         const mappedTarget = idMap.get(e.targetOriginalId);
                         return (mappedSource === parentId && mappedTarget === childId) ||
                             (mappedSource === childId && mappedTarget === parentId);
                     });
 
-                    if (!edgeExists) {
+                    if (!hierarchicalEdgeExists) {
                         const edgeId = nanoid();
                         newEdgeIds.push(edgeId);
 

@@ -15,7 +15,7 @@ import {
   Play, // Story 2.9: APP execution
   Loader2, // Story 2.9: APP running state
 } from 'lucide-react';
-import { NodeType, type TaskProps, type RequirementProps, type PBSProps, type DataProps, type AppProps, type AppOutput, type AppExecutionStatus } from '@cdm/types';
+import { NodeType, type TaskProps, type RequirementProps, type PBSProps, type DataProps, type AppProps, type AppOutput, type AppExecutionStatus, type ApprovalStatus, type ApprovalPipeline } from '@cdm/types';
 import type { MindNodeData } from '@cdm/types';
 import { updateNode, updateNodeProps } from '@/lib/api/nodes';
 
@@ -128,6 +128,32 @@ const getTypeConfig = (type: NodeType, isDone: boolean = false) => {
   }
 };
 
+// Story 4.1: Get approval status decoration styles
+const getApprovalDecoration = (approvalStatus: ApprovalStatus | undefined) => {
+  switch (approvalStatus) {
+    case 'PENDING':
+      return {
+        ringColor: 'ring-2 ring-yellow-400 ring-offset-1',
+        badgeClass: 'bg-yellow-100 text-yellow-700',
+        badgeText: '待审批',
+      };
+    case 'APPROVED':
+      return {
+        ringColor: 'ring-2 ring-green-400 ring-offset-1',
+        badgeClass: 'bg-green-100 text-green-700',
+        badgeText: '已通过',
+      };
+    case 'REJECTED':
+      return {
+        ringColor: 'ring-2 ring-red-400 ring-offset-1',
+        badgeClass: 'bg-red-100 text-red-700',
+        badgeText: '已驳回',
+      };
+    default:
+      return null;
+  }
+};
+
 const NODE_WIDTH = 220;
 
 export function MindNode({ node }: MindNodeProps) {
@@ -195,6 +221,11 @@ export function MindNode({ node }: MindNodeProps) {
   // Story 2.4: Assignment status indicator
   const assignmentStatus = taskProps?.assignmentStatus;
   const showAssignmentIndicator = nodeType === NodeType.TASK && assignmentStatus && assignmentStatus !== 'idle';
+
+  // Story 4.1: Approval status decoration
+  const approval = data.props && 'approval' in (data as any) ? (data as any).approval as ApprovalPipeline : undefined;
+  const approvalStatus = approval?.status;
+  const approvalDecoration = getApprovalDecoration(approvalStatus);
 
   // Dynamic pills based on props
   let pill = styles.pill;
@@ -450,8 +481,8 @@ export function MindNode({ node }: MindNodeProps) {
   const containerClasses = `
     relative flex flex-col w-full h-full transition-all duration-200
     ${styles.bgColor} backdrop-blur-sm
-    ${isSelected ? 'ring-2 ring-blue-500 border-transparent z-10' : `border ${styles.borderColor}`}
-    ${isSelected ? 'shadow-md scale-[1.01]' : 'shadow-sm hover:shadow-md'}
+    ${approvalDecoration ? approvalDecoration.ringColor : isSelected ? 'ring-2 ring-blue-500 border-transparent z-10' : `border ${styles.borderColor}`}
+    ${isSelected && !approvalDecoration ? 'shadow-md scale-[1.01]' : 'shadow-sm hover:shadow-md'}
     ${nodeType === NodeType.ORDINARY ? 'rounded px-3 py-1.5 items-center justify-center' : 'rounded-lg p-2 justify-between'}
   `;
 
@@ -621,6 +652,16 @@ export function MindNode({ node }: MindNodeProps) {
               </span>
             </div>
           )}
+
+          {/* Story 4.1: Approval Status Badge */}
+          {approvalDecoration && nodeType === NodeType.TASK && (
+            <div
+              className={`flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-medium leading-none flex-shrink-0 ${approvalDecoration.badgeClass}`}
+              title={`审批状态: ${approvalDecoration.badgeText}`}
+            >
+              <span>{approvalDecoration.badgeText}</span>
+            </div>
+          )}
         </div>
 
         {/* Right: Meta ID + APP Execute Button */}
@@ -630,8 +671,8 @@ export function MindNode({ node }: MindNodeProps) {
             <button
               onClick={handleAppExecute}
               className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors text-[9px] ${appRunning
-                  ? 'text-yellow-700 bg-yellow-100 cursor-wait'
-                  : 'text-cyan-700 bg-cyan-50 hover:bg-cyan-100'
+                ? 'text-yellow-700 bg-yellow-100 cursor-wait'
+                : 'text-cyan-700 bg-cyan-50 hover:bg-cyan-100'
                 }`}
               title={appRunning ? '执行中...' : '启动应用'}
               aria-label="启动应用"

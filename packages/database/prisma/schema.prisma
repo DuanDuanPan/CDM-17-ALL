@@ -73,6 +73,9 @@ model Node {
   height      Float    @default(40)
   metadata    Json     @default("{}")
 
+  // Story 4.1: Approval Workflow
+  approval    Json?    // Stores ApprovalPipeline: { status, currentStepIndex, steps[], history[] }
+
   // Story 2.5: Tags and Archive fields
   tags        String[] @default([])   // 标签数组
   isArchived  Boolean  @default(false) // 归档状态 (软删除)
@@ -128,6 +131,9 @@ model NodeTask {
 
   // Story 2.8: Knowledge association
   knowledgeRefs   Json?
+
+  // Story 4.1: Approval Workflow
+  deliverables    Json?    // Array: [{ id, fileId, fileName, uploadedAt }]
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

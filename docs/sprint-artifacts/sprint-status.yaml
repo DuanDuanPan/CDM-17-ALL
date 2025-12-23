@@ -61,11 +61,12 @@ development_status:
   2-9-app-node-type: done  # App node execution + I/O implemented; DB reset + migration applied
   epic-2-retrospective: done
 
-  epic-4: backlog
-  4-1-approval-driven-workflow: backlog
-  4-2-smart-notification-center: backlog
-  4-3-contextual-comments-mentions: backlog
-  4-4-watch-subscription: backlog
+  epic-4: in-progress
+  4-1-approval-driven-workflow: review
+  4-2-rich-node-design: planned # New story for Rich UI/UX
+  4-3-smart-notification-center: backlog
+  4-4-contextual-comments-mentions: backlog
+  4-5-watch-subscription: backlog
   epic-4-retrospective: optional
 
   epic-5: backlog

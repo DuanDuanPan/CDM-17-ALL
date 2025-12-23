@@ -216,7 +216,7 @@ export function RightSidebar({
         : { error };
       logger.error('Failed to ensure node exists', { nodeId, graphId, error: errorInfo });
     }
-  }, [graphId, resolvedCreatorName]);
+  }, [graph, graphId, resolvedCreatorName]);
 
   // Sync node data changes to X6 Graph (triggers Yjs sync via GraphSyncManager)
   const syncToGraph = useCallback((nodeId: string, data: Partial<EnhancedNodeData>) => {
