@@ -114,11 +114,21 @@ export function RightSidebar({
 
         // Story 2.6 Fix: Sync API data back to X6 node
         // This ensures props and tags from DB are available for clipboard copy
+        // Story 2.8 Fix: Only sync if API data is NEWER than local data
+        // This prevents stale API data from overwriting Yjs-synced updates
         const existingNodeData = node.getData() || {};
-        const needsSync =
+        const localUpdatedAt = existingNodeData.updatedAt;
+        const apiUpdatedAt = existing.updatedAt;
+
+        // Compare timestamps - only sync from API if API data is newer or local has no timestamp
+        const apiIsNewer = !localUpdatedAt ||
+          (apiUpdatedAt && new Date(apiUpdatedAt) > new Date(localUpdatedAt));
+
+        const needsSync = apiIsNewer && (
           JSON.stringify(existingNodeData.props) !== JSON.stringify(existing.props) ||
           JSON.stringify(existingNodeData.tags) !== JSON.stringify(existing.tags) ||
-          existingNodeData.nodeType !== existing.type;
+          existingNodeData.nodeType !== existing.type
+        );
 
         if (needsSync) {
           const now = new Date().toISOString();
@@ -130,8 +140,10 @@ export function RightSidebar({
             isArchived: existing.isArchived ?? existingNodeData.isArchived,
             archivedAt: existing.archivedAt ?? existingNodeData.archivedAt,
             updatedAt: now,
-          });
-          logger.debug('Synced API data back to X6 node', { nodeId, type: existing.type });
+          }, { overwrite: true });
+          logger.debug('Synced API data back to X6 node (API is newer)', { nodeId, type: existing.type, apiUpdatedAt, localUpdatedAt });
+        } else if (!apiIsNewer) {
+          logger.debug('Skipped API sync - local data is newer', { nodeId, apiUpdatedAt, localUpdatedAt });
         }
         return;
       }
@@ -216,13 +228,14 @@ export function RightSidebar({
       const updatedAt = now;
       // Merge with existing data and update X6 node
       // This triggers 'node:change:data' event which GraphSyncManager observes
+      // Always overwrite props to allow empty arrays (e.g., knowledgeRefs: []) to clear correctly
       x6Node.setData({
         ...existingData,
         nodeType: data.type ?? existingData.nodeType,  // Use nodeType field as defined in GraphSyncManager
-        props: data.props ?? existingData.props,
+        props: data.props,
         createdAt,
         updatedAt,
-      });
+      }, { overwrite: true });
       logger.debug('Synced node data to X6 graph', { nodeId, data });
       return;
     }
@@ -366,22 +379,40 @@ export function RightSidebar({
     if (x6Node) {
       const handleNodeDataChange = () => {
         const data = x6Node.getData() || {};
-        setNodeData((prev) => ({
-          id: selectedNodeId,
-          label: data.label || prev?.label || '未命名节点',
-          description: typeof data.description === 'string' ? data.description : prev?.description,
-          type: (data.nodeType as NodeType) || prev?.type || NodeType.ORDINARY,
-          props: (data.props as NodeProps) || prev?.props || {},
-          tags: Array.isArray(data.tags) ? data.tags : prev?.tags ?? [],
-          isArchived: typeof data.isArchived === 'boolean' ? data.isArchived : prev?.isArchived,
-          archivedAt:
-            typeof data.archivedAt === 'string' || data.archivedAt === null
-              ? data.archivedAt
-              : prev?.archivedAt,
-          createdAt: data.createdAt ?? prev?.createdAt,
-          updatedAt: data.updatedAt ?? prev?.updatedAt,
-          creator: data.creator ?? prev?.creator ?? resolvedCreatorName,
-        }));
+
+        // Guard: ignore stale updates (older than current nodeData.updatedAt)
+        setNodeData((prev) => {
+          const incomingUpdatedAt = data.updatedAt as string | undefined;
+          if (prev?.updatedAt && incomingUpdatedAt) {
+            const incomingTime = new Date(incomingUpdatedAt).getTime();
+            const prevTime = new Date(prev.updatedAt).getTime();
+            if (incomingTime < prevTime) {
+              return prev; // stale payload, skip
+            }
+          }
+
+          // IMPORTANT: do not fall back to previous props when data.props is an empty array; only fallback when undefined
+          const nextProps = data.props !== undefined
+            ? (data.props as NodeProps)
+            : (prev?.props || {});
+
+          return {
+            id: selectedNodeId,
+            label: data.label || prev?.label || '未命名节点',
+            description: typeof data.description === 'string' ? data.description : prev?.description,
+            type: (data.nodeType as NodeType) || prev?.type || NodeType.ORDINARY,
+            props: nextProps,
+            tags: Array.isArray(data.tags) ? data.tags : prev?.tags ?? [],
+            isArchived: typeof data.isArchived === 'boolean' ? data.isArchived : prev?.isArchived,
+            archivedAt:
+              typeof data.archivedAt === 'string' || data.archivedAt === null
+                ? data.archivedAt
+                : prev?.archivedAt,
+            createdAt: data.createdAt ?? prev?.createdAt,
+            updatedAt: data.updatedAt ?? prev?.updatedAt,
+            creator: data.creator ?? prev?.creator ?? resolvedCreatorName,
+          } as EnhancedNodeData;
+        });
       };
 
       x6Node.on('change:data', handleNodeDataChange);
@@ -400,7 +431,8 @@ export function RightSidebar({
           id: selectedNodeId,
           label: yjsNode.label || '未命名节点',
           type: (yjsNode.nodeType as NodeType) || NodeType.ORDINARY,
-          props: (yjsNode.props as NodeProps) || {},
+          // Fix: Use props directly, fallback to empty object only when undefined
+          props: yjsNode.props !== undefined ? (yjsNode.props as NodeProps) : {},
           createdAt: yjsNode.createdAt,
           updatedAt: yjsNode.updatedAt,
           creator: yjsNode.creator || resolvedCreatorName,

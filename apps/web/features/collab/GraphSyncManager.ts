@@ -473,7 +473,7 @@ export class GraphSyncManager {
                 tags: data.tags,
                 isArchived: data.isArchived,
                 archivedAt: data.archivedAt,
-            });
+            }, { overwrite: true });
 
             // Story 2.7: Handle visibility based on isArchived state (multi-client sync)
             if (data.isArchived) {

@@ -85,8 +85,8 @@ test.describe('Knowledge Link & Recommendation (Story 2.8)', () => {
                     const recommendationItems = propertyPanel.locator('button:has-text("React Best Practices"), button:has-text("System Design"), button:has-text("API Design")');
                     const itemCount = await recommendationItems.count();
 
-                    // Should have at least some recommendations (mock data)
-                    expect(itemCount).toBeGreaterThanOrEqual(0);
+                    // Should have at least one recommendation (mock data)
+                    expect(itemCount).toBeGreaterThan(0);
                 }
             }
         });
@@ -118,8 +118,8 @@ test.describe('Knowledge Link & Recommendation (Story 2.8)', () => {
                     const toast = page.locator('[data-sonner-toast], [role="alert"], .toast');
                     const toastVisible = await toast.isVisible().catch(() => false);
 
-                    // Pass if toast appears or console log is triggered
-                    expect(toastVisible || true).toBe(true);
+                    // Toast should be visible after clicking recommendation
+                    expect(toastVisible).toBe(true);
                 }
             }
         });
@@ -245,7 +245,8 @@ test.describe('Knowledge Link & Recommendation (Story 2.8)', () => {
                 const toast = page.locator('[data-sonner-toast]:has-text("关联成功")');
                 const toastVisible = await toast.isVisible().catch(() => false);
 
-                expect(itemVisible || toastVisible || true).toBe(true);
+                // At least one indicator should confirm the action succeeded
+                expect(itemVisible || toastVisible).toBe(true);
             }
         });
 
@@ -272,12 +273,15 @@ test.describe('Knowledge Link & Recommendation (Story 2.8)', () => {
     });
 
     test.describe('AC3.1-3.2: API & Data Types', () => {
+        // Use baseURL from playwright config or fallback to localhost for local dev
+        const getApiBaseUrl = () => process.env.API_BASE_URL || 'http://localhost:3001/api';
+
         test('TC-2.8-API-1: Knowledge Library API should return mock data', async ({
             page,
         }) => {
             // Given: API is available
             // When: Fetch knowledge library
-            const response = await page.request.get('http://localhost:3001/api/knowledge-library');
+            const response = await page.request.get(`${getApiBaseUrl()}/knowledge-library`);
 
             // Then: Should return array of knowledge items
             expect(response.ok()).toBe(true);
@@ -300,7 +304,7 @@ test.describe('Knowledge Link & Recommendation (Story 2.8)', () => {
             // Given: API is available
             // When: Search for "design"
             const response = await page.request.get(
-                'http://localhost:3001/api/knowledge-library?q=design'
+                `${getApiBaseUrl()}/knowledge-library?q=design`
             );
 
             // Then: Should return filtered results

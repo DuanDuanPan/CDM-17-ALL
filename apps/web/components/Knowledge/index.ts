@@ -1,5 +1,7 @@
 /**
- * Story 2.8: Knowledge Components Barrel Export
+ * Knowledge Components Index
+ * Story 2.8: Knowledge Link & Recommendation
  */
-export * from './KnowledgeSearchDialog';
-export * from './KnowledgeRecommendation';
+
+export { KnowledgeSearchDialog, type KnowledgeSearchDialogProps } from './KnowledgeSearchDialog';
+export { KnowledgeRecommendation } from './KnowledgeRecommendation';

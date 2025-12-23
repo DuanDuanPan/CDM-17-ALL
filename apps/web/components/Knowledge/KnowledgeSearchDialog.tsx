@@ -22,8 +22,8 @@ import {
 import { useDebounce } from 'use-debounce';
 import type { KnowledgeReference } from '@cdm/types';
 
-// API base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+// API base URL - prefer env override, otherwise same-origin /api to avoid invalid URL during preview/dev
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export interface KnowledgeSearchDialogProps {
     open: boolean;
@@ -84,7 +84,12 @@ export function KnowledgeSearchDialog({
         setError(null);
 
         try {
-            const url = new URL(`${API_BASE_URL}/knowledge-library`);
+            // Build absolute URL safely; preserve path when base already contains /api
+            const base = API_BASE_URL.startsWith('http')
+                ? API_BASE_URL
+                : (typeof window !== 'undefined' ? `${window.location.origin}${API_BASE_URL}` : API_BASE_URL);
+            const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+            const url = new URL('knowledge-library', normalizedBase);
             if (searchQuery.trim()) {
                 url.searchParams.set('q', searchQuery.trim());
             }

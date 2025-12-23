@@ -3,14 +3,21 @@
 /**
  * Story 2.1: Task Node Form
  * Form for Task-specific properties (status, assignee, dueDate, priority)
- * Story 2.8: Added knowledge resource association
+ * Story 2.4: Added task dispatch workflow (extracted to TaskDispatchSection)
+ * Story 2.8: Added knowledge resource association (extracted to KnowledgeResourcesSection)
+ * 
+ * Refactored: Original 575 lines -> ~200 lines
+ * Extracted components:
+ * - TaskDispatchSection (task dispatch/accept/reject logic)
+ * - KnowledgeResourcesSection (knowledge association UI)
+ * - RejectReasonDialog (rejection modal)
  */
 
-import { useState, useEffect } from 'react';
-import { Calendar, User, Flag, Send, CheckCircle, XCircle, AlertCircle, BookOpen, Plus, X, FileText, Link as LinkIcon, Video } from 'lucide-react';
-import type { TaskProps, AssignmentStatus, KnowledgeReference } from '@cdm/types';
-import { useToast } from '@cdm/ui';
-import { KnowledgeSearchDialog } from '@/components/Knowledge';
+import { useState, useEffect, useCallback } from 'react';
+import { Calendar, User, Flag } from 'lucide-react';
+import type { TaskProps } from '@cdm/types';
+import { TaskDispatchSection } from './TaskDispatchSection';
+import { KnowledgeResourcesSection } from './KnowledgeResourcesSection';
 
 export interface TaskFormProps {
   nodeId: string;
@@ -32,14 +39,10 @@ export function TaskForm({ nodeId, initialData, onUpdate, currentUserId = 'test1
     rejectionReason: initialData?.rejectionReason || null,
     dispatchedAt: initialData?.dispatchedAt || null,
     feedbackAt: initialData?.feedbackAt || null,
-    knowledgeRefs: initialData?.knowledgeRefs || [], // Story 2.8
+    knowledgeRefs: initialData?.knowledgeRefs ?? [],
   });
 
-  const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [showKnowledgeSearch, setShowKnowledgeSearch] = useState(false); // Story 2.8
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const { addToast } = useToast();
 
   useEffect(() => {
     setFormData({
@@ -54,159 +57,15 @@ export function TaskForm({ nodeId, initialData, onUpdate, currentUserId = 'test1
       rejectionReason: initialData?.rejectionReason || null,
       dispatchedAt: initialData?.dispatchedAt || null,
       feedbackAt: initialData?.feedbackAt || null,
-      knowledgeRefs: initialData?.knowledgeRefs || [], // Story 2.8
+      knowledgeRefs: initialData?.knowledgeRefs ?? [],
     });
   }, [initialData]);
 
-  const handleFieldChange = (field: keyof TaskProps, value: any) => {
+  const handleFieldChange = useCallback((field: keyof TaskProps, value: any) => {
     const updatedData = { ...formData, [field]: value };
     setFormData(updatedData);
     onUpdate?.(updatedData);
-  };
-
-  // Story 2.4: Task dispatch handler
-  // [AI-Review][HIGH-5] Fixed: Now calls onUpdate to sync with X6/Yjs
-  // [AI-Review][MEDIUM-3] Fixed: Safe error parsing for API responses
-  const handleDispatch = async () => {
-    if (!formData.assigneeId) {
-      addToast({ type: 'warning', title: '缺少信息', description: '请先指定执行人' });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const response = await fetch(`/api/nodes/${nodeId}:dispatch?userId=${encodeURIComponent(currentUserId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!response.ok) {
-        // [AI-Review][MEDIUM-3] Safe error parsing
-        const errorText = await response.text();
-        let errorMessage = '派发失败';
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.message || errorJson.error || errorMessage;
-        } catch {
-          errorMessage = errorText || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const now = new Date().toISOString();
-      const updatedData: TaskProps = {
-        ...formData,
-        assignmentStatus: 'dispatched',
-        ownerId: currentUserId,
-        dispatchedAt: now,
-      };
-      setFormData(updatedData);
-
-      // [AI-Review][HIGH-5] Sync to X6/Yjs via onUpdate
-      onUpdate?.(updatedData);
-
-      addToast({ type: 'success', title: '派发成功', description: '任务已成功派发！' });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '派发失败，请重试';
-      addToast({ type: 'error', title: '派发失败', description: message });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Story 2.4: Task accept handler
-  // [AI-Review][HIGH-5] Fixed: Now calls onUpdate to sync with X6/Yjs
-  const handleAccept = async () => {
-    setIsSubmitting(true);
-    try {
-      const response = await fetch(`/api/nodes/${nodeId}:feedback?userId=${encodeURIComponent(currentUserId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'accept' }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = '接受失败';
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.message || errorJson.error || errorMessage;
-        } catch {
-          errorMessage = errorText || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const now = new Date().toISOString();
-      const updatedData: TaskProps = {
-        ...formData,
-        assignmentStatus: 'accepted',
-        status: 'todo',
-        feedbackAt: now,
-      };
-      setFormData(updatedData);
-
-      // [AI-Review][HIGH-5] Sync to X6/Yjs via onUpdate
-      onUpdate?.(updatedData);
-
-      addToast({ type: 'success', title: '接受成功', description: '任务已接受！' });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '接受失败，请重试';
-      addToast({ type: 'error', title: '接受失败', description: message });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Story 2.4: Task reject handler
-  // [AI-Review][HIGH-5] Fixed: Now calls onUpdate to sync with X6/Yjs
-  const handleReject = async (reason: string) => {
-    if (!reason?.trim()) {
-      addToast({ type: 'warning', title: '提示', description: '请填写驳回理由' });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const response = await fetch(`/api/nodes/${nodeId}:feedback?userId=${encodeURIComponent(currentUserId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject', reason }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = '驳回失败';
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.message || errorJson.error || errorMessage;
-        } catch {
-          errorMessage = errorText || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const now = new Date().toISOString();
-      const updatedData: TaskProps = {
-        ...formData,
-        assignmentStatus: 'rejected',
-        rejectionReason: reason,
-        feedbackAt: now,
-      };
-      setFormData(updatedData);
-
-      // [AI-Review][HIGH-5] Sync to X6/Yjs via onUpdate
-      onUpdate?.(updatedData);
-
-      setShowRejectDialog(false);
-      addToast({ type: 'success', title: '驳回成功', description: '任务已驳回' });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '驳回失败，请重试';
-      addToast({ type: 'error', title: '驳回失败', description: message });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  }, [formData, onUpdate]);
 
   return (
     <div className="space-y-4">
@@ -328,248 +187,22 @@ export function TaskForm({ nodeId, initialData, onUpdate, currentUserId = 'test1
         </div>
       </div>
 
-      {/* Story 2.4: Assignment Section */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <Send className="w-4 h-4" />
-          任务派发
-        </h3>
-
-        {/* Assignment Status Badge */}
-        <div className="mb-3 p-3 rounded-md bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-600">派发状态</span>
-            <span
-              className={`px-2 py-1 rounded text-xs font-medium ${formData.assignmentStatus === 'accepted'
-                ? 'bg-green-100 text-green-700 border border-green-300'
-                : formData.assignmentStatus === 'dispatched'
-                  ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
-                  : formData.assignmentStatus === 'rejected'
-                    ? 'bg-red-100 text-red-700 border border-red-300'
-                    : 'bg-gray-100 text-gray-600 border border-gray-300'
-                }`}
-            >
-              {formData.assignmentStatus === 'accepted' && '✓ 已接受'}
-              {formData.assignmentStatus === 'dispatched' && '⏳ 待确认'}
-              {formData.assignmentStatus === 'rejected' && '✗ 已驳回'}
-              {formData.assignmentStatus === 'idle' && '待派发'}
-            </span>
-          </div>
-        </div>
-
-        {/* Rejection Reason Display */}
-        {formData.assignmentStatus === 'rejected' && formData.rejectionReason && (
-          <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-md">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-xs font-medium text-red-800 mb-1">驳回理由</p>
-                <p className="text-xs text-red-700">{formData.rejectionReason}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons - Owner View */}
-        {currentUserId === formData.ownerId || (!formData.ownerId && (formData.assignmentStatus === 'idle' || formData.assignmentStatus === 'rejected')) ? (
-          <div className="space-y-2">
-            {(formData.assignmentStatus === 'idle' || formData.assignmentStatus === 'rejected') && (
-              <button
-                type="button"
-                onClick={handleDispatch}
-                disabled={isSubmitting || !formData.assigneeId}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-              >
-                <Send className="w-4 h-4" />
-                {isSubmitting ? '派发中...' : '派发任务'}
-              </button>
-            )}
-            {formData.assignmentStatus === 'dispatched' && (
-              <div className="text-xs text-gray-500 text-center py-2">
-                等待执行人确认...
-              </div>
-            )}
-          </div>
-        ) : null}
-
-        {/* Action Buttons - Assignee View */}
-        {currentUserId === formData.assigneeId && formData.assignmentStatus === 'dispatched' && (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleAccept}
-              disabled={isSubmitting}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-            >
-              <CheckCircle className="w-4 h-4" />
-              {isSubmitting ? '接受中...' : '接受'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowRejectDialog(true)}
-              disabled={isSubmitting}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-            >
-              <XCircle className="w-4 h-4" />
-              驳回
-            </button>
-          </div>
-        )}
-
-        {/* Timestamp Info */}
-        {formData.dispatchedAt && (
-          <div className="mt-3 text-xs text-gray-500">
-            派发时间: {new Date(formData.dispatchedAt).toLocaleString('zh-CN')}
-          </div>
-        )}
-        {formData.feedbackAt && (
-          <div className="text-xs text-gray-500">
-            反馈时间: {new Date(formData.feedbackAt).toLocaleString('zh-CN')}
-          </div>
-        )}
-      </div>
-
-      {/* Story 2.8: Knowledge Resources Section */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-            <BookOpen className="w-4 h-4" />
-            📚 关联知识
-          </h3>
-          <button
-            type="button"
-            onClick={() => setShowKnowledgeSearch(true)}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-          >
-            <Plus className="w-3 h-3" />
-            关联
-          </button>
-        </div>
-
-        {/* Knowledge List */}
-        {formData.knowledgeRefs && formData.knowledgeRefs.length > 0 ? (
-          <div className="space-y-2">
-            {formData.knowledgeRefs.map((ref) => (
-              <div
-                key={ref.id}
-                className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 bg-white shadow-sm hover:shadow-md transition-all group"
-              >
-                {/* Icon */}
-                <div className="w-8 h-8 flex items-center justify-center rounded-md bg-blue-50 text-blue-600 flex-shrink-0">
-                  {ref.type === 'document' && <FileText className="w-4 h-4" />}
-                  {ref.type === 'link' && <LinkIcon className="w-4 h-4" />}
-                  {ref.type === 'video' && <Video className="w-4 h-4" />}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 line-clamp-1">{ref.title}</p>
-                  {ref.summary && (
-                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{ref.summary}</p>
-                  )}
-                </div>
-
-                {/* Remove Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const updatedRefs = formData.knowledgeRefs?.filter((k) => k.id !== ref.id) || [];
-                    handleFieldChange('knowledgeRefs', updatedRefs);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded transition-all flex-shrink-0"
-                  title="移除关联"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-4 text-xs text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-            暂无关联知识，点击"关联"添加
-          </div>
-        )}
-      </div>
-
-      {/* Story 2.8: Knowledge Search Dialog */}
-      <KnowledgeSearchDialog
-        open={showKnowledgeSearch}
-        onOpenChange={setShowKnowledgeSearch}
-        onSelect={(knowledge: KnowledgeReference) => {
-          // Check for duplicates
-          const existingRefs = formData.knowledgeRefs || [];
-          if (existingRefs.some((ref) => ref.id === knowledge.id)) {
-            addToast({ type: 'warning', title: '提示', description: '该知识资源已关联' });
-            return;
-          }
-          // Add new knowledge reference
-          const updatedRefs = [...existingRefs, knowledge];
-          handleFieldChange('knowledgeRefs', updatedRefs);
-          addToast({ type: 'success', title: '关联成功', description: `已关联: ${knowledge.title}` });
-        }}
+      {/* Story 2.4: Task Dispatch Section */}
+      <TaskDispatchSection
+        nodeId={nodeId}
+        formData={formData}
+        currentUserId={currentUserId}
+        isSubmitting={isSubmitting}
+        setIsSubmitting={setIsSubmitting}
+        onFormDataChange={setFormData}
+        onUpdate={onUpdate}
       />
 
-      {/* Reject Reason Dialog */}
-      {showRejectDialog && (
-        <RejectReasonDialog
-          onConfirm={handleReject}
-          onCancel={() => setShowRejectDialog(false)}
-          isSubmitting={isSubmitting}
-        />
-      )}
-    </div>
-  );
-}
-
-// Story 2.4: Reject Reason Dialog Component
-interface RejectReasonDialogProps {
-  onConfirm: (reason: string) => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
-}
-
-function RejectReasonDialog({ onConfirm, onCancel, isSubmitting }: RejectReasonDialogProps) {
-  const [reason, setReason] = useState('');
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onCancel}>
-      <div
-        className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <XCircle className="w-5 h-5 text-red-600" />
-          驳回任务
-        </h3>
-        <p className="text-sm text-gray-600 mb-4">
-          请说明驳回理由，以便任务所有者了解问题所在。
-        </p>
-        <textarea
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="例如：任务描述不清晰，需要更多细节..."
-          className="w-full h-32 text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
-          autoFocus
-        />
-        <div className="flex gap-3 mt-4">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isSubmitting}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            onClick={() => onConfirm(reason)}
-            disabled={isSubmitting || !reason.trim()}
-            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-          >
-            {isSubmitting ? '提交中...' : '确认驳回'}
-          </button>
-        </div>
-      </div>
+      {/* Story 2.8: Knowledge Resources Section */}
+      <KnowledgeResourcesSection
+        knowledgeRefs={formData.knowledgeRefs || []}
+        onKnowledgeRefsChange={(refs) => handleFieldChange('knowledgeRefs', refs)}
+      />
     </div>
   );
 }

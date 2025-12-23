@@ -11,37 +11,49 @@ import { useMemo } from 'react';
 import { Sparkles, BookOpen, FileText, Link as LinkIcon, Video, ExternalLink } from 'lucide-react';
 import { useToast } from '@cdm/ui';
 
-// Mock recommendation data (client-side static list for AC1.2)
+// Mock recommendation data - 卫星研发领域中文知识推荐 (client-side static list for AC1.2)
 const MOCK_RECOMMENDATIONS = [
     {
         id: 'rec_01',
-        title: 'React Best Practices',
-        type: 'link' as const,
-        reason: 'Based on "Architecture" tag',
+        title: '卫星热控系统设计手册',
+        type: 'document' as const,
+        reason: '热控设计相关任务推荐',
+        url: 'https://ntrs.nasa.gov/api/citations/20210000685/downloads/NASA-SP-8105-REV1.pdf',
     },
     {
         id: 'rec_02',
-        title: 'System Design Patterns',
+        title: '姿态轨道控制系统(AOCS)技术指南',
         type: 'document' as const,
-        reason: 'Frequently used in Epic-2',
+        reason: 'AOCS分系统设计参考',
+        url: 'https://arxiv.org/pdf/2401.00892.pdf',
     },
     {
         id: 'rec_03',
-        title: 'API Design Guidelines',
+        title: '卫星可靠性与FMECA分析',
         type: 'document' as const,
-        reason: 'Related to current task',
+        reason: '可靠性设计必读文档',
+        url: 'https://ntrs.nasa.gov/api/citations/19930020471/downloads/19930020471.pdf',
     },
     {
         id: 'rec_04',
-        title: 'Testing Strategy Video',
-        type: 'video' as const,
-        reason: 'Recommended for new features',
+        title: '空间环境与辐射效应分析',
+        type: 'document' as const,
+        reason: '环境适应性设计参考',
+        url: 'https://arxiv.org/pdf/2303.11000.pdf',
     },
     {
         id: 'rec_05',
-        title: 'Security Checklist',
+        title: '星载软件开发标准ECSS-E-ST-40C',
+        type: 'link' as const,
+        reason: '软件开发规范',
+        url: 'https://ecss.nl/standard/ecss-e-st-40c-software-general-requirements/',
+    },
+    {
+        id: 'rec_06',
+        title: '卫星电源分系统设计标准',
         type: 'document' as const,
-        reason: 'Best practice reminder',
+        reason: '电源系统设计依据',
+        url: 'https://ntrs.nasa.gov/api/citations/20180006860/downloads/20180006860.pdf',
     },
 ];
 
@@ -89,15 +101,18 @@ export function KnowledgeRecommendation({
         return result;
     }, [nodeId]);
 
-    // AC1.3: Interactive Mock - show toast when clicking recommendation
-    const handleRecommendationClick = (title: string) => {
+    // AC1.3: Open PDF preview in new tab when clicking recommendation
+    const handleRecommendationClick = (item: typeof MOCK_RECOMMENDATIONS[number]) => {
+        // Open the resource in a new tab for preview
+        window.open(item.url, '_blank', 'noopener,noreferrer');
+
         addToast({
             type: 'info',
-            title: `Mock: 打开资源 "${title}"`,
-            description: '这是模拟功能，真实知识库集成将在 Epic 5 中实现',
+            title: `正在打开: ${item.title}`,
+            description: 'PDF文档已在新标签页中打开',
             duration: 3000,
         });
-        console.log(`[Knowledge Recommendation] Mock: Open Resource - "${title}"`);
+        console.log(`[Knowledge Recommendation] Opening resource: "${item.title}" - ${item.url}`);
     };
 
     return (
@@ -118,7 +133,7 @@ export function KnowledgeRecommendation({
                 {recommendations.map((item) => (
                     <button
                         key={item.id}
-                        onClick={() => handleRecommendationClick(item.title)}
+                        onClick={() => handleRecommendationClick(item)}
                         className="w-full flex items-center gap-3 p-2.5 rounded-lg bg-white/60 hover:bg-white border border-transparent hover:border-indigo-100 cursor-pointer transition-all text-left group"
                     >
                         {/* Icon */}
