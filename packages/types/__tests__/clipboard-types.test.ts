@@ -20,6 +20,7 @@ describe('Clipboard Types', () => {
         version: '1.0',
         source: 'cdm-17',
         timestamp: Date.now(),
+        operation: 'copy',
         sourceGraphId: 'graph-123',
         nodes: [
             {
@@ -80,6 +81,12 @@ describe('Clipboard Types', () => {
     describe('ClipboardDataSchema', () => {
         it('should validate correct clipboard data', () => {
             const result = ClipboardDataSchema.safeParse(validClipboardData);
+            expect(result.success).toBe(true);
+        });
+
+        it('should accept clipboard data without operation', () => {
+            const { operation, ...withoutOperation } = validClipboardData;
+            const result = ClipboardDataSchema.safeParse(withoutOperation);
             expect(result.success).toBe(true);
         });
 
@@ -153,6 +160,7 @@ describe('Clipboard Types', () => {
             expect(result?.source).toBe('cdm-17');
             expect(result?.nodes.length).toBe(2);
             expect(result?.edges.length).toBe(1);
+            expect(result?.operation).toBe('copy');
         });
 
         it('should return null for invalid JSON', () => {

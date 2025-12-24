@@ -1,6 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Test mocks commonly use any */
+/* eslint-disable @typescript-eslint/no-unsafe-function-type -- Test mocks use generic Function type */
+/* eslint-disable @typescript-eslint/no-unused-vars -- Test setup variables may be used conditionally */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as Y from 'yjs';
-import { GraphSyncManager, YjsNodeData, YjsEdgeData } from '../../features/collab/GraphSyncManager';
+import { GraphSyncManager, YjsNodeData } from '../../features/collab/GraphSyncManager';
 
 // Mock X6 Graph
 const createMockGraph = () => {

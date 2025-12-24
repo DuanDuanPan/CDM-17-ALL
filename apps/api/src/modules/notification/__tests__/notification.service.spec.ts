@@ -3,6 +3,7 @@
  * Unit Tests for NotificationService
  * [AI-Review][HIGH-1] Created to address missing test coverage
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- Test mocks commonly use any */
 
 import { NotificationService } from '../notification.service';
 import { NotificationRepository } from '../notification.repository';

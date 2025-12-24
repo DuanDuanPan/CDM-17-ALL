@@ -2,7 +2,8 @@
  * Story 2.6: Multi-Select & Clipboard
  * Unit tests for useSelection hook
  */
-
+/* eslint-disable @typescript-eslint/no-explicit-any -- Test mocks commonly use any */
+/* eslint-disable @typescript-eslint/no-unsafe-function-type -- Test mocks use generic Function type */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSelection } from '@/hooks/useSelection';

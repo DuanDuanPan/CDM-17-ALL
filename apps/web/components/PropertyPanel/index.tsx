@@ -7,24 +7,27 @@
 
 import { useState, useEffect } from 'react';
 import { Archive, ChevronDown, RotateCcw, X } from 'lucide-react';
-import { NodeType, type EnhancedNodeData } from '@cdm/types';
+import { NodeType, type EnhancedNodeData, type NodeProps, type TaskProps } from '@cdm/types';
 import { CommonHeader } from './CommonHeader';
 import { getFormComponent } from './PropertyPanelRegistry';
 import { TagEditor } from './TagEditor';
 import { useConfirmDialog } from '@cdm/ui';
 import { KnowledgeRecommendation } from '@/components/Knowledge'; // Story 2.8
+import { ApprovalStatusPanel } from './ApprovalStatusPanel'; // Story 4.1
+import { useCurrentUserId } from '../../contexts'; // Story 4.1: FIX-9
 
 export interface PropertyPanelProps {
   nodeId: string | null;
   nodeData?: EnhancedNodeData;
   onClose?: () => void;
   onTypeChange?: (nodeId: string, newType: NodeType) => void;
-  onPropsUpdate?: (nodeId: string, nodeType: NodeType, props: any) => void;
+  onPropsUpdate?: (nodeId: string, nodeType: NodeType, props: NodeProps) => void;
   onTagsUpdate?: (nodeId: string, tags: string[]) => void;
   onArchiveToggle?: (nodeId: string, nextIsArchived: boolean) => void;
-  currentUserId?: string; // Current operating user
+  onApprovalUpdate?: (nodeId: string) => void; // Story 4.1: Refresh node data after approval action
 }
 
+// Story 4.1: FIX-9 - Use context instead of prop for currentUserId
 export function PropertyPanel({
   nodeId,
   nodeData,
@@ -33,8 +36,9 @@ export function PropertyPanel({
   onPropsUpdate,
   onTagsUpdate,
   onArchiveToggle,
-  currentUserId = 'test1',
+  onApprovalUpdate,
 }: PropertyPanelProps) {
+  const currentUserId = useCurrentUserId();
   const [currentType, setCurrentType] = useState<NodeType>(nodeData?.type || NodeType.ORDINARY);
   const { showConfirm } = useConfirmDialog();
 
@@ -53,7 +57,7 @@ export function PropertyPanel({
     onTypeChange?.(nodeId, newType);
   };
 
-  const handlePropsUpdate = (props: any) => {
+  const handlePropsUpdate = (props: NodeProps) => {
     onPropsUpdate?.(nodeId, currentType, props);
   };
 
@@ -174,7 +178,6 @@ export function PropertyPanel({
               nodeId={nodeId}
               initialData={nodeData.props}
               onUpdate={handlePropsUpdate}
-              currentUserId={currentUserId}
             />
           </div>
 
@@ -183,6 +186,25 @@ export function PropertyPanel({
             nodeId={nodeId}
             nodeTitle={nodeData.label}
           />
+
+          {/* Story 4.1: Approval Workflow Panel (visible for TASK nodes only) */}
+          {currentType === NodeType.TASK && (() => {
+            const taskProps = (nodeData.props as TaskProps | undefined) ?? {};
+            const deliverables = taskProps.deliverables ?? nodeData.deliverables ?? [];
+            return (
+              <>
+                <div className="border-t border-gray-200" />
+                <ApprovalStatusPanel
+                  nodeId={nodeId}
+                  nodeLabel={nodeData.label}
+                  approval={nodeData.approval ?? null}
+                  deliverables={deliverables}
+                  isAssignee={taskProps.assigneeId === currentUserId}
+                  onUpdate={() => onApprovalUpdate?.(nodeId)}
+                />
+              </>
+            );
+          })()}
         </div>
       </div>
 

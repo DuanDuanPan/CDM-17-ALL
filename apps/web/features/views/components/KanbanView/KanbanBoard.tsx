@@ -81,7 +81,6 @@ function KanbanBoardBase({ yDoc, onCardClick }: KanbanBoardProps) {
 
   // Drag state
   const [activeCard, setActiveCard] = useState<KanbanCardData | null>(null);
-  const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
 
   // Sensors for drag detection
   const sensors = useSensors(
@@ -116,24 +115,7 @@ function KanbanBoardBase({ yDoc, onCardClick }: KanbanBoardProps) {
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
     const { over } = event;
-
-    if (over) {
-      // Get the column ID being dragged over
-      const overData = over.data.current;
-      if (overData?.type === 'column') {
-        setActiveColumnId(over.id as string);
-      } else if (overData?.type === 'card') {
-        // Find the column containing this card
-        const card = overData.card as KanbanCardData;
-        if (groupBy === 'customStage') {
-          setActiveColumnId(card.customStage || '__unassigned__');
-        } else {
-          setActiveColumnId(card.status);
-        }
-      }
-    } else {
-      setActiveColumnId(null);
-    }
+    void over;
   }, [groupBy]);
 
   const handleDragEnd = useCallback(
@@ -141,7 +123,6 @@ function KanbanBoardBase({ yDoc, onCardClick }: KanbanBoardProps) {
       const { active, over } = event;
 
       setActiveCard(null);
-      setActiveColumnId(null);
 
       if (!over) return;
 

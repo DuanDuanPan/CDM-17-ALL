@@ -25,6 +25,9 @@ export interface ClipboardData {
     /** Timestamp when content was copied */
     timestamp: number; // Date.now() when copied
 
+    /** Operation type for clipboard semantics (copy vs cut) */
+    operation?: ClipboardOperation;
+
     /** ID of the graph where content was copied from */
     sourceGraphId: string;
 
@@ -227,6 +230,7 @@ export const ClipboardDataSchema = z.object({
     version: z.string(),
     source: z.literal('cdm-17'),
     timestamp: z.number(),
+    operation: z.enum(['copy', 'cut']).optional(),
     sourceGraphId: z.string(),
     nodes: z.array(ClipboardNodeDataSchema),
     edges: z.array(ClipboardEdgeDataSchema),
@@ -257,4 +261,3 @@ export function parseClipboardData(text: string): ClipboardData | null {
         return null;
     }
 }
-

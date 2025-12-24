@@ -168,7 +168,6 @@ function GraphPageContent() {
                             graphId={graphId}
                             yDoc={collab.yDoc}
                             creatorName={CURRENT_USER.name}
-                            currentUserId={userId} // Pass current user ID
                             onClose={handleClosePanel}
                         />
                     </div>

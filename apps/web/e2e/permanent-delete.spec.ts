@@ -203,7 +203,7 @@ test.describe('Permanent Delete Feature', () => {
             await page.keyboard.press('Shift+Delete');
 
             // Should show warning toast
-            const warningToast = page.locator('text=无法删除根节点');
+            const _warningToast = page.locator('text=无法删除根节点');
             // The warning might appear as a toast or the action might just be blocked
             // Either way, the center node should still exist
             await page.waitForTimeout(500);

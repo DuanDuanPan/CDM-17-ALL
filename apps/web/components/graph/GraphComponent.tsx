@@ -5,7 +5,7 @@ import { useGraph, addCenterNode } from '@/hooks/useGraph';
 import { useMindmapPlugin } from '@/hooks/useMindmapPlugin';
 import { useLayoutPlugin } from '@/hooks/useLayoutPlugin';
 import { Graph, Node, Edge } from '@antv/x6';
-import { AddChildCommand, AddSiblingCommand, RemoveNodeCommand, NavigationCommand } from '@cdm/plugin-mindmap-core';
+import { AddChildCommand, AddSiblingCommand, NavigationCommand } from '@cdm/plugin-mindmap-core';
 import { LayoutMode } from '@cdm/types';
 
 // Story 1.4: Collaboration imports
@@ -18,7 +18,7 @@ import { useCollaborationUIOptional } from '@/contexts';
 import { CURSOR_UPDATE_THROTTLE_MS, DEFAULT_CREATOR_NAME } from '@/lib/constants';
 // Story 2.2: Edge validation utilities
 import { isDependencyEdge, validateDependencyEdge, isTaskNode, getEdgeMetadata } from '@/lib/edgeValidation';
-import { NodeType, DependencyType } from '@cdm/types';
+import { DependencyType } from '@cdm/types';
 import { useToast } from '@cdm/ui';
 // Story 2.6: Multi-Select & Clipboard
 import { useSelection } from '@/hooks/useSelection';
@@ -391,7 +391,8 @@ export function GraphComponent({
     useEffect(() => {
         if (!graph || !isReady || !isDependencyMode) return;
 
-        const handleNodeClickForDependency = ({ node }: { node: Node }) => {
+        const handleNodeClickForDependency = ({ node, e }: { node: Node; e: MouseEvent }) => {
+            if (e?.button !== 0) return;
             // Only allow TASK nodes for dependency edges
             if (!isTaskNode(node)) {
                 console.warn('依赖连线只能连接任务节点');
@@ -662,7 +663,8 @@ export function GraphComponent({
                 node.setData({ ...nodeData, isSelected: false });
             };
 
-            const handleBlankClick = () => {
+            const handleBlankClick = ({ e }: { e: MouseEvent }) => {
+                if (e?.button !== 0) return;
                 onNodeSelect?.(null);
                 // Keep focus on graph container
                 containerRef.current?.focus();
@@ -834,6 +836,7 @@ export function GraphComponent({
                 e.stopPropagation();
                 // Select the node if not already selected
                 if (!graph.isSelected(node)) {
+                    graph.unselect(graph.getSelectedCells());
                     graph.select(node);
                 }
                 const graphPoint = graph.clientToLocal(e.clientX, e.clientY);
@@ -1107,7 +1110,6 @@ export function GraphComponent({
 
 const addChildCommand = new AddChildCommand();
 const addSiblingCommand = new AddSiblingCommand();
-const removeNodeCommand = new RemoveNodeCommand();
 const navigationCommand = new NavigationCommand();
 
 // Helper: Create child node (with batch for undo grouping)
@@ -1148,11 +1150,6 @@ function createSiblingOrChildNode(graph: Graph, selectedNode: Node): void {
         // If node creation failed, stop batch immediately
         graph.stopBatch(batchId);
     }
-}
-
-// Helper: Remove node and its descendants
-function removeNode(graph: Graph, node: Node): void {
-    removeNodeCommand.execute(graph, node);
 }
 
 function ensureNodeTimestamps(node: Node): void {

@@ -133,20 +133,23 @@ const getApprovalDecoration = (approvalStatus: ApprovalStatus | undefined) => {
   switch (approvalStatus) {
     case 'PENDING':
       return {
-        ringColor: 'ring-2 ring-yellow-400 ring-offset-1',
-        badgeClass: 'bg-yellow-100 text-yellow-700',
+        // 审批中: 蓝色虚线边框 + 微弱蓝底
+        containerClass: 'border-2 border-dashed border-blue-400 bg-blue-50/30',
+        badgeClass: 'bg-blue-100 text-blue-700',
         badgeText: '待审批',
       };
     case 'APPROVED':
       return {
-        ringColor: 'ring-2 ring-green-400 ring-offset-1',
-        badgeClass: 'bg-green-100 text-green-700',
+        // 已通过: 绿色实线边框
+        containerClass: 'border-2 border-solid border-emerald-500 bg-emerald-50/10',
+        badgeClass: 'bg-emerald-100 text-emerald-700',
         badgeText: '已通过',
       };
     case 'REJECTED':
       return {
-        ringColor: 'ring-2 ring-red-400 ring-offset-1',
-        badgeClass: 'bg-red-100 text-red-700',
+        // 已驳回: 红色实线边框 + 阴影警示
+        containerClass: 'border-2 border-solid border-rose-500 bg-rose-50/30 shadow-[0_0_10px_rgba(244,63,94,0.2)]',
+        badgeClass: 'bg-rose-100 text-rose-700',
         badgeText: '已驳回',
       };
     default:
@@ -223,7 +226,8 @@ export function MindNode({ node }: MindNodeProps) {
   const showAssignmentIndicator = nodeType === NodeType.TASK && assignmentStatus && assignmentStatus !== 'idle';
 
   // Story 4.1: Approval status decoration
-  const approval = data.props && 'approval' in (data as any) ? (data as any).approval as ApprovalPipeline : undefined;
+  // Note: approval is stored at Node level (data.approval), NOT in data.props
+  const approval = data.approval as ApprovalPipeline | undefined;
   const approvalStatus = approval?.status;
   const approvalDecoration = getApprovalDecoration(approvalStatus);
 
@@ -478,10 +482,18 @@ export function MindNode({ node }: MindNodeProps) {
     [appRunning, getData, node]
   );
 
+  /* 
+    Story 4.1: Enhanced Visualization Strategy
+    If approval decoration exists, it overrides the default border color and bg color.
+    Selection ring is added on top of the approval border if selected.
+  */
   const containerClasses = `
     relative flex flex-col w-full h-full transition-all duration-200
-    ${styles.bgColor} backdrop-blur-sm
-    ${approvalDecoration ? approvalDecoration.ringColor : isSelected ? 'ring-2 ring-blue-500 border-transparent z-10' : `border ${styles.borderColor}`}
+    backdrop-blur-sm
+    ${approvalDecoration
+      ? `${approvalDecoration.containerClass} ${isSelected ? 'ring-2 ring-blue-500 z-10' : ''}`
+      : `${styles.bgColor} ${isSelected ? 'ring-2 ring-blue-500 border-transparent z-10' : `border ${styles.borderColor}`}`
+    }
     ${isSelected && !approvalDecoration ? 'shadow-md scale-[1.01]' : 'shadow-sm hover:shadow-md'}
     ${nodeType === NodeType.ORDINARY ? 'rounded px-3 py-1.5 items-center justify-center' : 'rounded-lg p-2 justify-between'}
   `;
@@ -581,6 +593,17 @@ export function MindNode({ node }: MindNodeProps) {
       <div className="w-full flex items-center justify-between mt-1.5 pt-1.5 border-t border-gray-100">
         {/* Left: Status Pill + Tags */}
         <div className="flex items-center gap-1 overflow-hidden min-w-0">
+
+          {/* Story 4.1: Approval Status Badge - Priority Display (Leftmost) */}
+          {approvalDecoration && nodeType === NodeType.TASK && (
+            <div
+              className={`flex items-center gap-0.5 px-1 py-0.5 border border-transparent rounded text-[8px] font-medium leading-none flex-shrink-0 ${approvalDecoration.badgeClass}`}
+              title={`审批状态: ${approvalDecoration.badgeText}`}
+            >
+              <span className="truncate">{approvalDecoration.badgeText}</span>
+            </div>
+          )}
+
           {pill ? (
             <div className={`px-1.5 py-0.5 rounded text-[9px] font-medium leading-none truncate ${pill.bg} ${pill.text}`} title={pill.label}>
               {pill.label}
@@ -653,15 +676,6 @@ export function MindNode({ node }: MindNodeProps) {
             </div>
           )}
 
-          {/* Story 4.1: Approval Status Badge */}
-          {approvalDecoration && nodeType === NodeType.TASK && (
-            <div
-              className={`flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-medium leading-none flex-shrink-0 ${approvalDecoration.badgeClass}`}
-              title={`审批状态: ${approvalDecoration.badgeText}`}
-            >
-              <span>{approvalDecoration.badgeText}</span>
-            </div>
-          )}
         </div>
 
         {/* Right: Meta ID + APP Execute Button */}

@@ -7,7 +7,7 @@
  */
 
 import { Folder, Globe, Library, Grid3X3, Plus, Trash2 } from 'lucide-react';
-import type { AppSourceType, AppLibraryEntry } from '@cdm/types';
+import type { AppSourceType } from '@cdm/types';
 
 export interface AppSourceSelectorProps {
   sourceType: AppSourceType;

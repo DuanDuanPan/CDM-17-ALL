@@ -119,7 +119,7 @@ export class TaskService {
     }
 
     // 2. 更新状态
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       assignmentStatus: action === 'accept' ? 'accepted' : 'rejected',
       feedbackAt: new Date(),
     };

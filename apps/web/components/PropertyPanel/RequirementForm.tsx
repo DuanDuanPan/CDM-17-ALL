@@ -5,7 +5,7 @@
  * Form for Requirement-specific properties (reqType, acceptanceCriteria, priority)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FileText, Flag } from 'lucide-react';
 import type { RequirementProps } from '@cdm/types';
 
@@ -15,7 +15,7 @@ export interface RequirementFormProps {
   onUpdate?: (data: RequirementProps) => void;
 }
 
-export function RequirementForm({ nodeId, initialData, onUpdate }: RequirementFormProps) {
+export function RequirementForm({ nodeId: _nodeId, initialData, onUpdate }: RequirementFormProps) {
   const [formData, setFormData] = useState<RequirementProps>({
     reqType: initialData?.reqType || '',
     acceptanceCriteria: initialData?.acceptanceCriteria || '',
@@ -30,11 +30,11 @@ export function RequirementForm({ nodeId, initialData, onUpdate }: RequirementFo
     });
   }, [initialData]);
 
-  const handleFieldChange = (field: keyof RequirementProps, value: any) => {
-    const updatedData = { ...formData, [field]: value };
+  const handleFieldChange = useCallback(<K extends keyof RequirementProps>(field: K, value: RequirementProps[K]) => {
+    const updatedData = { ...formData, [field]: value } as RequirementProps;
     setFormData(updatedData);
     onUpdate?.(updatedData);
-  };
+  }, [formData, onUpdate]);
 
   return (
     <div className="space-y-4">

@@ -8,14 +8,15 @@
 
 import { useState } from 'react';
 import { Send, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import type { TaskProps, AssignmentStatus } from '@cdm/types';
+import type { TaskProps } from '@cdm/types';
 import { useToast } from '@cdm/ui';
 import { RejectReasonDialog } from './RejectReasonDialog';
+import { useCurrentUserId } from '../../contexts'; // Story 4.1: FIX-9
 
+// Story 4.1: FIX-9 - currentUserId removed, now uses context
 export interface TaskDispatchSectionProps {
     nodeId: string;
     formData: TaskProps;
-    currentUserId: string;
     isSubmitting: boolean;
     setIsSubmitting: (value: boolean) => void;
     onFormDataChange: (data: TaskProps) => void;
@@ -35,15 +36,16 @@ async function parseApiError(response: Response, defaultMessage: string): Promis
     }
 }
 
+// Story 4.1: FIX-9 - Use context for currentUserId
 export function TaskDispatchSection({
     nodeId,
     formData,
-    currentUserId,
     isSubmitting,
     setIsSubmitting,
     onFormDataChange,
     onUpdate,
 }: TaskDispatchSectionProps) {
+    const currentUserId = useCurrentUserId();
     const [showRejectDialog, setShowRejectDialog] = useState(false);
     const { addToast } = useToast();
 

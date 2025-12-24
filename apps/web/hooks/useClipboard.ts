@@ -7,12 +7,12 @@
  */
 
 import { useCallback, useRef } from 'react';
-import type { Node, Graph } from '@antv/x6';
+import type { Cell, Node, Graph } from '@antv/x6';
 import { nanoid } from 'nanoid';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import type { UndoManager } from 'yjs';
-import { archiveNode } from '@/lib/api/nodes';
+import { archiveNode, unarchiveNode } from '@/lib/api/nodes';
 import { useConfirmDialog } from '@cdm/ui';
 import {
     ClipboardData,
@@ -267,9 +267,10 @@ export function useClipboard({
         }
 
         try {
-            const jsonStr = JSON.stringify(data);
+            const payload: ClipboardData = { ...data, operation: 'copy' };
+            const jsonStr = JSON.stringify(payload);
             await navigator.clipboard.writeText(jsonStr);
-            toast.success(`已复制 ${data.nodes.length} 个节点`);
+            toast.success(`已复制 ${payload.nodes.length} 个节点`);
         } catch (err) {
             console.error('[Clipboard] Copy failed:', err);
             toast.error('复制失败，请检查剪贴板权限');
@@ -292,7 +293,8 @@ export function useClipboard({
 
         try {
             // Copy first
-            const jsonStr = JSON.stringify(data);
+            const payload: ClipboardData = { ...data, operation: 'cut' };
+            const jsonStr = JSON.stringify(payload);
             await navigator.clipboard.writeText(jsonStr);
 
             // Soft delete (archive) via Yjs - including all descendants
@@ -323,14 +325,14 @@ export function useClipboard({
             const descendantIds = findAllDescendants(selectedIds);
             const allNodesToArchive = new Set([...selectedIds, ...descendantIds]);
 
-            yDoc.transact(() => {
-                const now = new Date().toISOString();
-                allNodesToArchive.forEach(nodeId => {
-                    const existing = yNodes.get(nodeId) as any;
-                    if (existing) {
-                        yNodes.set(nodeId, {
-                            ...existing,
-                            isArchived: true,
+	            yDoc.transact(() => {
+	                const now = new Date().toISOString();
+	                allNodesToArchive.forEach(nodeId => {
+	                    const existing = yNodes.get(nodeId);
+	                    if (existing) {
+	                        yNodes.set(nodeId, {
+	                            ...existing,
+	                            isArchived: true,
                             archivedAt: now,
                             updatedAt: now
                         });
@@ -342,14 +344,14 @@ export function useClipboard({
                 });
                 // Note: We don't need to explicitly delete edges; X6/UI should hide edges connected to hidden nodes.
             });
-
-            // Update X6 local state (hide nodes and all their connected edges)
-            if (graphRef.current) {
-                const cellsToHide: any[] = [];
-                allNodesToArchive.forEach(nodeId => {
-                    const cell = graphRef.current!.getCellById(nodeId);
-                    if (cell) {
-                        cellsToHide.push(cell);
+	
+	            // Update X6 local state (hide nodes and all their connected edges)
+	            if (graphRef.current) {
+	                const cellsToHide: Cell[] = [];
+	                allNodesToArchive.forEach(nodeId => {
+	                    const cell = graphRef.current!.getCellById(nodeId);
+	                    if (cell) {
+	                        cellsToHide.push(cell);
                         const edges = graphRef.current!.getConnectedEdges(cell as Node);
                         edges?.forEach(edge => cellsToHide.push(edge));
                     }
@@ -403,6 +405,143 @@ export function useClipboard({
                     x: graphArea.center.x,
                     y: graphArea.center.y,
                 };
+            }
+
+            const operation = data.operation ?? 'copy';
+
+            // Cut + paste within the same graph should MOVE nodes (unarchive + reposition),
+            // not create archived duplicates.
+            if (operation === 'cut' && data.sourceGraphId === graphId) {
+                const yNodes = yDoc.getMap('nodes');
+                const yEdges = yDoc.getMap('edges');
+                const selectedOriginalIds = new Set(data.nodes.map(node => node.originalId));
+                const missingOriginalIds = data.nodes
+                    .filter(node => !yNodes.get(node.originalId))
+                    .map(node => node.originalId);
+
+                if (missingOriginalIds.length === 0) {
+                    // Story 2.6 Fix: Determine paste target parent (same logic as copy)
+                    const pasteTargetParentId = selectedNodes.length === 1 ? selectedNodes[0].id : undefined;
+                    const fallbackParentId = pasteTargetParentId ?? (() => {
+                        const graph = graphRef.current;
+                        if (!graph) return undefined;
+                        const nodes = graph.getNodes();
+                        const rootNode = nodes.find((node) => {
+                            const nodeData = node.getData() || {};
+                            return nodeData.type === 'root' || nodeData.mindmapType === 'root';
+                        });
+                        if (rootNode) return rootNode.id;
+                        const topLevelNode = nodes.find((node) => {
+                            const nodeData = node.getData() || {};
+                            return !nodeData.parentId;
+                        });
+                        return topLevelNode?.id;
+                    })();
+
+                    const parentChildRelations: Array<{ parentId: string; childId: string }> = [];
+
+                    undoManager?.stopCapturing();
+                    yDoc.transact(() => {
+                        // Remove edges that connect moved nodes to outside nodes
+                        const edgesToDelete: string[] = [];
+                        yEdges.forEach((edgeData, edgeId) => {
+                            const edge = edgeData as { source?: string; target?: string };
+                            const sourceId = edge.source;
+                            const targetId = edge.target;
+                            if (!sourceId || !targetId) return;
+                            const sourceIn = selectedOriginalIds.has(sourceId);
+                            const targetIn = selectedOriginalIds.has(targetId);
+                            if (sourceIn !== targetIn) {
+                                edgesToDelete.push(edgeId);
+                            }
+                        });
+                        edgesToDelete.forEach(edgeId => yEdges.delete(edgeId));
+
+	                        const now = new Date().toISOString();
+	                        data.nodes.forEach(nodeData => {
+	                            const existing = yNodes.get(nodeData.originalId);
+	                            if (!existing) return;
+	
+	                            let resolvedParentId: string | undefined;
+	                            if (nodeData.parentOriginalId && selectedOriginalIds.has(nodeData.parentOriginalId)) {
+                                resolvedParentId = nodeData.parentOriginalId;
+                            } else if (fallbackParentId) {
+                                resolvedParentId = fallbackParentId;
+                            }
+
+                            if (resolvedParentId) {
+                                parentChildRelations.push({ parentId: resolvedParentId, childId: nodeData.originalId });
+                            }
+
+                            yNodes.set(nodeData.originalId, {
+                                ...existing,
+                                x: nodeData.x + pasteCenter.x,
+                                y: nodeData.y + pasteCenter.y,
+                                parentId: resolvedParentId,
+                                isArchived: false,
+                                archivedAt: null,
+                                updatedAt: now,
+                            });
+                        });
+
+                        // Ensure hierarchical edges exist for new parent-child relations
+                        const existingHierarchicalPairs = new Set<string>();
+                        yEdges.forEach((edgeData) => {
+                            const edge = edgeData as {
+                                source?: string;
+                                target?: string;
+                                type?: string;
+                                metadata?: { kind?: string };
+                            };
+                            const sourceId = edge.source;
+                            const targetId = edge.target;
+                            if (!sourceId || !targetId) return;
+                            const metadata = edge.metadata || {};
+                            const kind = metadata.kind ?? (edge.type === 'reference' ? 'dependency' : 'hierarchical');
+                            if (kind !== 'hierarchical') return;
+                            const key = sourceId < targetId ? `${sourceId}|${targetId}` : `${targetId}|${sourceId}`;
+                            existingHierarchicalPairs.add(key);
+                        });
+
+                        parentChildRelations.forEach(({ parentId, childId }) => {
+                            const key = parentId < childId ? `${parentId}|${childId}` : `${childId}|${parentId}`;
+                            if (existingHierarchicalPairs.has(key)) return;
+                            const edgeId = nanoid();
+                            yEdges.set(edgeId, {
+                                id: edgeId,
+                                source: parentId,
+                                target: childId,
+                                type: 'hierarchical',
+                                metadata: { kind: 'hierarchical' },
+                                graphId: graphId,
+                            });
+                        });
+                    });
+
+                    selectedOriginalIds.forEach(nodeId => {
+                        unarchiveNode(nodeId).catch(err =>
+                            console.error(`[Clipboard] Failed to unarchive node ${nodeId} on server during cut paste`, err)
+                        );
+                    });
+
+                    setTimeout(() => {
+                        const movedIds = Array.from(selectedOriginalIds);
+                        selectNodes(movedIds);
+                        if (movedIds.length > 0 && graphRef.current) {
+                            const firstNode = graphRef.current.getCellById(movedIds[0]);
+                            if (firstNode) {
+                                graphRef.current.centerCell(firstNode);
+                            }
+                        }
+                    }, 100);
+
+                    toast.success(`已移动 ${data.nodes.length} 个节点`);
+                    return;
+                }
+
+                console.warn('[Clipboard] Cut paste fallback to copy (missing nodes)', {
+                    missingOriginalIds,
+                });
             }
 
             // Create ID mapping for new nodes (AC3.2)
@@ -648,13 +787,13 @@ export function useClipboard({
 
         // Soft delete in Yjs transaction
         undoManager?.stopCapturing();
-        yDoc.transact(() => {
-            const now = new Date().toISOString();
-            allNodesToArchive.forEach(nodeId => {
-                const existing = yNodes.get(nodeId) as any;
-                if (existing) {
-                    yNodes.set(nodeId, {
-                        ...existing,
+	        yDoc.transact(() => {
+	            const now = new Date().toISOString();
+	            allNodesToArchive.forEach(nodeId => {
+	                const existing = yNodes.get(nodeId);
+	                if (existing) {
+	                    yNodes.set(nodeId, {
+	                        ...existing,
                         isArchived: true,
                         archivedAt: now,
                         updatedAt: now
@@ -666,14 +805,14 @@ export function useClipboard({
                 }
             });
         });
-
-        // Update X6 visibility locally
-        if (graphRef.current) {
-            const cellsToHide: any[] = [];
-            allNodesToArchive.forEach(id => {
-                const cell = graphRef.current!.getCellById(id);
-                if (cell) {
-                    cellsToHide.push(cell);
+	
+	        // Update X6 visibility locally
+	        if (graphRef.current) {
+	            const cellsToHide: Cell[] = [];
+	            allNodesToArchive.forEach(id => {
+	                const cell = graphRef.current!.getCellById(id);
+	                if (cell) {
+	                    cellsToHide.push(cell);
                     const edges = graphRef.current!.getConnectedEdges(cell as Node);
                     edges?.forEach(edge => cellsToHide.push(edge));
                 }
@@ -733,12 +872,11 @@ export function useClipboard({
             return descendants;
         };
 
-        const descendantIds = findAllDescendants(selectedIds);
-        const allNodesToDelete = new Set([...selectedIds, ...descendantIds]);
-        const totalCount = allNodesToDelete.size;
+	        const descendantIds = findAllDescendants(selectedIds);
+	        const allNodesToDelete = new Set([...selectedIds, ...descendantIds]);
 
-        // Show confirmation dialog
-        showConfirm({
+	        // Show confirmation dialog
+	        showConfirm({
             title: '确认永久删除',
             description: `将永久删除 ${selectedIds.size} 个节点${descendantIds.size > 0 ? `及 ${descendantIds.size} 个子节点` : ''}。此操作无法撤销。`,
             confirmText: '永久删除',

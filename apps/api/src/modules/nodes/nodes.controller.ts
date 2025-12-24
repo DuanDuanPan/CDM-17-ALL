@@ -190,7 +190,7 @@ export class NodesController {
   async dispatchTask(
     @Param('id') nodeId: string,
     @Query('userId') userId?: string
-  ) {
+  ): Promise<unknown> {
     const dispatchingUserId = userId || 'test1';
     return this.taskService.dispatchTask(nodeId, dispatchingUserId);
   }
@@ -206,7 +206,7 @@ export class NodesController {
     @Param('id') nodeId: string,
     @Body() body: FeedbackTaskDto,
     @Query('userId') userId?: string
-  ) {
+  ): Promise<unknown> {
     const feedbackUserId = userId || 'test1';
     return this.taskService.feedbackTask(nodeId, feedbackUserId, body.action, body.reason);
   }

@@ -28,7 +28,11 @@ interface MockNodeTask {
 
 describe('TaskService', () => {
     let service: TaskService;
-    let mockTaskRepo: jest.Mocked<NodeTaskRepository>;
+    let mockTaskRepo: {
+        findByNodeId: jest.Mock;
+        update: jest.Mock;
+        upsert: jest.Mock;
+    };
     let mockNotificationService: jest.Mocked<NotificationService>;
 
     const mockTask: MockNodeTask = {
@@ -49,7 +53,7 @@ describe('TaskService', () => {
             findByNodeId: jest.fn(),
             update: jest.fn(),
             upsert: jest.fn(),
-        } as unknown as jest.Mocked<NodeTaskRepository>;
+        };
 
         // Create mock notification service
         mockNotificationService = {
@@ -57,7 +61,10 @@ describe('TaskService', () => {
         } as unknown as jest.Mocked<NotificationService>;
 
         // Instantiate service with mocks
-        service = new TaskService(mockTaskRepo, mockNotificationService);
+        service = new TaskService(
+            mockTaskRepo as unknown as NodeTaskRepository,
+            mockNotificationService
+        );
     });
 
     afterEach(() => {

@@ -42,7 +42,6 @@ export function useNotifications({
   const [error, setError] = useState<Error | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch notifications from REST API
   const fetchNotifications = useCallback(async () => {
@@ -160,7 +159,7 @@ export function useNotifications({
       setUnreadCount((prev) => prev + 1);
     });
 
-    socket.on('connect_error', (err) => {
+    socket.on('connect_error', () => {
       // Suppress verbose error logging - connection failures are expected in development
       console.debug('[useNotifications] WebSocket unavailable (falling back to polling)');
       setIsConnected(false);

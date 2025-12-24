@@ -14,7 +14,22 @@ import {
   DestroyOptions,
   PaginatedResult,
   FilterCondition,
+  FilterOperators,
 } from './types';
+
+type PrismaDelegate<TModel> = {
+  findMany: (args?: unknown) => Promise<TModel[]>;
+  count: (args?: unknown) => Promise<number>;
+  findFirst: (args?: unknown) => Promise<TModel | null>;
+  create: (args: unknown) => Promise<TModel>;
+  createMany: (args: unknown) => Promise<{ count: number }>;
+  update: (args: unknown) => Promise<TModel>;
+  updateMany: (args: unknown) => Promise<{ count: number }>;
+  delete: (args: unknown) => Promise<TModel>;
+  deleteMany: (args: unknown) => Promise<{ count: number }>;
+};
+
+type IncludeTree = Record<string, true | { include: IncludeTree }>;
 
 /**
  * Abstract Repository base class
@@ -33,6 +48,7 @@ import {
  * }
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic type parameter for dynamic Prisma model types
 export abstract class Repository<T = any> {
   protected prisma: PrismaClient;
   protected modelName: string;
@@ -45,17 +61,17 @@ export abstract class Repository<T = any> {
   /**
    * Get the Prisma model delegate
    */
-  protected get model(): any {
-    return (this.prisma as any)[this.modelName];
+  protected get model(): PrismaDelegate<T> {
+    return (this.prisma as unknown as Record<string, PrismaDelegate<T>>)[this.modelName];
   }
 
   /**
    * Convert filter to Prisma where clause
    */
-  protected buildWhere(filter?: FilterCondition): any {
+  protected buildWhere(filter?: FilterCondition): Record<string, unknown> | undefined {
     if (!filter) return undefined;
 
-    const where: any = {};
+    const where: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(filter)) {
       if (key === '$and') {
@@ -64,23 +80,23 @@ export abstract class Repository<T = any> {
         where.OR = (value as FilterCondition[]).map((f) => this.buildWhere(f));
       } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
         // Handle operators
-        const ops = value as Record<string, any>;
-        const prismaOps: any = {};
+        const ops = value as FilterOperators;
+        const prismaOps: Record<string, unknown> = {};
 
-        if ('$eq' in ops) prismaOps.equals = ops.$eq;
-        if ('$ne' in ops) prismaOps.not = ops.$ne;
-        if ('$gt' in ops) prismaOps.gt = ops.$gt;
-        if ('$gte' in ops) prismaOps.gte = ops.$gte;
-        if ('$lt' in ops) prismaOps.lt = ops.$lt;
-        if ('$lte' in ops) prismaOps.lte = ops.$lte;
-        if ('$in' in ops) prismaOps.in = ops.$in;
-        if ('$notIn' in ops) prismaOps.notIn = ops.$notIn;
-        if ('$like' in ops) prismaOps.contains = ops.$like.replace(/%/g, '');
-        if ('$iLike' in ops) {
+        if (ops.$eq !== undefined) prismaOps.equals = ops.$eq;
+        if (ops.$ne !== undefined) prismaOps.not = ops.$ne;
+        if (ops.$gt !== undefined) prismaOps.gt = ops.$gt;
+        if (ops.$gte !== undefined) prismaOps.gte = ops.$gte;
+        if (ops.$lt !== undefined) prismaOps.lt = ops.$lt;
+        if (ops.$lte !== undefined) prismaOps.lte = ops.$lte;
+        if (ops.$in !== undefined) prismaOps.in = ops.$in;
+        if (ops.$notIn !== undefined) prismaOps.notIn = ops.$notIn;
+        if (typeof ops.$like === 'string') prismaOps.contains = ops.$like.replace(/%/g, '');
+        if (typeof ops.$iLike === 'string') {
           prismaOps.contains = ops.$iLike.replace(/%/g, '');
           prismaOps.mode = 'insensitive';
         }
-        if ('$isNull' in ops) {
+        if (typeof ops.$isNull === 'boolean') {
           if (ops.$isNull) {
             prismaOps.equals = null;
           } else {
@@ -100,7 +116,7 @@ export abstract class Repository<T = any> {
   /**
    * Convert sort array to Prisma orderBy
    */
-  protected buildOrderBy(sort?: string[]): any {
+  protected buildOrderBy(sort?: string[]): Record<string, string>[] | undefined {
     if (!sort || sort.length === 0) return undefined;
 
     return sort.map((field) => {
@@ -114,10 +130,10 @@ export abstract class Repository<T = any> {
   /**
    * Convert fields array to Prisma select
    */
-  protected buildSelect(fields?: string[]): any {
+  protected buildSelect(fields?: string[]): Record<string, boolean> | undefined {
     if (!fields || fields.length === 0) return undefined;
 
-    const select: any = {};
+    const select: Record<string, boolean> = {};
     for (const field of fields) {
       select[field] = true;
     }
@@ -127,10 +143,10 @@ export abstract class Repository<T = any> {
   /**
    * Convert appends array to Prisma include
    */
-  protected buildInclude(appends?: string[]): any {
+  protected buildInclude(appends?: string[]): IncludeTree | undefined {
     if (!appends || appends.length === 0) return undefined;
 
-    const include: any = {};
+    const include: IncludeTree = {};
     for (const relation of appends) {
       // Support nested relations like 'creator.profile'
       const parts = relation.split('.');
@@ -141,8 +157,11 @@ export abstract class Repository<T = any> {
         if (i === parts.length - 1) {
           current[part] = true;
         } else {
-          current[part] = current[part] || { include: {} };
-          current = current[part].include;
+          const existing = current[part];
+          if (!existing || existing === true || !('include' in existing)) {
+            current[part] = { include: {} };
+          }
+          current = (current[part] as { include: IncludeTree }).include;
         }
       }
     }
@@ -164,14 +183,21 @@ export abstract class Repository<T = any> {
       limit,
     } = options;
 
-    const query: any = {
+    const query: {
+      where?: Record<string, unknown>;
+      orderBy?: Record<string, string>[];
+      select?: Record<string, boolean>;
+      include?: IncludeTree;
+      skip?: number;
+      take?: number;
+    } = {
       where: this.buildWhere(filter),
       orderBy: this.buildOrderBy(sort),
     };
 
     // Handle select/include (mutually exclusive in Prisma)
     if (fields && fields.length > 0) {
-      query.select = this.buildSelect(fields);
+      query.select = this.buildSelect(fields) ?? {};
       // If appends are also requested, merge them into select
       if (appends && appends.length > 0) {
         for (const relation of appends) {
@@ -220,7 +246,11 @@ export abstract class Repository<T = any> {
   async findOne(options: FindOneOptions = {}): Promise<T | null> {
     const { filter, filterByTk, fields, appends } = options;
 
-    const query: any = {};
+    const query: {
+      where?: Record<string, unknown>;
+      select?: Record<string, boolean>;
+      include?: IncludeTree;
+    } = {};
 
     if (filterByTk !== undefined) {
       query.where = { id: filterByTk };
@@ -230,7 +260,7 @@ export abstract class Repository<T = any> {
 
     // Handle select/include
     if (fields && fields.length > 0) {
-      query.select = this.buildSelect(fields);
+      query.select = this.buildSelect(fields) ?? {};
       if (appends && appends.length > 0) {
         for (const relation of appends) {
           query.select[relation] = true;
@@ -262,7 +292,7 @@ export abstract class Repository<T = any> {
   /**
    * Create multiple records
    */
-  async createMany(records: Record<string, any>[]): Promise<{ count: number }> {
+  async createMany(records: Record<string, unknown>[]): Promise<{ count: number }> {
     return this.model.createMany({
       data: records,
     });

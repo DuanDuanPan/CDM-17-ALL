@@ -58,7 +58,6 @@ export function TopBar({
   // Story 2.4: Get graph context for node navigation
   const graphContext = useGraphContextOptional();
   const navigateToNode = graphContext?.navigateToNode;
-  const graph = graphContext?.graph ?? null;
 
   // Story 2.4: Notification system
   const {

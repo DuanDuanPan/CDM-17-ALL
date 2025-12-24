@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { HocuspocusProvider } from '@hocuspocus/provider';
 import * as Y from 'yjs';
-import { LayoutMode } from '@cdm/types';
 import { collabLogger as logger } from '@/lib/logger';
 // Story 1.4 LOW-1: Use centralized constants
 import { CURSOR_UPDATE_THROTTLE_MS } from '@/lib/constants';
@@ -242,7 +241,7 @@ export function useCollaboration(config: CollaborationConfig): UseCollaborationR
                     }
                 }
             },
-            onDisconnect: ({ event }) => {
+            onDisconnect: () => {
                 if (!silent) {
                     logger.info('WebSocket disconnected');
                 }

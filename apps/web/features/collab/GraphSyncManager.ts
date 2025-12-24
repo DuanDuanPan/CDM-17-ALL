@@ -1,6 +1,6 @@
 import { Graph, Node, Edge, Cell } from '@antv/x6';
 import * as Y from 'yjs';
-import { LayoutMode, NodeData, EdgeData, NodeType, TaskProps, RequirementProps, PBSProps, DataProps, EdgeKind, DependencyType, EdgeMetadata } from '@cdm/types';
+import { LayoutMode, NodeType, TaskProps, RequirementProps, PBSProps, DataProps, EdgeMetadata } from '@cdm/types';
 import { syncLogger as logger } from '@/lib/logger';
 
 /**

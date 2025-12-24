@@ -23,13 +23,13 @@ import {
 import { DEFAULT_CREATOR_NAME, PROPS_UPDATE_DEBOUNCE_MS } from '@/lib/constants';
 import type { YjsNodeData } from '@/features/collab/GraphSyncManager';
 
+// Story 4.1: FIX-9 - currentUserId removed, now uses context
 export interface RightSidebarProps {
   selectedNodeId: string | null;
   graph: Graph | null;  // X6 Graph reference for Yjs sync
   graphId: string;
   yDoc?: Y.Doc | null; // Yjs doc for sync when graph is not available
   creatorName?: string; // Default creator name for new nodes
-  currentUserId?: string; // Current operating user
   onClose?: () => void;
 }
 
@@ -81,7 +81,6 @@ export function RightSidebar({
   graphId,
   yDoc = null,
   creatorName,
-  currentUserId = 'test1',
   onClose,
 }: RightSidebarProps) {
   const resolvedCreatorName = creatorName || DEFAULT_CREATOR_NAME;
@@ -505,8 +504,7 @@ export function RightSidebar({
 
       const x6Node = getX6Node(nodeId);
       if (x6Node) {
-        const existingData = x6Node.getData() || {};
-        x6Node.setData({ ...existingData, tags, updatedAt: now });
+        x6Node.updateData({ tags, updatedAt: now });
       }
 
       updateNodeTags(nodeId, tags).then((success) => {
@@ -562,6 +560,37 @@ export function RightSidebar({
     [getX6Node, graph, onClose]
   );
 
+  // Story 4.1: Handle approval-related updates (refresh node data from API)
+  const handleApprovalUpdate = useCallback(async (nodeId: string) => {
+    try {
+      const data = await fetchNode(nodeId);
+      // Type assertion for extended properties
+      const extendedData = data as (typeof data) & {
+        approval?: unknown;
+        deliverables?: unknown;
+      };
+      if (data) {
+        setNodeData(data);
+        // Also sync to X6 node for consistency
+        const x6Node = getX6Node(nodeId);
+        if (x6Node) {
+          const existingData = x6Node.getData() || {};
+          // IMPORTANT: use overwrite mode so empty arrays in props (e.g. deliverables: [])
+          // can correctly clear existing arrays in X6's deep-merge semantics.
+          x6Node.setData({
+            ...existingData,
+            props: data.props,
+            approval: extendedData.approval,
+            deliverables: extendedData.deliverables,
+            updatedAt: data.updatedAt,
+          }, { overwrite: true });
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to refresh node data after approval update', { nodeId, error });
+    }
+  }, [getX6Node]);
+
   if (!selectedNodeId) {
     return null;
   }
@@ -591,7 +620,7 @@ export function RightSidebar({
       onPropsUpdate={handlePropsUpdate}
       onTagsUpdate={handleTagsUpdate}
       onArchiveToggle={handleArchiveToggle}
-      currentUserId={currentUserId}
+      onApprovalUpdate={handleApprovalUpdate}
     />
   );
 }

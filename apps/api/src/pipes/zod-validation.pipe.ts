@@ -16,7 +16,7 @@ export class ZodValidationPipe implements PipeTransform {
     if (metadata.type === 'body' && typeof value === 'string') {
       try {
         parsedValue = JSON.parse(value);
-      } catch (err) {
+      } catch {
         throw new BadRequestException({
           message: 'Invalid JSON body',
           issues: [{ path: '', message: 'Body is not valid JSON' }],

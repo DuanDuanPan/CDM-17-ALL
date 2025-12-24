@@ -49,3 +49,4 @@ apps/web/test-results
 
 # Claude
 .claude/audio
+apps/api/uploads

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { CollabService } from './collab.service';
 
 /**
@@ -9,7 +9,6 @@ import { CollabService } from './collab.service';
  */
 describe('CollabService', () => {
     let service: CollabService;
-    let configService: ConfigService;
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
@@ -28,7 +27,6 @@ describe('CollabService', () => {
         }).compile();
 
         service = module.get<CollabService>(CollabService);
-        configService = module.get<ConfigService>(ConfigService);
     });
 
     afterEach(async () => {

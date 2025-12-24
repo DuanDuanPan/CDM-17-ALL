@@ -6,7 +6,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { prisma, type Notification, type Prisma } from '@cdm/database';
-import type { CreateNotificationDto, NotificationContent } from '@cdm/types';
+import type { CreateNotificationDto } from '@cdm/types';
 
 // Prisma BatchPayload type for updateMany operations
 type BatchPayload = Prisma.BatchPayload;

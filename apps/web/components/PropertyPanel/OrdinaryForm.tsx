@@ -15,7 +15,7 @@ export interface OrdinaryFormProps {
   onUpdate?: (data: { description?: string }) => void;
 }
 
-export function OrdinaryForm({ nodeId, initialData, onUpdate }: OrdinaryFormProps) {
+export function OrdinaryForm({ nodeId: _nodeId, initialData, onUpdate }: OrdinaryFormProps) {
   const [description, setDescription] = useState(initialData?.description || '');
 
   useEffect(() => {

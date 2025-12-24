@@ -23,3 +23,13 @@ export {
 } from './AppLibraryContext';
 
 export type { AppLibraryContextValue, AppLibraryProviderProps } from './AppLibraryContext';
+
+// Story 4.1: User context for current user management
+export {
+    UserProvider,
+    useCurrentUser,
+    useCurrentUserId,
+    useCurrentUserOptional,
+} from './UserContext';
+
+export type { CurrentUser, UserProviderProps } from './UserContext';

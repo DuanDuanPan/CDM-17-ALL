@@ -10,13 +10,13 @@ import { prisma } from './client';
 import { Repository } from './Repository';
 import {
   CollectionDefinition,
-  DatabaseEventType,
   DatabaseEventHandler,
 } from './types';
 
 /**
  * Generic Repository implementation
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic type parameter for dynamic model types
 class GenericRepository<T = any> extends Repository<T> {
   constructor(prisma: PrismaClient, modelName: string) {
     super(prisma, modelName);
@@ -128,6 +128,7 @@ export class Database {
   /**
    * Get repository for a collection
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic type parameter for dynamic model types
   getRepository<T = any>(name: string): Repository<T> {
     // Return cached instance if exists
     if (this.repositories.has(name)) {
@@ -150,8 +151,9 @@ export class Database {
    * Wrap repository methods with event emission
    */
   private wrapRepositoryWithEvents(collectionName: string, repository: Repository): Repository {
-    const db = this;
     const original = repository;
+    // Arrow functions to capture `this` context
+    const emitEvent = (event: string, data: unknown): Promise<void> => this.emit(event, data);
 
     // Create a proxy to intercept method calls
     return new Proxy(repository, {
@@ -164,28 +166,28 @@ export class Database {
 
         // Wrap specific methods with events
         if (prop === 'create') {
-          return async function (options: any) {
-            await db.emit(`${collectionName}.beforeCreate`, options.values);
+          return async function (options: unknown) {
+            await emitEvent(`${collectionName}.beforeCreate`, (options as { values: unknown }).values);
             const result = await original.create.call(target, options);
-            await db.emit(`${collectionName}.afterCreate`, result);
+            await emitEvent(`${collectionName}.afterCreate`, result);
             return result;
           };
         }
 
         if (prop === 'update') {
-          return async function (options: any) {
-            await db.emit(`${collectionName}.beforeUpdate`, options);
+          return async function (options: unknown) {
+            await emitEvent(`${collectionName}.beforeUpdate`, options);
             const result = await original.update.call(target, options);
-            await db.emit(`${collectionName}.afterUpdate`, result);
+            await emitEvent(`${collectionName}.afterUpdate`, result);
             return result;
           };
         }
 
         if (prop === 'destroy') {
-          return async function (options: any) {
-            await db.emit(`${collectionName}.beforeDestroy`, options);
+          return async function (options: unknown) {
+            await emitEvent(`${collectionName}.beforeDestroy`, options);
             const result = await original.destroy.call(target, options);
-            await db.emit(`${collectionName}.afterDestroy`, result);
+            await emitEvent(`${collectionName}.afterDestroy`, result);
             return result;
           };
         }
@@ -229,7 +231,7 @@ export class Database {
   /**
    * Emit an event
    */
-  async emit(event: string, data: any): Promise<void> {
+  async emit(event: string, data: unknown): Promise<void> {
     const handlers = this.eventHandlers.get(event) ?? [];
     for (const handler of handlers) {
       await handler(data);

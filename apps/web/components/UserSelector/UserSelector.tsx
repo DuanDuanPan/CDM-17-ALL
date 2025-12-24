@@ -34,7 +34,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 async function searchUsers(query: string): Promise<UserOption[]> {
     try {
         const response = await fetch(
-            `${API_BASE}/users/search?q=${encodeURIComponent(query)}&limit=20`
+            `${API_BASE}/api/users/search?q=${encodeURIComponent(query)}&limit=20`
         );
         if (!response.ok) {
             throw new Error('Failed to fetch users');
@@ -83,7 +83,47 @@ export function UserSelector({
     const inputRef = useRef<HTMLInputElement>(null);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Fetch users when search changes (debounced)
+    // Fetch selected user info when value changes (for displaying selected user)
+    useEffect(() => {
+        if (!value) {
+            setSelectedUser(null);
+            return;
+        }
+
+        // If we already have the user with this ID, don't refetch
+        if (selectedUser?.id === value) {
+            return;
+        }
+
+        // Fetch user info by searching with the ID
+        const fetchSelectedUser = async () => {
+            try {
+                const response = await fetch(
+                    `${API_BASE}/api/users/${value}`
+                );
+                if (response.ok) {
+                    const user = await response.json();
+                    if (user) {
+                        setSelectedUser({
+                            id: user.id,
+                            name: user.name,
+                            email: user.email,
+                        });
+                    }
+                }
+            } catch {
+                // If fetching fails, try to find from users list
+                const found = users.find(u => u.id === value);
+                if (found) {
+                    setSelectedUser(found);
+                }
+            }
+        };
+
+        fetchSelectedUser();
+    }, [value, selectedUser?.id, users]);
+
+    // Fetch users when search changes (debounced) or when dropdown opens
     useEffect(() => {
         if (!open) return;
 
@@ -92,16 +132,13 @@ export function UserSelector({
         }
 
         debounceRef.current = setTimeout(async () => {
-            if (search.trim().length > 0) {
-                setLoading(true);
-                const results = await searchUsers(search);
-                setUsers(results);
-                setLoading(false);
-                setHighlightedIndex(0);
-            } else {
-                setUsers([]);
-            }
-        }, 300);
+            setLoading(true);
+            // Always fetch users - use empty string to get default list
+            const results = await searchUsers(search.trim());
+            setUsers(results);
+            setLoading(false);
+            setHighlightedIndex(0);
+        }, search.trim().length > 0 ? 300 : 0); // No delay for initial load
 
         return () => {
             if (debounceRef.current) {
@@ -114,7 +151,6 @@ export function UserSelector({
     useEffect(() => {
         if (open) {
             setSearch('');
-            setUsers([]);
             setHighlightedIndex(0);
             setTimeout(() => inputRef.current?.focus(), 0);
         }
@@ -174,16 +210,25 @@ export function UserSelector({
 
     return (
         <div ref={containerRef} className={`relative ${className}`}>
-            {/* Trigger Button */}
-            <button
-                type="button"
+            {/* Trigger - using div with combobox role to allow nested clear button */}
+            <div
+                role="combobox"
+                aria-expanded={open}
+                aria-haspopup="listbox"
+                aria-disabled={disabled}
+                tabIndex={disabled ? -1 : 0}
                 onClick={() => !disabled && setOpen(!open)}
-                disabled={disabled}
+                onKeyDown={(e) => {
+                    if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        setOpen(!open);
+                    }
+                }}
                 className={`
           w-full flex items-center justify-between gap-2 px-3 py-2
-          text-sm border border-gray-300 rounded-md bg-white
+          text-sm border border-gray-300 rounded-md bg-white cursor-pointer
           hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500
-          disabled:bg-gray-100 disabled:cursor-not-allowed
+          ${disabled ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}
           ${!selectedUser ? 'text-gray-400' : 'text-gray-900'}
         `}
             >
@@ -206,18 +251,22 @@ export function UserSelector({
                 </div>
                 <div className="flex items-center gap-1">
                     {selectedUser && (
-                        <X
-                            className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+                        <button
+                            type="button"
                             onClick={handleClear}
-                        />
+                            className="p-0.5 hover:bg-gray-100 rounded"
+                            aria-label="清除选择"
+                        >
+                            <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                        </button>
                     )}
                     <ChevronDown className="h-4 w-4 text-gray-400" />
                 </div>
-            </button>
+            </div>
 
-            {/* Dropdown */}
+            {/* Dropdown - using high z-index for modal compatibility */}
             {open && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
+                <div className="absolute z-[10000] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-[280px] overflow-hidden" style={{ bottom: 'auto' }}>
                     {/* Search Input */}
                     <div className="flex items-center border-b border-gray-100 px-3">
                         <Search className="h-4 w-4 text-gray-400" />

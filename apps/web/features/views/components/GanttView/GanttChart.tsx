@@ -121,11 +121,13 @@ function GanttChartBase({
   onTaskClick,
   onTaskDoubleClick,
 }: GanttChartProps) {
+  type DhtmlxGanttTask = GanttTask & { color?: string; textColor?: string };
+
   const containerRef = useRef<HTMLDivElement>(null);
   const ganttRef = useRef<typeof import('dhtmlx-gantt').gantt | null>(null);
   const isInitializedRef = useRef(false);
   const [isGanttReady, setIsGanttReady] = useState(false);
-  const ganttDataRef = useRef<{ tasks: any[]; links: any[] }>({ tasks: [], links: [] });
+  const ganttDataRef = useRef<{ tasks: DhtmlxGanttTask[]; links: GanttLink[] }>({ tasks: [], links: [] });
 
   // Gantt data from Yjs
   const { tasks, links, unscheduledTasks, totalTasks, updateTaskDates, updateTaskProgress } =
@@ -161,7 +163,7 @@ function GanttChartBase({
       setIsGanttReady(true);
 
       // Attach event handlers
-      gantt.attachEvent('onAfterTaskDrag', (id: string, mode: string) => {
+      gantt.attachEvent('onAfterTaskDrag', (id: string, _mode: string) => {
         const task = gantt.getTask(id);
         if (task && task.start_date && task.end_date) {
           updateTaskDates(

@@ -37,7 +37,7 @@ export interface FieldDefinition {
   /** Whether field is unique */
   unique?: boolean;
   /** Default value */
-  default?: any;
+  default?: unknown;
   /** For relations: target collection name */
   target?: string;
   /** For belongsToMany: through table name */
@@ -45,7 +45,7 @@ export interface FieldDefinition {
   /** Foreign key name */
   foreignKey?: string;
   /** Additional field options */
-  options?: Record<string, any>;
+  options?: Record<string, unknown>;
 }
 
 /**
@@ -81,7 +81,7 @@ export interface CollectionDefinition {
 /**
  * Filter operators
  */
-export interface FilterOperators<T = any> {
+export interface FilterOperators<T = unknown> {
   $eq?: T;
   $ne?: T;
   $gt?: T;
@@ -105,7 +105,7 @@ export interface FilterOperators<T = any> {
  * Filter condition type
  */
 export type FilterCondition = {
-  [key: string]: any | FilterOperators;
+  [key: string]: unknown | FilterOperators;
 };
 
 /**
@@ -149,7 +149,7 @@ export interface FindOneOptions {
  */
 export interface CreateOptions {
   /** Values to create */
-  values: Record<string, any>;
+  values: Record<string, unknown>;
 }
 
 /**
@@ -161,7 +161,7 @@ export interface UpdateOptions {
   /** Update by primary key */
   filterByTk?: string | number;
   /** Values to update */
-  values: Record<string, any>;
+  values: Record<string, unknown>;
 }
 
 /**
@@ -206,7 +206,7 @@ export type DatabaseEventType =
 /**
  * Database event handler
  */
-export type DatabaseEventHandler<T = any> = (
+export type DatabaseEventHandler<T = unknown> = (
   model: T,
-  options?: Record<string, any>
+  options?: Record<string, unknown>
 ) => Promise<void> | void;

@@ -37,6 +37,8 @@ export interface MindNodeData extends NodeData {
   tags?: string[];           // 标签数组
   isArchived?: boolean;      // 归档状态
   archivedAt?: string | null; // 归档时间
+  // Story 4.1: Approval Workflow - approval data stored at Node level, NOT in props
+  approval?: import('./approval').ApprovalPipeline | null;
 }
 
 // Story 2.2: Import edge types for EdgeData extension

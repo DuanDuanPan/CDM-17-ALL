@@ -14,19 +14,20 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, User, Flag } from 'lucide-react';
+import { Calendar, Flag } from 'lucide-react';
 import type { TaskProps } from '@cdm/types';
 import { TaskDispatchSection } from './TaskDispatchSection';
 import { KnowledgeResourcesSection } from './KnowledgeResourcesSection';
+import { UserSelector } from '../UserSelector'; // Story 4.1: FIX-8
 
 export interface TaskFormProps {
   nodeId: string;
   initialData?: TaskProps;
   onUpdate?: (data: TaskProps) => void;
-  currentUserId?: string; // Current operating user
 }
 
-export function TaskForm({ nodeId, initialData, onUpdate, currentUserId = 'test1' }: TaskFormProps) {
+// Story 4.1: FIX-9 - currentUserId removed from props (now uses context in child components)
+export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
   const [formData, setFormData] = useState<TaskProps>({
     status: initialData?.status || 'todo',
     priority: initialData?.priority || 'medium',
@@ -61,8 +62,8 @@ export function TaskForm({ nodeId, initialData, onUpdate, currentUserId = 'test1
     });
   }, [initialData]);
 
-  const handleFieldChange = useCallback((field: keyof TaskProps, value: any) => {
-    const updatedData = { ...formData, [field]: value };
+  const handleFieldChange = useCallback(<K extends keyof TaskProps>(field: K, value: TaskProps[K]) => {
+    const updatedData = { ...formData, [field]: value } as TaskProps;
     setFormData(updatedData);
     onUpdate?.(updatedData);
   }, [formData, onUpdate]);
@@ -103,18 +104,15 @@ export function TaskForm({ nodeId, initialData, onUpdate, currentUserId = 'test1
         </select>
       </div>
 
-      {/* Assignee */}
+      {/* Assignee - Story 4.1: FIX-8 Use UserSelector instead of text input */}
       <div>
-        <label className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-2">
-          <User className="w-4 h-4" />
+        <label className="text-sm font-medium text-gray-700 mb-2 block">
           执行人
         </label>
-        <input
-          type="text"
+        <UserSelector
           value={formData.assigneeId ?? ''}
-          onChange={(e) => handleFieldChange('assigneeId', e.target.value)}
-          placeholder="输入执行人 ID 或邮箱"
-          className="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          onChange={(userId) => handleFieldChange('assigneeId', userId)}
+          placeholder="选择执行人..."
         />
       </div>
 
@@ -191,7 +189,6 @@ export function TaskForm({ nodeId, initialData, onUpdate, currentUserId = 'test1
       <TaskDispatchSection
         nodeId={nodeId}
         formData={formData}
-        currentUserId={currentUserId}
         isSubmitting={isSubmitting}
         setIsSubmitting={setIsSubmitting}
         onFormDataChange={setFormData}

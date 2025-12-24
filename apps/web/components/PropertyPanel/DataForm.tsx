@@ -24,7 +24,7 @@ const DATA_TYPE_LABELS: Record<DataType, { label: string; description: string }>
   drawing: { label: '图纸', description: '中望CAD 图纸' },
 };
 
-export function DataForm({ nodeId, initialData, onUpdate }: DataFormProps) {
+export function DataForm({ nodeId: _nodeId, initialData, onUpdate }: DataFormProps) {
   const [formData, setFormData] = useState<DataProps>({
     dataType: initialData?.dataType || 'document',
     version: initialData?.version || 'v1.0.0',

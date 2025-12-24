@@ -7,6 +7,7 @@ import {
     Controller,
     Post,
     Get,
+    Delete,
     Body,
     Param,
     Headers,
@@ -172,6 +173,20 @@ export class ApprovalController {
         };
 
         const deliverables = await this.approvalService.addDeliverable(nodeId, deliverable);
+        return { deliverables };
+    }
+
+    /**
+     * DELETE /approval/:nodeId/deliverables/:deliverableId
+     * Remove a deliverable from the node
+     */
+    @Delete(':nodeId/deliverables/:deliverableId')
+    @HttpCode(HttpStatus.OK)
+    async removeDeliverable(
+        @Param('nodeId') nodeId: string,
+        @Param('deliverableId') deliverableId: string
+    ): Promise<{ deliverables: Deliverable[] }> {
+        const deliverables = await this.approvalService.removeDeliverable(nodeId, deliverableId);
         return { deliverables };
     }
 }

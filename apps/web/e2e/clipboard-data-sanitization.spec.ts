@@ -1,6 +1,18 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page, type Request } from '@playwright/test';
 
-async function openFirstGraph(page: any) {
+type ExposedGraphNode = { getData?: () => unknown };
+type ExposedGraph = {
+  getNodes: () => ExposedGraphNode[];
+  cleanSelection?: () => void;
+  select: (node: ExposedGraphNode) => void;
+};
+
+type UpdateNodePropertiesRequestBody = {
+  type: string;
+  props?: Record<string, unknown>;
+};
+
+async function openFirstGraph(page: Page) {
   await page.goto('/');
   const graphContainer = page.locator('#graph-container');
   if (!(await graphContainer.isVisible({ timeout: 3000 }).catch(() => false))) {
@@ -10,14 +22,15 @@ async function openFirstGraph(page: any) {
   await page.waitForSelector('#graph-container', { timeout: 15000 });
 }
 
-async function selectGraphNodeByLabel(page: any, label: string) {
-  await page.waitForFunction(() => (window as any).__cdmGraph, null, { timeout: 10000 });
+async function selectGraphNodeByLabel(page: Page, label: string) {
+  await page.waitForFunction(() => (window as unknown as { __cdmGraph?: unknown }).__cdmGraph, null, { timeout: 10000 });
   await page.waitForFunction(
     (lbl) => {
-      const graph = (window as any).__cdmGraph;
+      const graph = (window as unknown as { __cdmGraph?: ExposedGraph }).__cdmGraph;
       if (!graph) return false;
-      return graph.getNodes().some((node: any) => {
-        const data = node.getData?.() || {};
+      return graph.getNodes().some((node) => {
+        const raw = typeof node.getData === 'function' ? node.getData() : {};
+        const data = raw as { label?: unknown };
         return data.label === lbl;
       });
     },
@@ -26,10 +39,11 @@ async function selectGraphNodeByLabel(page: any, label: string) {
   );
 
   await page.evaluate((lbl) => {
-    const graph = (window as any).__cdmGraph;
+    const graph = (window as unknown as { __cdmGraph?: ExposedGraph }).__cdmGraph;
     if (!graph) throw new Error('Graph not exposed on window');
-    const node = graph.getNodes().find((n: any) => {
-      const data = n.getData?.() || {};
+    const node = graph.getNodes().find((n) => {
+      const raw = typeof n.getData === 'function' ? n.getData() : {};
+      const data = raw as { label?: unknown };
       return data.label === lbl;
     });
     if (!node) throw new Error(`Node not found: ${lbl}`);
@@ -81,11 +95,11 @@ test.describe('Clipboard Data Props Sanitization', () => {
       await navigator.clipboard.writeText(JSON.stringify(payload));
     }, clipboardPayload);
 
-    let updatePayload: any = null;
-    page.on('request', (req) => {
+    let updatePayload: UpdateNodePropertiesRequestBody | null = null;
+    page.on('request', (req: Request) => {
       if (req.method() === 'PATCH' && req.url().includes('/api/nodes/') && req.url().endsWith('/properties')) {
         try {
-          updatePayload = JSON.parse(req.postData() || '{}');
+          updatePayload = JSON.parse(req.postData() || '{}') as UpdateNodePropertiesRequestBody;
         } catch {
           updatePayload = null;
         }
@@ -157,11 +171,11 @@ test.describe('Clipboard Data Props Sanitization', () => {
       await navigator.clipboard.writeText(JSON.stringify(payload));
     }, clipboardPayload);
 
-    let updatePayload: any = null;
-    page.on('request', (req) => {
+    let updatePayload: UpdateNodePropertiesRequestBody | null = null;
+    page.on('request', (req: Request) => {
       if (req.method() === 'PATCH' && req.url().includes('/api/nodes/') && req.url().endsWith('/properties')) {
         try {
-          updatePayload = JSON.parse(req.postData() || '{}');
+          updatePayload = JSON.parse(req.postData() || '{}') as UpdateNodePropertiesRequestBody;
         } catch {
           updatePayload = null;
         }
@@ -230,11 +244,11 @@ test.describe('Clipboard Data Props Sanitization', () => {
       await navigator.clipboard.writeText(JSON.stringify(payload));
     }, clipboardPayload);
 
-    let updatePayload: any = null;
-    page.on('request', (req) => {
+    let updatePayload: UpdateNodePropertiesRequestBody | null = null;
+    page.on('request', (req: Request) => {
       if (req.method() === 'PATCH' && req.url().includes('/api/nodes/') && req.url().endsWith('/properties')) {
         try {
-          updatePayload = JSON.parse(req.postData() || '{}');
+          updatePayload = JSON.parse(req.postData() || '{}') as UpdateNodePropertiesRequestBody;
         } catch {
           updatePayload = null;
         }
@@ -306,11 +320,11 @@ test.describe('Clipboard Data Props Sanitization', () => {
       await navigator.clipboard.writeText(JSON.stringify(payload));
     }, clipboardPayload);
 
-    let updatePayload: any = null;
-    page.on('request', (req) => {
+    let updatePayload: UpdateNodePropertiesRequestBody | null = null;
+    page.on('request', (req: Request) => {
       if (req.method() === 'PATCH' && req.url().includes('/api/nodes/') && req.url().endsWith('/properties')) {
         try {
-          updatePayload = JSON.parse(req.postData() || '{}');
+          updatePayload = JSON.parse(req.postData() || '{}') as UpdateNodePropertiesRequestBody;
         } catch {
           updatePayload = null;
         }

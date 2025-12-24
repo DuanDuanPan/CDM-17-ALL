@@ -13,6 +13,7 @@ import { KnowledgeLibraryModule } from './modules/knowledge-library'; // Story 2
 import { AppLibraryModule } from './modules/app-library'; // Story 2.9
 import { ApprovalModule } from './modules/approval'; // Story 4.1
 import { UsersModule } from './modules/users'; // Story 4.1
+import { FileModule } from './modules/file/file.module'; // Story 4.1: FIX-11
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { UsersModule } from './modules/users'; // Story 4.1
     AppLibraryModule, // Story 2.9: APP node library and execution services
     ApprovalModule, // Story 4.1: Approval driven workflow
     UsersModule, // Story 4.1: User selector API
+    FileModule, // Story 4.1: FIX-11 - File upload for deliverables
   ],
   controllers: [AppController],
   providers: [AppService],

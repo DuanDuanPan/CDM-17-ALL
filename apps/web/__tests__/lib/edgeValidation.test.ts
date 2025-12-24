@@ -2,8 +2,8 @@
  * Story 2.2: Edge Validation Utilities Unit Tests
  * Tests for dependency edge validation and cycle detection
  */
-
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+/* eslint-disable @typescript-eslint/no-explicit-any -- Test mocks commonly use any */
+import { describe, expect, it } from 'vitest';
 import { NodeType } from '@cdm/types';
 import {
   isTaskNode,

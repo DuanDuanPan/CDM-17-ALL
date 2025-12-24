@@ -7,7 +7,7 @@
  * Uses React Portal to escape PropertyPanel container constraints
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Command } from 'cmdk';
 import {

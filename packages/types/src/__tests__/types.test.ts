@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { NodeData, EdgeData, GraphState, ApiResponse } from '../index';
 // Story 2.2: Import edge types
-import type { EdgeKind, DependencyType, EdgeMetadata, EnhancedEdgeData } from '../edge-types';
+import type { DependencyType, EdgeMetadata, EnhancedEdgeData } from '../edge-types';
 import {
   CreateEdgeSchema,
   UpdateEdgeSchema,

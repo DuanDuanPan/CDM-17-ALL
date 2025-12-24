@@ -75,23 +75,39 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
     // and `graph.getSelectedCells()` works for keyboard operations.
     // Story 2.2: Enable edge selection for dependency edge management
     // Story 2.6: Enable multi-select and rubberband selection
-    graph.use(
-      new Selection({
-        enabled: true,
-        multiple: true,              // Story 2.6 AC1.1: Allow Shift+Click multi-select
-        rubberband: true,            // Story 2.6 AC1.2: Enable rubberband selection box
-        modifiers: undefined,        // No modifier needed for rubberband (direct drag)
-        strict: false,               // Story 2.6 AC1.3: Intersect mode (not strict contain)
-        movable: true,               // Allow moving selected group together
-        showNodeSelectionBox: true,  // Story 2.6 AC1.4: Visual feedback with selection box
-        showEdgeSelectionBox: false, // Story 2.2: Disable edge box, use highlight instead
-        pointerEvents: 'auto',       // Allow selection box interactions
-        // Note: No filter - allow both nodes and edges to be selected
-        // Story 2.2 needs edge selection for dependency management
-        // Selection box styling (AC1.4)
-        className: 'cdm-selection-box',
-      })
-    );
+    const selectionPlugin = new Selection({
+      enabled: true,
+      multiple: true,              // Story 2.6 AC1.1: Allow Shift+Click multi-select
+      rubberband: true,            // Story 2.6 AC1.2: Enable rubberband selection box
+      modifiers: undefined,        // No modifier needed for rubberband (direct drag)
+      strict: false,               // Story 2.6 AC1.3: Intersect mode (not strict contain)
+      movable: true,               // Allow moving selected group together
+      showNodeSelectionBox: true,  // Story 2.6 AC1.4: Visual feedback with selection box
+      showEdgeSelectionBox: false, // Story 2.2: Disable edge box, use highlight instead
+      pointerEvents: 'none',
+      // Note: No filter - allow both nodes and edges to be selected
+      // Story 2.2 needs edge selection for dependency management
+      // Selection box styling (AC1.4)
+      className: 'cdm-selection-box',
+    });
+    graph.use(selectionPlugin);
+
+    const selectionInternal = selectionPlugin as unknown as {
+      onBlankClick: () => void;
+      onCellMouseUp: (args: unknown) => void;
+    };
+
+    graph.off('blank:click', selectionInternal.onBlankClick, selectionPlugin);
+    graph.on('blank:click', ({ e }: { e: { button?: number } }) => {
+      if (e?.button === 2) return;
+      selectionPlugin.clean();
+    });
+
+    graph.off('cell:mouseup', selectionInternal.onCellMouseUp, selectionPlugin);
+    graph.on('cell:mouseup', (args: { e: { button?: number } }) => {
+      if (args?.e?.button === 2) return;
+      selectionInternal.onCellMouseUp(args);
+    }, selectionPlugin);
 
     // Enable History plugin for undo/redo functionality (Ctrl+Z / Ctrl+Y)
     graph.use(

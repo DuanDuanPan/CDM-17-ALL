@@ -35,7 +35,7 @@ test.describe('Layout Switching', () => {
     // Get initial positions
     const initialPositions = await page.evaluate(() => {
       const nodes = document.querySelectorAll('[data-shape="mind-node"]');
-      return Array.from(nodes).map((node: any) => ({
+      return Array.from(nodes).map((node: Element) => ({
         id: node.getAttribute('data-cell-id'),
         x: parseFloat(node.getAttribute('transform')?.match(/translate\(([^,]+)/)?.[1] || '0'),
         y: parseFloat(node.getAttribute('transform')?.match(/translate\([^,]+,\s*([^)]+)/)?.[1] || '0'),
@@ -51,7 +51,7 @@ test.describe('Layout Switching', () => {
     // Get new positions
     const newPositions = await page.evaluate(() => {
       const nodes = document.querySelectorAll('[data-shape="mind-node"]');
-      return Array.from(nodes).map((node: any) => ({
+      return Array.from(nodes).map((node: Element) => ({
         id: node.getAttribute('data-cell-id'),
         x: parseFloat(node.getAttribute('transform')?.match(/translate\(([^,]+)/)?.[1] || '0'),
         y: parseFloat(node.getAttribute('transform')?.match(/translate\([^,]+,\s*([^)]+)/)?.[1] || '0'),
@@ -91,8 +91,6 @@ test.describe('Layout Switching', () => {
   });
 
   test('should show loading state during layout switch', async ({ page }) => {
-    const mindmapButton = page.locator('[data-testid="layout-mindmap"]');
-
     // Click logic layout
     await page.locator('[data-testid="layout-logic"]').click();
 

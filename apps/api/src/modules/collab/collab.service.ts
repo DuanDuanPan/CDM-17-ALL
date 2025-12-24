@@ -137,7 +137,7 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                                         archivedAt: node.archivedAt ? node.archivedAt.toISOString() : null,
                                         createdAt: node.createdAt.toISOString(),
                                         updatedAt: node.updatedAt.toISOString(),
-                                        metadata: (node.metadata as any) || {},
+                                        metadata: (node.metadata as Record<string, unknown>) || {},
                                         mindmapType: 'topic', // Default to topic
                                     };
                                     yNodes.set(node.id, yNode);
@@ -152,7 +152,7 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                                         source: edge.sourceId,
                                         target: edge.targetId,
                                         type: edge.type,
-                                        metadata: (edge.metadata as any) || {},
+                                        metadata: (edge.metadata as Record<string, unknown>) || {},
                                     };
                                     yEdges.set(edge.id, yEdge);
                                 }
@@ -165,7 +165,7 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                                 const existingEdgePairs = new Set<string>();
 
                                 // Collect existing edges (source->target pairs)
-                                yEdges.forEach((edgeData: any) => {
+                                yEdges.forEach((edgeData: { source: string; target: string }) => {
                                     existingEdgePairs.add(`${edgeData.source}->${edgeData.target}`);
                                 });
 
@@ -192,8 +192,9 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                             }
 
                             // Sync Meta
-                            if (graph.data && (graph.data as any).layoutMode) {
-                                yMeta.set('layoutMode', (graph.data as any).layoutMode);
+                            const graphData = graph.data as Record<string, unknown> | null;
+                            if (graphData && graphData.layoutMode) {
+                                yMeta.set('layoutMode', graphData.layoutMode);
                             }
                         });
 

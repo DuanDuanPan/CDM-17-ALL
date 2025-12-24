@@ -25,7 +25,7 @@ export class NotificationGateway implements OnGatewayConnection {
    * @param event - Event name (e.g., 'notification:new')
    * @param data - Notification payload
    */
-  sendToUser(userId: string, event: string, data: any) {
+  sendToUser(userId: string, event: string, data: unknown) {
     this.server.to(`user:${userId}`).emit(event, data);
   }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Graph } from '@antv/x6';
+import { Graph, type Node } from '@antv/x6';
 import { LayoutMode } from '@cdm/types';
 import { layoutPlugin } from '@cdm/plugin-layout';
 import { useToast } from '@cdm/ui';
@@ -172,7 +172,7 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
   useEffect(() => {
     if (!graph || !isReady) return;
 
-    const handleNodeMouseUp = ({ node, e }: { node: any; e: MouseEvent }) => {
+    const handleNodeMouseUp = ({ node, e }: { node: Node; e: MouseEvent }) => {
       if (currentMode === 'free') return;
       if (!graph.clientToLocal) return;
 

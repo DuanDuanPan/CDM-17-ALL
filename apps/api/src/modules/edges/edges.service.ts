@@ -6,7 +6,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { EdgeRepository, EdgeCreateData, EdgeUpdateData } from './repositories/edge.repository';
 import { prisma } from '@cdm/database';
-import { NodeType, type EdgeKind, type DependencyType, type EdgeMetadata, type EdgeResponse } from '@cdm/types';
+import { NodeType, type EdgeMetadata, type EdgeResponse } from '@cdm/types';
 
 export interface CycleDetectionResult {
   hasCycle: boolean;
@@ -253,8 +253,18 @@ export class EdgesService {
   /**
    * Format edge for API response
    */
-  private formatEdgeResponse(edge: any): EdgeResponse {
-    const metadata = (edge.metadata as EdgeMetadata) ?? { kind: 'hierarchical' };
+  private formatEdgeResponse(
+    edge: {
+      id: string;
+      graphId: string;
+      sourceId: string;
+      targetId: string;
+      metadata: unknown;
+      createdAt: Date;
+      updatedAt: Date;
+    }
+  ): EdgeResponse {
+    const metadata = (edge.metadata as EdgeMetadata | null) ?? { kind: 'hierarchical' };
 
     return {
       id: edge.id,

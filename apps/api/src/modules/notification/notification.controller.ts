@@ -3,7 +3,7 @@
  * Notification Controller - REST API for notifications
  */
 
-import { Controller, Get, Patch, Param, Query, Headers, Res } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { NotificationService } from './notification.service';
 
@@ -22,7 +22,7 @@ export class NotificationController {
     @Query('userId') userId: string,
     @Query('isRead') isRead?: string,
     @Res({ passthrough: true }) res?: Response,
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     // Disable caching to ensure fresh data
     res?.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res?.setHeader('Pragma', 'no-cache');
@@ -58,7 +58,7 @@ export class NotificationController {
    * PATCH /api/notifications/:id:markRead - 标记单条已读
    */
   @Patch(':id\\:markRead')
-  async markRead(@Param('id') id: string): Promise<any> {
+  async markRead(@Param('id') id: string): Promise<unknown> {
     return this.notificationService.markAsRead(id);
   }
 
@@ -67,7 +67,7 @@ export class NotificationController {
    * Query params: userId (required for dev)
    */
   @Patch('markAllRead')
-  async markAllRead(@Query('userId') userId: string): Promise<any> {
+  async markAllRead(@Query('userId') userId: string): Promise<unknown> {
     const recipientId = userId || 'test1';
     return this.notificationService.markAllAsRead(recipientId);
   }

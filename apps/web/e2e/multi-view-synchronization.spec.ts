@@ -1,5 +1,15 @@
 import { test, expect, type Page } from '@playwright/test';
 
+type GanttApi = {
+  getTask?: (id: string) => { id: string; start_date: unknown; end_date: unknown } | null;
+  showTask?: (id: string) => void;
+  updateTask?: (id: string) => void;
+  callEvent?: (name: string, args: unknown[]) => void;
+  date?: { add: (date: unknown, value: number, unit: string) => unknown };
+};
+
+type WindowWithGantt = Window & { gantt?: GanttApi };
+
 const openPropertyPanelForRoot = async (page: Page) => {
   await page.waitForSelector('.x6-node');
   const rootNode = page.locator('.x6-node').first();
@@ -67,7 +77,7 @@ const getGanttTaskLocator = async (page: Page) => {
 
 const ensureGanttTaskInView = async (page: Page, taskId: string) => {
   await page.waitForFunction((id) => {
-    const gantt = (window as any).gantt;
+    const gantt = (window as unknown as WindowWithGantt).gantt;
     if (!gantt?.getTask) return false;
     try {
       return Boolean(gantt.getTask(id));
@@ -76,7 +86,7 @@ const ensureGanttTaskInView = async (page: Page, taskId: string) => {
     }
   }, taskId);
   await page.evaluate((id) => {
-    const gantt = (window as any).gantt;
+    const gantt = (window as unknown as WindowWithGantt).gantt;
     if (gantt?.showTask) {
       gantt.showTask(id);
     }
@@ -147,7 +157,7 @@ test.describe('Multi-View Synchronization', () => {
 
     // Simulate drag via gantt API to avoid flaky pointer interactions in CI
     await page.evaluate(() => {
-      const gantt = (window as any).gantt;
+      const gantt = (window as unknown as WindowWithGantt).gantt;
       if (!gantt?.getTask || !gantt?.date || !gantt?.callEvent) return;
       const task = gantt.getTask('center-node');
       if (!task) return;
@@ -155,7 +165,7 @@ test.describe('Multi-View Synchronization', () => {
       const newEnd = gantt.date.add(task.end_date, 2, 'day');
       task.start_date = newStart;
       task.end_date = newEnd;
-      gantt.updateTask(task.id);
+      gantt.updateTask?.(task.id);
       gantt.callEvent('onAfterTaskDrag', [task.id, 'move']);
     });
 

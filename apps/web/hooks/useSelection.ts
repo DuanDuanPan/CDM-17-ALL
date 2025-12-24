@@ -69,8 +69,8 @@ export function useSelection({ graph }: UseSelectionOptions): UseSelectionReturn
         if (!graph) return;
 
         const handleSelectionChanged = ({
-            added,
-            removed,
+            added: _added,
+            removed: _removed,
             selected
         }: {
             added: Cell[];

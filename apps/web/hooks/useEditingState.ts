@@ -66,7 +66,7 @@ export function useEditingState({ graph }: UseEditingStateOptions): UseEditingSt
         };
 
         // Handler for node exiting edit mode
-        const handleNodeEdited = ({ node }: { node: { id: string } }) => {
+        const handleNodeEdited = () => {
             setIsEditing(false);
             setEditingNodeId(null);
         };
@@ -88,10 +88,10 @@ export function useEditingState({ graph }: UseEditingStateOptions): UseEditingSt
         };
 
         // Listen to X6 editing events
-        graph.on('node:editing' as any, handleNodeEditing);
-        graph.on('node:edited' as any, handleNodeEdited);
+        graph.on('node:editing', handleNodeEditing);
+        graph.on('node:edited', handleNodeEdited);
         // Also listen for data changes (MindNode sets isEditing in data)
-        graph.on('node:change:data' as any, handleNodeChange);
+        graph.on('node:change:data', handleNodeChange);
 
         // Also check for any node data with isEditing: true on mount
         const nodes = graph.getNodes();
@@ -105,9 +105,9 @@ export function useEditingState({ graph }: UseEditingStateOptions): UseEditingSt
         }
 
         return () => {
-            graph.off('node:editing' as any, handleNodeEditing);
-            graph.off('node:edited' as any, handleNodeEdited);
-            graph.off('node:change:data' as any, handleNodeChange);
+            graph.off('node:editing', handleNodeEditing);
+            graph.off('node:edited', handleNodeEdited);
+            graph.off('node:change:data', handleNodeChange);
         };
     }, [graph, editingNodeId]);
 

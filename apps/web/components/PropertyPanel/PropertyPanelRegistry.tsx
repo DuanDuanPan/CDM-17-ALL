@@ -25,18 +25,18 @@ export type PropertyFormProps =
   | AppFormProps;
 
 // Registry mapping NodeType to Form Component
-export const PropertyFormRegistry: Record<NodeType, ComponentType<any>> = {
-  [NodeType.ORDINARY]: OrdinaryForm,
-  [NodeType.TASK]: TaskForm,
-  [NodeType.REQUIREMENT]: RequirementForm,
-  [NodeType.PBS]: PBSForm,
-  [NodeType.DATA]: DataForm,
-  [NodeType.APP]: AppForm, // Story 2.9
+export const PropertyFormRegistry: Record<NodeType, ComponentType<Record<string, unknown>>> = {
+  [NodeType.ORDINARY]: OrdinaryForm as unknown as ComponentType<Record<string, unknown>>,
+  [NodeType.TASK]: TaskForm as unknown as ComponentType<Record<string, unknown>>,
+  [NodeType.REQUIREMENT]: RequirementForm as unknown as ComponentType<Record<string, unknown>>,
+  [NodeType.PBS]: PBSForm as unknown as ComponentType<Record<string, unknown>>,
+  [NodeType.DATA]: DataForm as unknown as ComponentType<Record<string, unknown>>,
+  [NodeType.APP]: AppForm as unknown as ComponentType<Record<string, unknown>>, // Story 2.9
 };
 
 /**
  * Get the form component for a given node type
  */
-export function getFormComponent(nodeType: NodeType): ComponentType<any> {
-  return PropertyFormRegistry[nodeType] || OrdinaryForm;
+export function getFormComponent(nodeType: NodeType): ComponentType<Record<string, unknown>> {
+  return PropertyFormRegistry[nodeType] || (OrdinaryForm as unknown as ComponentType<Record<string, unknown>>);
 }

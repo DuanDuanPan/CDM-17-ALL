@@ -69,7 +69,6 @@ class Logger {
     }
 
     private log(level: LogLevel, message: string, data?: Record<string, unknown>): void {
-        const timestamp = new Date().toISOString();
         const prefix = `[${this.namespace}]`;
 
         const logFn = level === 'error' ? console.error

@@ -165,7 +165,7 @@ export function FilePreviewModal({ output, onClose }: FilePreviewModalProps) {
             try {
                 const mockContent = generateMockContent(output);
                 setContent(mockContent);
-            } catch (err) {
+            } catch {
                 setError('无法加载文件内容');
             } finally {
                 setLoading(false);

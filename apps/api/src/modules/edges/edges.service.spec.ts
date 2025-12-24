@@ -5,7 +5,7 @@
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { EdgesService, CycleDetectionResult } from './edges.service';
+import { EdgesService } from './edges.service';
 import { EdgeRepository } from './repositories/edge.repository';
 import type { EdgeMetadata } from '@cdm/types';
 import { NodeType } from '@cdm/types';
@@ -30,7 +30,6 @@ import { prisma } from '@cdm/database';
 
 describe('EdgesService', () => {
   let service: EdgesService;
-  let edgeRepository: EdgeRepository;
 
   const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 
@@ -40,7 +39,6 @@ describe('EdgesService', () => {
     }).compile();
 
     service = module.get<EdgesService>(EdgesService);
-    edgeRepository = module.get<EdgeRepository>(EdgeRepository);
 
     // Reset mocks
     jest.clearAllMocks();

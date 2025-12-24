@@ -6,7 +6,9 @@
  * Features: Stepper visualization, action buttons, deliverables section
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { nanoid } from 'nanoid';
 import {
     ShieldCheck,
     Check,
@@ -19,32 +21,42 @@ import {
     File,
     Trash2,
     Loader2,
+    Plus,
+    Settings,
+    Download,
+    Eye,
+    FileText,
+    FileImage,
+    FileJson,
 } from 'lucide-react';
+import { WorkflowConfigDialog } from './WorkflowConfigDialog';
 import type {
     ApprovalPipeline,
     ApprovalStep,
     ApprovalStatus,
     Deliverable
 } from '@cdm/types';
+import { useCurrentUserId } from '../../contexts'; // Story 4.1: FIX-9
 
 // API base URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-// Props
+// Props - Story 4.1: FIX-9 - currentUserId removed, now uses context
 interface ApprovalStatusPanelProps {
     nodeId: string;
     nodeLabel: string;
     approval: ApprovalPipeline | null;
     deliverables: Deliverable[];
-    currentUserId: string;
     isAssignee: boolean;
     onUpdate?: () => void;
 }
 
 /**
  * Get status badge color and label
+ * @param status - The approval status
+ * @param hasSteps - Whether the workflow has steps configured
  */
-function getStatusBadge(status: ApprovalStatus): { className: string; label: string; icon: React.ReactNode } {
+function getStatusBadge(status: ApprovalStatus, hasSteps: boolean): { className: string; label: string; icon: React.ReactNode } {
     switch (status) {
         case 'PENDING':
             return { className: 'bg-yellow-100 text-yellow-700', label: '待审批', icon: <Clock className="h-3 w-3" /> };
@@ -53,6 +65,10 @@ function getStatusBadge(status: ApprovalStatus): { className: string; label: str
         case 'REJECTED':
             return { className: 'bg-red-100 text-red-700', label: '已驳回', icon: <X className="h-3 w-3" /> };
         default:
+            // NONE status - check if workflow is configured
+            if (hasSteps) {
+                return { className: 'bg-blue-100 text-blue-700', label: '待提交', icon: <Send className="h-3 w-3" /> };
+            }
             return { className: 'bg-gray-100 text-gray-600', label: '未配置', icon: <ShieldCheck className="h-3 w-3" /> };
     }
 }
@@ -105,8 +121,8 @@ function ApprovalStepper({ steps, currentStepIndex }: { steps: ApprovalStep[]; c
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className={`text-sm font-medium ${step.status === 'approved' ? 'text-green-600' :
-                                step.status === 'rejected' ? 'text-red-600' :
-                                    step.status === 'pending' ? 'text-blue-600' : 'text-gray-700'
+                            step.status === 'rejected' ? 'text-red-600' :
+                                step.status === 'pending' ? 'text-blue-600' : 'text-gray-700'
                             }`}>
                             {step.name}
                         </p>
@@ -136,15 +152,197 @@ function ApprovalStepper({ steps, currentStepIndex }: { steps: ApprovalStep[]; c
 }
 
 /**
- * Deliverables Section
+ * Story 4.1: FIX-11 - Deliverables Section with file upload, download, and preview
  */
 function DeliverablesSection({
     deliverables,
     canEdit,
+    onUpload,
+    onDelete,
+    isUploading,
 }: {
     deliverables: Deliverable[];
     canEdit: boolean;
+    onUpload: (file: File) => Promise<void>;
+    onDelete: (deliverableId: string) => Promise<void>;
+    isUploading: boolean;
 }) {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [previewFile, setPreviewFile] = useState<Deliverable | null>(null);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            await onUpload(file);
+            // Reset file input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const handleDownload = (deliverable: Deliverable) => {
+        // Open file in new tab for download
+        window.open(`${API_BASE}/api/files/${deliverable.fileId}`, '_blank');
+    };
+
+    const handlePreview = (deliverable: Deliverable) => {
+        setPreviewFile(deliverable);
+    };
+
+    // Get file icon based on file extension
+    const getFileIcon = (fileName: string) => {
+        const ext = fileName.toLowerCase().split('.').pop() || '';
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) {
+            return <FileImage className="h-4 w-4 text-blue-500" />;
+        }
+        if (['json'].includes(ext)) {
+            return <FileJson className="h-4 w-4 text-yellow-500" />;
+        }
+        if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) {
+            return <FileText className="h-4 w-4 text-red-500" />;
+        }
+        return <File className="h-4 w-4 text-gray-400" />;
+    };
+
+    // Generate mock preview content
+    const generateMockContent = (deliverable: Deliverable): string => {
+        const ext = deliverable.fileName.toLowerCase().split('.').pop() || '';
+        if (['json'].includes(ext)) {
+            return JSON.stringify({
+                fileName: deliverable.fileName,
+                uploadedAt: deliverable.uploadedAt,
+                mockData: true,
+                values: Array.from({ length: 5 }, (_, i) => ({
+                    index: i,
+                    value: (Math.random() * 100).toFixed(4)
+                }))
+            }, null, 2);
+        }
+        if (['csv'].includes(ext)) {
+            let csv = 'Time,Value1,Value2\n';
+            for (let i = 0; i < 10; i++) {
+                csv += `${i * 60},${(50 + Math.sin(i) * 20).toFixed(2)},${(30 + Math.cos(i) * 15).toFixed(2)}\n`;
+            }
+            return csv;
+        }
+        return `========================================
+    ${deliverable.fileName}
+========================================
+
+上传时间: ${new Date(deliverable.uploadedAt).toLocaleString()}
+
+此为模拟预览内容，实际内容将由后端服务提供。
+
+----------------------------------------
+注: Mock 预览
+----------------------------------------`;
+    };
+
+    // Preview Modal
+    const PreviewModal = () => {
+        if (!previewFile || !mounted) return null;
+
+        const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(previewFile.fileName);
+        const isJson = /\.json$/i.test(previewFile.fileName);
+        const isPdf = /\.pdf$/i.test(previewFile.fileName);
+
+        const modalContent = (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-5 py-4 border-b bg-gradient-to-r from-blue-50 to-cyan-50">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 rounded-lg">
+                                {getFileIcon(previewFile.fileName)}
+                            </div>
+                            <div>
+                                <h3 className="text-base font-semibold text-gray-800">{previewFile.fileName}</h3>
+                                <p className="text-xs text-gray-500">
+                                    上传于 {new Date(previewFile.uploadedAt).toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => handleDownload(previewFile)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                            >
+                                <Download className="w-4 h-4" />
+                                下载
+                            </button>
+                            <button
+                                onClick={() => setPreviewFile(null)}
+                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 overflow-auto bg-gray-50 p-4">
+                        {isImage ? (
+                            <div className="flex items-center justify-center min-h-[200px]">
+                                <div className="bg-white rounded-lg shadow-md p-4">
+                                    <div className="w-64 h-48 bg-gradient-to-br from-blue-100 via-cyan-50 to-blue-50 rounded-lg flex items-center justify-center border-2 border-dashed border-blue-200">
+                                        <div className="text-center">
+                                            <FileImage className="w-12 h-12 text-blue-300 mx-auto mb-2" />
+                                            <p className="text-sm text-gray-500">{previewFile.fileName}</p>
+                                            <p className="text-xs text-gray-400 mt-1">[Mock 图片预览]</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : isPdf ? (
+                            <div className="flex items-center justify-center min-h-[200px]">
+                                <div className="bg-white rounded-lg shadow-md p-8 text-center">
+                                    <FileText className="w-16 h-16 text-red-400 mx-auto mb-4" />
+                                    <p className="text-lg font-medium text-gray-700 mb-2">{previewFile.fileName}</p>
+                                    <p className="text-sm text-gray-500 mb-4">PDF 文件预览</p>
+                                    <button
+                                        onClick={() => handleDownload(previewFile)}
+                                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors mx-auto"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                        下载查看
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <pre className={`p-4 rounded-lg text-sm overflow-auto max-h-[50vh] ${isJson
+                                ? 'bg-gray-900 text-green-400 font-mono'
+                                : 'bg-white text-gray-700 font-mono border border-gray-200'
+                                }`}>
+                                {generateMockContent(previewFile)}
+                            </pre>
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-5 py-3 border-t bg-gray-50/80 flex items-center justify-between">
+                        <p className="text-xs text-gray-400">
+                            ⓘ 此为模拟预览，实际内容将由后端服务提供
+                        </p>
+                        <button
+                            onClick={() => setPreviewFile(null)}
+                            className="px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+                        >
+                            关闭
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        return createPortal(modalContent, document.body);
+    };
+
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -153,14 +351,28 @@ function DeliverablesSection({
                     交付物
                 </h4>
                 {canEdit && (
-                    <button
-                        type="button"
-                        disabled
-                        className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 bg-gray-50 rounded cursor-not-allowed"
-                    >
-                        <Upload className="h-3 w-3" />
-                        上传
-                    </button>
+                    <>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.gif,.webp,.zip,.rar,.json"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploading}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {isUploading ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                                <Upload className="h-3 w-3" />
+                            )}
+                            上传
+                        </button>
+                    </>
                 )}
             </div>
             {deliverables.length === 0 ? (
@@ -168,24 +380,47 @@ function DeliverablesSection({
             ) : (
                 <div className="space-y-1">
                     {deliverables.map((d) => (
-                        <div key={d.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                            <div className="flex items-center gap-2 min-w-0">
-                                <File className="h-4 w-4 text-gray-400" />
-                                <span className="text-sm truncate">{d.fileName}</span>
+                        <div key={d.id} className="flex items-center justify-between p-2 bg-gray-50 rounded group hover:bg-gray-100 transition-colors">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                                {getFileIcon(d.fileName)}
+                                <span className="text-sm truncate flex-1">{d.fileName}</span>
                             </div>
-                            {canEdit && (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {/* Preview Button */}
                                 <button
                                     type="button"
-                                    disabled
-                                    className="p-1 text-gray-300 cursor-not-allowed"
+                                    onClick={() => handlePreview(d)}
+                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                    title="预览"
                                 >
-                                    <Trash2 className="h-3 w-3" />
+                                    <Eye className="h-3.5 w-3.5" />
                                 </button>
-                            )}
+                                {/* Download Button */}
+                                <button
+                                    type="button"
+                                    onClick={() => handleDownload(d)}
+                                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                    title="下载"
+                                >
+                                    <Download className="h-3.5 w-3.5" />
+                                </button>
+                                {/* Delete Button */}
+                                {canEdit && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onDelete(d.id)}
+                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                        title="删除"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
             )}
+            <PreviewModal />
         </div>
     );
 }
@@ -193,18 +428,115 @@ function DeliverablesSection({
 /**
  * ApprovalStatusPanel - Main component
  */
+// Story 4.1: FIX-9 - Use context for currentUserId
 export function ApprovalStatusPanel({
     nodeId,
-    nodeLabel,
-    approval,
-    deliverables,
-    currentUserId,
+    nodeLabel: _nodeLabel,
+    approval: initialApproval,
+    deliverables: initialDeliverables,
     isAssignee,
     onUpdate,
 }: ApprovalStatusPanelProps) {
+    const currentUserId = useCurrentUserId();
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
     const [showRejectForm, setShowRejectForm] = useState(false);
+
+    // Internal state for approval data (allows instant refresh)
+    const [approval, setApproval] = useState(initialApproval);
+    const [deliverables, setDeliverables] = useState(initialDeliverables);
+
+    // Fetch approval status from API
+    const fetchApprovalStatus = useCallback(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/approval/${nodeId}`);
+            if (response.ok) {
+                const data = await response.json();
+                setApproval(data.approval);
+            }
+        } catch (error) {
+            console.error('Failed to fetch approval status:', error);
+        }
+    }, [nodeId]);
+
+    // Fetch approval on mount and when nodeId changes
+    useEffect(() => {
+        fetchApprovalStatus();
+    }, [nodeId, fetchApprovalStatus]);
+
+    // Sync deliverables from props (they come from parent's nodeData.props.deliverables)
+    useEffect(() => {
+        setDeliverables(initialDeliverables);
+    }, [initialDeliverables]);
+
+    // Handler to refresh data after configuration
+    const handleRefreshAfterConfig = useCallback(() => {
+        fetchApprovalStatus();
+        onUpdate?.();
+    }, [fetchApprovalStatus, onUpdate]);
+
+    // Story 4.1: FIX-11 - File upload handler
+    const handleUploadFile = useCallback(async (file: File) => {
+        setUploading(true);
+        try {
+            // Step 1: Upload file to file service
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadResponse = await fetch(`${API_BASE}/api/files/upload`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!uploadResponse.ok) {
+                throw new Error('File upload failed');
+            }
+
+            const fileMetadata = await uploadResponse.json();
+
+            // Step 2: Add deliverable to node
+            const deliverableData = {
+                id: nanoid(),
+                fileId: fileMetadata.id,
+                fileName: file.name,
+                uploadedAt: new Date().toISOString(),
+            };
+
+            const deliverableResponse = await fetch(`${API_BASE}/api/approval/${nodeId}/deliverables`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(deliverableData),
+            });
+
+            if (deliverableResponse.ok) {
+                fetchApprovalStatus(); // Refresh to show new deliverable
+                onUpdate?.();
+            }
+        } catch (error) {
+            console.error('Upload failed:', error);
+        } finally {
+            setUploading(false);
+        }
+    }, [nodeId, fetchApprovalStatus, onUpdate]);
+
+    // Story 4.1: FIX-11 - File delete handler
+    const handleDeleteDeliverable = useCallback(async (deliverableId: string) => {
+        try {
+            const response = await fetch(`${API_BASE}/api/approval/${nodeId}/deliverables/${deliverableId}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                // Optimistic update: immediately remove from local state
+                setDeliverables(prev => prev.filter(d => d.id !== deliverableId));
+                // Then trigger parent refresh
+                onUpdate?.();
+            }
+        } catch (error) {
+            console.error('Delete failed:', error);
+        }
+    }, [nodeId, onUpdate]);
 
     // Determine user role
     const currentStep = approval?.steps?.[approval.currentStepIndex];
@@ -217,11 +549,12 @@ export function ApprovalStatusPanel({
     const handleSubmit = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE}/approval/${nodeId}/submit`, {
+            const response = await fetch(`${API_BASE}/api/approval/${nodeId}/submit`, {
                 method: 'POST',
                 headers: { 'x-user-id': currentUserId },
             });
             if (response.ok) {
+                fetchApprovalStatus();
                 onUpdate?.();
             }
         } catch (error) {
@@ -229,16 +562,17 @@ export function ApprovalStatusPanel({
         } finally {
             setLoading(false);
         }
-    }, [nodeId, currentUserId, onUpdate]);
+    }, [nodeId, currentUserId, fetchApprovalStatus, onUpdate]);
 
     const handleApprove = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE}/approval/${nodeId}/approve`, {
+            const response = await fetch(`${API_BASE}/api/approval/${nodeId}/approve`, {
                 method: 'POST',
                 headers: { 'x-user-id': currentUserId },
             });
             if (response.ok) {
+                fetchApprovalStatus();
                 onUpdate?.();
             }
         } catch (error) {
@@ -246,14 +580,14 @@ export function ApprovalStatusPanel({
         } finally {
             setLoading(false);
         }
-    }, [nodeId, currentUserId, onUpdate]);
+    }, [nodeId, currentUserId, fetchApprovalStatus, onUpdate]);
 
     const handleReject = useCallback(async () => {
         if (!rejectReason.trim()) return;
 
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE}/approval/${nodeId}/reject`, {
+            const response = await fetch(`${API_BASE}/api/approval/${nodeId}/reject`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -264,6 +598,7 @@ export function ApprovalStatusPanel({
             if (response.ok) {
                 setShowRejectForm(false);
                 setRejectReason('');
+                fetchApprovalStatus();
                 onUpdate?.();
             }
         } catch (error) {
@@ -271,26 +606,58 @@ export function ApprovalStatusPanel({
         } finally {
             setLoading(false);
         }
-    }, [nodeId, currentUserId, rejectReason, onUpdate]);
+    }, [nodeId, currentUserId, rejectReason, fetchApprovalStatus, onUpdate]);
 
-    const statusBadge = getStatusBadge(approval?.status || 'NONE');
+    const hasSteps = (approval?.steps?.length ?? 0) > 0;
+    const statusBadge = getStatusBadge(approval?.status || 'NONE', hasSteps);
+
+    // State for workflow config dialog
+    const [showConfigDialog, setShowConfigDialog] = useState(false);
 
     // Not configured state
     if (!approval || approval.steps.length === 0) {
         return (
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                <div className="px-4 py-3 border-b border-gray-100">
-                    <h3 className="text-sm font-medium flex items-center gap-2 text-gray-700">
-                        <ShieldCheck className="h-4 w-4" />
-                        审批流程
-                    </h3>
+            <>
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <h3 className="text-sm font-medium flex items-center gap-2 text-gray-700">
+                            <ShieldCheck className="h-4 w-4" />
+                            审批流程
+                        </h3>
+                        <button
+                            type="button"
+                            onClick={() => setShowConfigDialog(true)}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                        >
+                            <Plus className="h-3 w-3" />
+                            配置流程
+                        </button>
+                    </div>
+                    <div className="p-4 text-center">
+                        <Settings className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-sm text-gray-400 mb-3">
+                            此任务未配置审批流程
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => setShowConfigDialog(true)}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+                        >
+                            <Plus className="h-4 w-4" />
+                            配置审批流程
+                        </button>
+                    </div>
                 </div>
-                <div className="p-4">
-                    <p className="text-sm text-gray-400">
-                        此任务未配置审批流程
-                    </p>
-                </div>
-            </div>
+
+                {/* Workflow Config Dialog */}
+                {showConfigDialog && (
+                    <WorkflowConfigDialog
+                        nodeId={nodeId}
+                        onClose={() => setShowConfigDialog(false)}
+                        onConfigured={handleRefreshAfterConfig}
+                    />
+                )}
+            </>
         );
     }
 
@@ -316,10 +683,13 @@ export function ApprovalStatusPanel({
 
                 <hr className="border-gray-100" />
 
-                {/* Deliverables */}
+                {/* Deliverables - Story 4.1: FIX-11 */}
                 <DeliverablesSection
                     deliverables={deliverables}
                     canEdit={isAssignee && approval.status !== 'APPROVED'}
+                    onUpload={handleUploadFile}
+                    onDelete={handleDeleteDeliverable}
+                    isUploading={uploading}
                 />
 
                 <hr className="border-gray-100" />

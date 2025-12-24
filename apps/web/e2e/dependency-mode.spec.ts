@@ -5,16 +5,6 @@
 
 import { test, expect, type Page } from '@playwright/test';
 
-// Helper to wait for API responses
-const waitForApi = (page: Page, method: string, path: string) =>
-  page.waitForResponse(
-    (res) =>
-      res.url().includes(path) &&
-      res.request().method() === method &&
-      res.ok(),
-    { timeout: 10000 }
-  );
-
 // Helper to wait for any node-related API response
 const waitForNodeReady = (page: Page) =>
   Promise.race([

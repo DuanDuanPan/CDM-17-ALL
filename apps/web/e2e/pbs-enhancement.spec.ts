@@ -158,7 +158,7 @@ test.describe('PBS Node Enhancement', () => {
                     await page.waitForTimeout(500);
 
                     // Verify indicator persisted
-                    const indicatorName = page.locator('input[value="质量 (Mass)"]');
+                    const _indicatorName = page.locator('input[value="质量 (Mass)"]');
                     // Note: This may not work perfectly depending on actual persistence setup
                     // but the test structure is correct
                 }
@@ -259,7 +259,7 @@ test.describe('PBS Node Enhancement', () => {
 
                             // Verify product code appears in node pill
                             // The pill should show the product code instead of version
-                            const pill = node.locator('.bg-indigo-100');
+                            const _pill = node.locator('.bg-indigo-100');
                             // Note: This selector may need adjustment based on actual rendered HTML
                         }
                     }

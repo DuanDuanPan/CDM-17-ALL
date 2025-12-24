@@ -15,36 +15,6 @@ const waitForApi = (page: Page, method: string, path: string) =>
         { timeout: 10000 }
     );
 
-// Helper to create and select a Task node
-async function createAndSelectTaskNode(page: Page) {
-    // Select root node
-    const nodes = page.locator('.x6-node');
-    const firstNode = nodes.first();
-    await firstNode.click();
-    await page.waitForTimeout(300);
-
-    // Create a child node with Tab
-    await page.keyboard.press('Tab');
-    await page.waitForTimeout(500);
-
-    // Get the newly created node (should be selected)
-    const selectedNode = page.locator('.x6-node').last();
-    await selectedNode.click();
-    await page.waitForTimeout(300);
-
-    // Open property panel and change type to Task
-    const propertyPanel = page.locator('aside:has-text("属性")');
-    const panelVisible = await propertyPanel.isVisible().catch(() => false);
-
-    if (panelVisible) {
-        const typeSelect = propertyPanel.locator('select').first();
-        await typeSelect.selectOption('TASK');
-        await page.waitForTimeout(300);
-    }
-
-    return selectedNode;
-}
-
 test.describe('Knowledge Link & Recommendation (Story 2.8)', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/');

@@ -17,7 +17,6 @@ import {
     Database,
     Circle,
     Loader2,
-    Trash2,
     Package,
 } from 'lucide-react';
 import { NodeType, SearchResultItem } from '@cdm/types';
@@ -136,14 +135,6 @@ export function ArchiveDrawer({
     ), [archivedNodes, searchQuery]);
 
     // Selection Handlers
-    const handleSelectAll = () => {
-        if (selectedIds.size === filteredNodes.length && filteredNodes.length > 0) {
-            setSelectedIds(new Set());
-        } else {
-            setSelectedIds(new Set(filteredNodes.map(n => n.id)));
-        }
-    };
-
     const toggleSelect = (id: string) => {
         const next = new Set(selectedIds);
         if (next.has(id)) next.delete(id);

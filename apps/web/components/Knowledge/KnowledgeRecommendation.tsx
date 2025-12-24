@@ -78,7 +78,6 @@ export interface KnowledgeRecommendationProps {
 
 export function KnowledgeRecommendation({
     nodeId,
-    nodeTitle,
 }: KnowledgeRecommendationProps) {
     const { addToast } = useToast();
 

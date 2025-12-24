@@ -5,7 +5,8 @@
 
 import { Injectable } from '@nestjs/common';
 import { prisma, type Node, type NodeTask } from '@cdm/database';
-import type { ApprovalPipeline, Deliverable } from '@cdm/types';
+import type { ApprovalPipeline, Deliverable, EdgeMetadata } from '@cdm/types';
+import { isDependencyEdge } from '@cdm/types';
 
 export interface NodeWithApproval extends Omit<Node, 'approval'> {
     approval: ApprovalPipeline | null;
@@ -80,6 +81,9 @@ export class ApprovalRepository {
     /**
      * Find all dependency edges where source is the given node
      * Returns target node IDs of successor tasks
+     *
+     * Uses shared isDependencyEdge utility from @cdm/types (Story 2.2)
+     * to ensure consistent edge classification across frontend and backend.
      */
     async findDependencySuccessors(nodeId: string): Promise<Array<{ targetId: string; graphId: string }>> {
         const edges = await prisma.edge.findMany({
@@ -93,11 +97,11 @@ export class ApprovalRepository {
             },
         });
 
-        // Filter for dependency edges only
+        // Use shared utility from @cdm/types for consistent edge filtering
         return edges
             .filter((edge) => {
-                const metadata = edge.metadata as { kind?: string } | null;
-                return metadata?.kind === 'dependency';
+                const metadata = edge.metadata as EdgeMetadata | null;
+                return metadata && isDependencyEdge(metadata);
             })
             .map((edge) => ({
                 targetId: edge.targetId,
@@ -108,6 +112,9 @@ export class ApprovalRepository {
     /**
      * Find all dependency edges where target is the given node
      * Returns source node IDs (predecessors)
+     *
+     * Uses shared isDependencyEdge utility from @cdm/types (Story 2.2)
+     * to ensure consistent edge classification across frontend and backend.
      */
     async findDependencyPredecessors(nodeId: string): Promise<string[]> {
         const edges = await prisma.edge.findMany({
@@ -120,11 +127,11 @@ export class ApprovalRepository {
             },
         });
 
-        // Filter for dependency edges only
+        // Use shared utility from @cdm/types for consistent edge filtering
         return edges
             .filter((edge) => {
-                const metadata = edge.metadata as { kind?: string } | null;
-                return metadata?.kind === 'dependency';
+                const metadata = edge.metadata as EdgeMetadata | null;
+                return metadata && isDependencyEdge(metadata);
             })
             .map((edge) => edge.sourceId);
     }
@@ -153,5 +160,78 @@ export class ApprovalRepository {
             const approval = node.approval as ApprovalPipeline | null;
             return approval?.status === 'APPROVED';
         });
+    }
+
+    /**
+     * Story 4.1 FIX-10: Get node label by ID
+     */
+    async getNodeLabel(nodeId: string): Promise<string | null> {
+        const node = await prisma.node.findUnique({
+            where: { id: nodeId },
+            select: { label: true },
+        });
+        return node?.label ?? null;
+    }
+
+    /**
+     * Story 4.1 FIX-10: Get node with graphId
+     */
+    async getNodeWithGraph(nodeId: string): Promise<{ label: string; graphId: string } | null> {
+        const node = await prisma.node.findUnique({
+            where: { id: nodeId },
+            select: { label: true, graphId: true },
+        });
+        return node ?? null;
+    }
+
+    /**
+     * Story 4.1 FIX-10: Get user name by ID
+     */
+    async getUserName(userId: string): Promise<string | null> {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { name: true },
+        });
+        return user?.name ?? null;
+    }
+
+    /**
+     * Story 4.1 FIX-10: Get node with approval and assignee info for notification
+     */
+    async getNodeForNotification(nodeId: string): Promise<{
+        label: string;
+        graphId: string;
+        approval: ApprovalPipeline | null;
+        assigneeId: string | null;
+    } | null> {
+        const node = await prisma.node.findUnique({
+            where: { id: nodeId },
+            select: {
+                label: true,
+                graphId: true,
+                approval: true,
+                taskProps: { select: { assigneeId: true } },
+            },
+        });
+
+        if (!node) return null;
+
+        return {
+            label: node.label,
+            graphId: node.graphId,
+            approval: node.approval as ApprovalPipeline | null,
+            assigneeId: node.taskProps?.assigneeId ?? null,
+        };
+    }
+
+    /**
+     * Story 4.1 FIX-10: Get node type
+     */
+    async getNodeType(nodeId: string): Promise<string | null> {
+        const node = await prisma.node.findUnique({
+            where: { id: nodeId },
+            select: { type: true },
+        });
+        return node?.type ?? null;
     }
 }

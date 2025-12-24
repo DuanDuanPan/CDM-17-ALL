@@ -4,7 +4,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { prisma, type User } from '@cdm/database';
+import { prisma } from '@cdm/database';
 
 export interface UserSearchResult {
     id: string;
@@ -45,14 +45,26 @@ export class UsersService {
 
     /**
      * Search users by name or email
+     * Returns default list when query is empty
      */
     async search(q: string, limit = 20): Promise<UserSearchResult[]> {
-        if (!q || q.trim().length === 0) {
-            return [];
+        const keyword = q?.trim() || '';
+
+        // If no search keyword, return default user list
+        if (keyword.length === 0) {
+            const users = await prisma.user.findMany({
+                take: limit,
+                orderBy: { name: 'asc' },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                },
+            });
+            return users;
         }
 
-        const keyword = q.trim();
-
+        // Search by name or email
         const users = await prisma.user.findMany({
             where: {
                 OR: [

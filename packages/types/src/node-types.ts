@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { DeliverableSchema } from './approval';
 
 // Node Type Enum - matches Prisma schema
 export enum NodeType {
@@ -49,6 +50,9 @@ export interface TaskProps extends BaseNodeProps {
 
   // Story 2.8: Knowledge association
   knowledgeRefs?: KnowledgeReference[]; // 关联的知识资源列表
+
+  // Story 4.1: Approval deliverables (synced via Yjs for multi-client)
+  deliverables?: import('./approval').Deliverable[];
 }
 
 // Requirement Node Properties
@@ -187,6 +191,7 @@ export const NODE_PROP_KEYS_BY_TYPE: Record<NodeType, readonly string[]> = {
     'dispatchedAt',
     'feedbackAt',
     'knowledgeRefs', // Story 2.8: Knowledge association
+    'deliverables', // Story 4.1: Approval deliverables (synced via Yjs)
   ],
   [NodeType.REQUIREMENT]: ['reqType', 'acceptanceCriteria', 'priority'],
   [NodeType.PBS]: ['code', 'version', 'ownerId', 'indicators', 'productRef'],
@@ -252,6 +257,10 @@ export interface EnhancedNodeData {
   createdAt?: string;
   updatedAt?: string;
   creator?: string;  // Creator name (mocked until auth integration)
+
+  // Story 4.1: Approval Workflow
+  approval?: import('./approval').ApprovalPipeline | null;
+  deliverables?: import('./approval').Deliverable[];
 }
 
 // DTOs for API requests
@@ -349,6 +358,8 @@ export const TaskPropsSchema = z
     feedbackAt: z.string().nullable().optional(),
     // Story 2.8: Knowledge association
     knowledgeRefs: z.array(KnowledgeReferenceSchema).optional(),
+    // Story 4.1: Approval deliverables (synced via Yjs)
+    deliverables: z.array(DeliverableSchema).optional(),
   })
   .strict();
 
