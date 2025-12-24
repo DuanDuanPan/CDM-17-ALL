@@ -89,3 +89,6 @@ export * from './app-library';
 
 // Story 4.1: Export approval workflow types
 export * from './approval';
+
+// Story 4.3: Export comment types for contextual comments
+export * from './comment';

@@ -17,6 +17,9 @@ import { collabLogger as logger } from '@/lib/logger';
 import { useViewStore } from '@/features/views';
 import { ViewContainer } from '@/features/views';
 import { useCollaboration } from '@/hooks/useCollaboration';
+import { useCommentCount } from '@/hooks/useCommentCount';
+import { CommentPanel } from '@/components/Comments';
+import { CommentCountContext } from '@/contexts/CommentCountContext';
 import {
     STORAGE_KEY_LAYOUT_MODE,
     STORAGE_KEY_GRID_ENABLED,
@@ -54,6 +57,9 @@ function GraphPageContent() {
     const [layoutMode, setLayoutMode] = useState<LayoutMode>('mindmap');
     const [gridEnabled, setGridEnabled] = useState(false);
     const [isDependencyMode, setIsDependencyMode] = useState(false);
+    // Story 4.3: Comment panel state
+    const [commentNodeId, setCommentNodeId] = useState<string | null>(null);
+    const [commentNodeLabel, setCommentNodeLabel] = useState<string>('');
 
     // 使用URL参数的userId构建用户对象
     const CURRENT_USER = {
@@ -71,6 +77,13 @@ function GraphPageContent() {
         graphId,
         user: CURRENT_USER,
         wsUrl: process.env.NEXT_PUBLIC_COLLAB_WS_URL || 'ws://localhost:1234',
+    });
+
+    // HIGH-5 Fix: Use comment count hook to track unread comments
+    const { unreadCounts, getUnreadCount, refresh: refreshCommentCounts } = useCommentCount({
+        mindmapId: graphId,
+        userId,
+        pollInterval: 30000, // Refresh every 30 seconds
     });
 
     // Restore state from localStorage on client mount
@@ -121,61 +134,100 @@ function GraphPageContent() {
         logger.debug('Find user', { userId: clickedUserId });
     }, []);
 
+    // Story 4.3: Handle opening comments for a node
+    const handleOpenComments = useCallback((nodeId: string, nodeLabel: string) => {
+        setCommentNodeId(nodeId);
+        setCommentNodeLabel(nodeLabel);
+    }, []);
+
+    const handleCloseComments = useCallback(() => {
+        setCommentNodeId(null);
+        setCommentNodeLabel('');
+    }, []);
+
+    // Story 4.3: Listen for custom event to open comments
+    useEffect(() => {
+        const handleCommentEvent = (event: Event) => {
+            const customEvent = event as CustomEvent<{ nodeId: string; nodeLabel: string }>;
+            handleOpenComments(customEvent.detail.nodeId, customEvent.detail.nodeLabel);
+        };
+        window.addEventListener('mindmap:open-comments', handleCommentEvent);
+        return () => {
+            window.removeEventListener('mindmap:open-comments', handleCommentEvent);
+        };
+    }, [handleOpenComments]);
+
+
     return (
         <CollaborationUIProvider
             onUserHoverExternal={handleUserHover}
             onUserClickExternal={handleUserClick}
         >
-            <GraphProvider graph={graph} graphId={graphId} yDoc={collab.yDoc} onNodeSelect={handleNodeSelect}>
-                <div className="flex flex-col h-screen">
-                    <TopBar
-                        userId={userId} // Story 2.4: Pass current user for notifications
-                        projectName="CDM图谱"
-                        currentLayout={layoutMode}
-                        onLayoutChange={handleLayoutChange}
-                        onGridToggle={handleGridToggle}
-                        gridEnabled={gridEnabled}
-                        isLoading={isLayoutLoading}
-                        viewMode={viewMode}
-                        onViewModeChange={setViewMode}
-                    />
-
-                    <div className="flex flex-1 overflow-hidden">
-                        <LeftSidebar
-                            isDependencyMode={isDependencyMode}
-                            onDependencyModeToggle={handleDependencyModeToggle}
+            {/* HIGH-5 Fix: Provide comment counts to all child components */}
+            <CommentCountContext.Provider value={{ unreadCounts, getUnreadCount, refresh: refreshCommentCounts }}>
+                <GraphProvider graph={graph} graphId={graphId} yDoc={collab.yDoc} onNodeSelect={handleNodeSelect}>
+                    <div className="flex flex-col h-screen">
+                        <TopBar
+                            userId={userId} // Story 2.4: Pass current user for notifications
+                            projectName="CDM图谱"
+                            currentLayout={layoutMode}
+                            onLayoutChange={handleLayoutChange}
+                            onGridToggle={handleGridToggle}
+                            gridEnabled={gridEnabled}
+                            isLoading={isLayoutLoading}
+                            viewMode={viewMode}
+                            onViewModeChange={setViewMode}
                         />
 
-                        <main className="flex-1 relative overflow-hidden">
-                            <ViewContainer
-                                graphId={graphId}
-                                user={CURRENT_USER}
-                                collaboration={collab}
-                                onNodeSelect={handleNodeSelect}
-                                onLayoutChange={handleLayoutChange}
-                                onGridToggle={handleGridToggle}
-                                currentLayout={layoutMode}
-                                gridEnabled={gridEnabled}
-                                onGraphReady={setGraph}
+                        <div className="flex flex-1 overflow-hidden">
+                            <LeftSidebar
                                 isDependencyMode={isDependencyMode}
-                                onExitDependencyMode={() => setIsDependencyMode(false)}
+                                onDependencyModeToggle={handleDependencyModeToggle}
                             />
-                        </main>
 
-                        <RightSidebar
-                            selectedNodeId={selectedNodeId}
-                            graph={graph}
-                            graphId={graphId}
-                            yDoc={collab.yDoc}
-                            creatorName={CURRENT_USER.name}
-                            onClose={handleClosePanel}
-                        />
-                    </div>
-                </div>
-            </GraphProvider>
-        </CollaborationUIProvider>
-    );
-}
+                            <main className="flex-1 relative overflow-hidden">
+                                <ViewContainer
+                                    graphId={graphId}
+                                    user={CURRENT_USER}
+                                    collaboration={collab}
+                                    onNodeSelect={handleNodeSelect}
+                                    onLayoutChange={handleLayoutChange}
+                                    onGridToggle={handleGridToggle}
+                                    currentLayout={layoutMode}
+                                    gridEnabled={gridEnabled}
+                                    onGraphReady={setGraph}
+                                    isDependencyMode={isDependencyMode}
+                                    onExitDependencyMode={() => setIsDependencyMode(false)}
+                                />
+                            </main>
+
+                            <RightSidebar
+                                selectedNodeId={selectedNodeId}
+                                graph={graph}
+                                graphId={graphId}
+                                yDoc={collab.yDoc}
+                                creatorName={CURRENT_USER.name}
+                                onClose={handleClosePanel}
+                            />
+                        </div>
+
+                        {/* Story 4.3: Comment Panel */}
+                        {commentNodeId && (
+                            <CommentPanel
+                                nodeId={commentNodeId}
+                                nodeLabel={commentNodeLabel}
+                                mindmapId={graphId}
+                                userId={userId}
+                                onClose={handleCloseComments}
+                                onMarkAsRead={refreshCommentCounts}
+                            />
+	                        )}
+	                    </div>
+	                </GraphProvider>
+	            </CommentCountContext.Provider>
+	        </CollaborationUIProvider>
+	    );
+	}
 
 export default function GraphPage() {
     return (

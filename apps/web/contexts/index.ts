@@ -33,3 +33,11 @@ export {
 } from './UserContext';
 
 export type { CurrentUser, UserProviderProps } from './UserContext';
+
+// Story 4.3: Comment count context for unread indicators
+export {
+    CommentCountContext,
+    useCommentCountContext,
+} from './CommentCountContext';
+
+export type { CommentCountContextType } from './CommentCountContext';

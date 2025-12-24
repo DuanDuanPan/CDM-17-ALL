@@ -5,7 +5,7 @@
 
 'use client';
 
-import { CheckCircle, XCircle, Send, RefreshCw, CheckCheck, X } from 'lucide-react';
+import { CheckCircle, XCircle, Send, RefreshCw, CheckCheck, X, AtSign } from 'lucide-react';
 import type { Notification, NotificationContent } from '@cdm/types';
 
 export interface NotificationListProps {
@@ -54,6 +54,9 @@ export function NotificationList({
         return <CheckCircle className="w-4 h-4 text-green-600" />;
       case 'TASK_REJECTED':
         return <XCircle className="w-4 h-4 text-red-600" />;
+      case 'MENTION':
+        // Story 4.3: @mention notification icon
+        return <AtSign className="w-4 h-4 text-purple-600" />;
       default:
         return <Send className="w-4 h-4 text-gray-600" />;
     }
@@ -174,9 +177,28 @@ function NotificationItem({
       onMarkAsRead(notification.id);
     }
 
-    // 2. Navigate to the related node (if refNodeId exists)
-    if (notification.refNodeId && onNavigate) {
-      onNavigate(notification.refNodeId);
+    const mentionNodeId =
+      notification.type === 'MENTION' && 'nodeId' in content
+        ? (content as { nodeId: string }).nodeId
+        : undefined;
+
+    const targetNodeId = notification.refNodeId || mentionNodeId;
+
+    // 2. Navigate to the related node (if any)
+    if (targetNodeId && onNavigate) {
+      onNavigate(targetNodeId);
+    }
+
+    // Story 4.3: Open CommentPanel when clicking a MENTION notification
+    if (notification.type === 'MENTION' && targetNodeId) {
+      const nodeLabel =
+        'nodeName' in content ? (content as { nodeName: string }).nodeName : '节点';
+
+      window.dispatchEvent(
+        new CustomEvent('mindmap:open-comments', {
+          detail: { nodeId: targetNodeId, nodeLabel },
+        })
+      );
     }
 
     // 3. Close the notification panel
@@ -207,24 +229,35 @@ function NotificationItem({
           </div>
 
           <p className="text-xs text-gray-600 mb-1 leading-relaxed">
-            {content.action === 'dispatch' && (
+            {/* Story 4.3: Handle MENTION notifications separately */}
+            {notification.type === 'MENTION' && 'preview' in content && (
+              <>
+                <span className="font-medium">{(content as { senderName: string }).senderName}</span> 在「
+                {(content as { nodeName: string }).nodeName}」中提到了您：
+                <span className="block mt-1 text-gray-500 italic truncate">
+                  {(content as { preview: string }).preview}
+                </span>
+              </>
+            )}
+            {/* Task Dispatch notifications */}
+            {'action' in content && content.action === 'dispatch' && (
               <>
                 <span className="font-medium">{content.senderName}</span> 派发了任务「
-                {content.taskName}」给您
+                {(content as { taskName: string }).taskName}」给您
               </>
             )}
-            {content.action === 'accept' && (
+            {'action' in content && content.action === 'accept' && (
               <>
                 <span className="font-medium">{content.senderName}</span> 已接受任务「
-                {content.taskName}」
+                {(content as { taskName: string }).taskName}」
               </>
             )}
-            {content.action === 'reject' && (
+            {'action' in content && content.action === 'reject' && (
               <>
                 <span className="font-medium">{content.senderName}</span> 驳回了任务「
-                {content.taskName}」
-                {content.reason && (
-                  <span className="block mt-1 text-red-600">理由: {content.reason}</span>
+                {(content as { taskName: string }).taskName}」
+                {'reason' in content && content.reason && (
+                  <span className="block mt-1 text-red-600">理由: {content.reason as string}</span>
                 )}
               </>
             )}

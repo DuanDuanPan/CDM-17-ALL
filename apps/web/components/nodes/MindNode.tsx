@@ -14,10 +14,12 @@ import {
   Grid3X3, // Story 2.9: APP node icon
   Play, // Story 2.9: APP execution
   Loader2, // Story 2.9: APP running state
+  MessageSquare, // Story 4.3: Comments
 } from 'lucide-react';
 import { NodeType, type TaskProps, type RequirementProps, type PBSProps, type DataProps, type AppProps, type AppOutput, type AppExecutionStatus, type ApprovalStatus, type ApprovalPipeline } from '@cdm/types';
 import type { MindNodeData } from '@cdm/types';
 import { updateNode, updateNodeProps } from '@/lib/api/nodes';
+import { useCommentCountContext } from '@/contexts';
 // Rich Node UI components
 import { RichNodeLayout } from './rich/RichNodeLayout';
 import { TitleRow } from './rich/TitleRow';
@@ -188,6 +190,10 @@ export function MindNode({ node }: MindNodeProps) {
   const [tags, setTags] = useState<string[]>(() => getData().tags ?? []);
   // Story 2.9: Local-only execution state (do not sync running status)
   const [appRunning, setAppRunning] = useState(false);
+
+  // Story 4.3: Unread comment indicator (AC4)
+  const { getUnreadCount } = useCommentCountContext();
+  const unreadCount = getUnreadCount(node.id);
 
   // Sync state with node data
   useEffect(() => {
@@ -489,6 +495,23 @@ export function MindNode({ node }: MindNodeProps) {
     [appRunning, getData, node]
   );
 
+  // Story 4.3: Open comments panel
+  const handleOpenComments = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const el = containerRef.current;
+      if (el) {
+        // Dispatch custom event to open comments panel
+        window.dispatchEvent(
+          new CustomEvent('mindmap:open-comments', {
+            detail: { nodeId: node.id, nodeLabel: label },
+          })
+        );
+      }
+    },
+    [node.id, label]
+  );
+
   /* 
     Story 4.1: Enhanced Visualization Strategy
     If approval decoration exists, it overrides the default border color and bg color.
@@ -652,6 +675,20 @@ export function MindNode({ node }: MindNodeProps) {
                     <span>启动</span>
                   </button>
                 )}
+
+                {/* Story 4.3: Comments Button */}
+                <button
+                  onClick={handleOpenComments}
+                  className="relative inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-medium 
+	                    text-gray-500 hover:bg-gray-100 hover:text-blue-600 transition-colors"
+                  title="查看评论"
+                >
+                  <MessageSquare className="w-3 h-3" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
+                  )}
+                </button>
+
                 <span className="text-[10px] text-gray-400 font-mono">{node.id.slice(0, 6)}</span>
               </>
             }
@@ -837,6 +874,20 @@ export function MindNode({ node }: MindNodeProps) {
               <span>启动</span>
             </button>
           )}
+
+          {/* Story 4.3: Comments Button for Legacy Nodes */}
+          <button
+            onClick={handleOpenComments}
+            className="relative inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] 
+	              text-gray-400 hover:bg-gray-100 hover:text-blue-600 transition-colors"
+            title="查看评论"
+          >
+            <MessageSquare className="w-3 h-3" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
+            )}
+          </button>
+
           <span className="text-[9px] font-mono text-gray-400">{node.id.slice(0, 6).toUpperCase()}</span>
           {nodeType === NodeType.DATA && <Lock className="w-2.5 h-2.5 text-gray-300" />}
         </div>

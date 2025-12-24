@@ -31,6 +31,10 @@ model User {
 
   projects      Project[]
   notifications Notification[] // Story 2.4: Task dispatch notifications
+  
+  // Story 4.3: Contextual Comments
+  comments      Comment[]
+  commentReads  CommentRead[]
 }
 
 model Project {
@@ -57,8 +61,11 @@ model Graph {
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  nodes Node[]
-  edges Edge[]
+  nodes    Node[]
+  edges    Edge[]
+  
+  // Story 4.3: Contextual Comments
+  comments Comment[]
 }
 
 model Node {
@@ -97,6 +104,9 @@ model Node {
   pbsProps         NodePBS?
   dataProps        NodeData?
   appProps         NodeApp? // Story 2.9: APP 节点属性
+
+  // Story 4.3: Contextual Comments
+  comments  Comment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -238,4 +248,45 @@ model Notification {
 
   @@index([recipientId, isRead])
   @@index([recipientId, createdAt])
+}
+
+// Story 4.3: Comment Model for Contextual Comments
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  
+  // Relations
+  nodeId    String
+  node      Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  
+  mindmapId String
+  mindmap   Graph    @relation(fields: [mindmapId], references: [id], onDelete: Cascade)
+  
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  
+  // Threading (max 2 levels in UI)
+  replyToId String?
+  replyTo   Comment? @relation("CommentThread", fields: [replyToId], references: [id])
+  replies   Comment[] @relation("CommentThread")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([nodeId])
+  @@index([mindmapId])
+  @@index([authorId])
+}
+
+// Story 4.3: CommentRead Model for tracking unread state
+model CommentRead {
+  id         String   @id @default(cuid())
+  userId     String
+  nodeId     String
+  lastReadAt DateTime @default(now())
+  
+  user       User     @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, nodeId])
+  @@index([nodeId])
 }

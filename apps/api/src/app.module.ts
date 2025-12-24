@@ -14,6 +14,7 @@ import { AppLibraryModule } from './modules/app-library'; // Story 2.9
 import { ApprovalModule } from './modules/approval'; // Story 4.1
 import { UsersModule } from './modules/users'; // Story 4.1
 import { FileModule } from './modules/file/file.module'; // Story 4.1: FIX-11
+import { CommentsModule } from './modules/comments'; // Story 4.3: Contextual Comments
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { FileModule } from './modules/file/file.module'; // Story 4.1: FIX-11
     ApprovalModule, // Story 4.1: Approval driven workflow
     UsersModule, // Story 4.1: User selector API
     FileModule, // Story 4.1: FIX-11 - File upload for deliverables
+    CommentsModule, // Story 4.3: Contextual Comments & Mentions
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -8,13 +8,15 @@ import { z } from 'zod';
 
 // Notification Type Enum
 // Story 4.1: Added approval workflow notification types
+// Story 4.3: Added MENTION notification type
 export type NotificationType =
   | 'TASK_DISPATCH'
   | 'TASK_ACCEPTED'
   | 'TASK_REJECTED'
   | 'APPROVAL_REQUESTED'   // Story 4.1: New
   | 'APPROVAL_APPROVED'    // Story 4.1: New
-  | 'APPROVAL_REJECTED';   // Story 4.1: New
+  | 'APPROVAL_REJECTED'    // Story 4.1: New
+  | 'MENTION';             // Story 4.3: Contextual Comments
 
 // Base Notification Content (JSON payload for task notifications)
 export interface TaskNotificationContent {
@@ -36,8 +38,18 @@ export interface ApprovalNotificationContent {
   reason?: string;          // 仅 rejection 时有值
 }
 
+// Story 4.3: Mention Notification Content
+export interface MentionNotificationContent {
+  commentId: string;
+  nodeId: string;
+  nodeName: string;
+  preview: string;      // First 100 chars of comment
+  senderName: string;
+  mindmapId: string;
+}
+
 // Union type for all notification content types
-export type NotificationContent = TaskNotificationContent | ApprovalNotificationContent;
+export type NotificationContent = TaskNotificationContent | ApprovalNotificationContent | MentionNotificationContent;
 
 // Notification Entity
 export interface Notification {
@@ -71,9 +83,20 @@ export const ApprovalNotificationContentSchema = z.object({
   reason: z.string().optional(),
 });
 
+// Story 4.3: Mention Notification Content Schema
+export const MentionNotificationContentSchema = z.object({
+  commentId: z.string(),
+  nodeId: z.string(),
+  nodeName: z.string(),
+  preview: z.string(),
+  senderName: z.string(),
+  mindmapId: z.string(),
+});
+
 export const NotificationContentSchema = z.union([
   TaskNotificationContentSchema,
   ApprovalNotificationContentSchema,
+  MentionNotificationContentSchema,
 ]);
 
 export const NotificationSchema = z.object({
@@ -84,6 +107,7 @@ export const NotificationSchema = z.object({
     'APPROVAL_REQUESTED',
     'APPROVAL_APPROVED',
     'APPROVAL_REJECTED',
+    'MENTION',
   ]),
   title: z.string(),
   content: NotificationContentSchema,
