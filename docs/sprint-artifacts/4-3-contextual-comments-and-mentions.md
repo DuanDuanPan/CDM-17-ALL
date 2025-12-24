@@ -1,6 +1,6 @@
 # Story 4.3: Contextual Comments & Mentions
 
-Status: in-progress
+Status: completed
 
 ## Story
 
@@ -692,23 +692,23 @@ apps/web/hooks/
 
 #### 🔴 关键/高危问题 (CRITICAL/HIGH - 必须修复)
 
-- [ ] [AI-Review][CRITICAL-1] **迁移文件不存在** - Story 标记任务 1.2 已完成但 `prisma/migrations/` 中无 `add_comments_system` 目录，需运行迁移并提交 `[packages/database/prisma/migrations/]`
-- [ ] [AI-Review][HIGH-2] **权限校验形同虚设** - `assertNodeReadAccess()` 永远放行 (只有 logger.debug 无 throw)；`getUnreadCounts/markAsRead` 完全无权限检查 `[comments.service.ts:118-146, comments.controller.ts:83-97]`
-- [ ] [AI-Review][HIGH-3] **AC3 实时同步基本不可用** - 客户端发 `join mindmap:${id}` 但 CommentsGateway 无 `@SubscribeMessage('join')` 处理，也无 CORS 配置，room 广播无人接收 `[comments.gateway.ts:15, useComments.ts:194]`
-- [ ] [AI-Review][HIGH-4] **@提及在中文/空格用户名下必坏** - 前端插入 `@${displayName}` 但解析 regex `\w` 只支持字母数字，不匹配中文；UI 高亮同样问题 `[CommentInput.tsx:100, mention.util.ts:13, CommentItem.tsx:40]`
-- [ ] [AI-Review][HIGH-5] **AC4 未读红点完全未实现** - `useCommentCount` 从未被任何组件 import 使用；`CommentPanel.onMarkAsRead` 未从 page.tsx 传入 `[useCommentCount.ts, page.tsx:205-211]`
-- [ ] [AI-Review][HIGH-6] **TypeScript import 错误** - `import type { COMMENT_SOCKET_EVENTS }` 把 const 当 type 导入 (虽不崩溃但应修正) `[useComments.ts:9]`
-- [ ] [AI-Review][HIGH-7] **P0 关键测试缺失** - 仅有 mention.util 单测，安全 gate 未满足 `[__tests__/, story:621]`
+- [x] [AI-Review][CRITICAL-1] **迁移文件不存在** - Story 标记任务 1.2 已完成但 `prisma/migrations/` 中无 `add_comments_system` 目录，需运行迁移并提交 `[packages/database/prisma/migrations/]`
+- [x] [AI-Review][HIGH-2] **权限校验形同虚设** - `assertNodeReadAccess()` 永远放行 (只有 logger.debug 无 throw)；`getUnreadCounts/markAsRead` 完全无权限检查 `[comments.service.ts:118-146, comments.controller.ts:83-97]`
+- [x] [AI-Review][HIGH-3] **AC3 实时同步基本不可用** - 客户端发 `join mindmap:${id}` 但 CommentsGateway 无 `@SubscribeMessage('join')` 处理，也无 CORS 配置，room 广播无人接收 `[comments.gateway.ts:15, useComments.ts:194]`
+- [x] [AI-Review][HIGH-4] **@提及在中文/空格用户名下必坏** - 前端插入 `@${displayName}` 但解析 regex `\w` 只支持字母数字，不匹配中文；UI 高亮同样问题 `[CommentInput.tsx:100, mention.util.ts:13, CommentItem.tsx:40]`
+- [x] [AI-Review][HIGH-5] **AC4 未读红点完全未实现** - `useCommentCount` 从未被任何组件 import 使用；`CommentPanel.onMarkAsRead` 未从 page.tsx 传入 `[useCommentCount.ts, page.tsx:205-211]`
+- [x] [AI-Review][HIGH-6] **TypeScript import 错误** - `import type { COMMENT_SOCKET_EVENTS }` 把 const 当 type 导入 (虽不崩溃但应修正) `[useComments.ts:9]`
+- [x] [AI-Review][HIGH-7] **P0 关键测试缺失** - 仅有 mention.util 单测，安全 gate 未满足 `[__tests__/, story:621]`
 
 #### 🟡 中危问题 (MEDIUM - 应该修复)
 
-- [ ] [AI-Review][MEDIUM-1] **未读计数 N+1 查询** - `getUnreadCounts()` 循环内对每个 node 执行 `prisma.comment.count()`，性能问题 `[comments.repository.ts:140-153]`
-- [ ] [AI-Review][MEDIUM-2] **replyToId 数据一致性未校验** - 创建评论不校验 reply 是否同 node/mindmap，可导致 thread 串线 `[comments.service.ts:46-52]`
-- [ ] [AI-Review][MEDIUM-3] **MENTION 通知点击后未打开评论面板** - 导航到节点但不触发 CommentPanel 打开 `[NotificationList.tsx:180-186]`
+- [x] [AI-Review][MEDIUM-1] **未读计数 N+1 查询** - `getUnreadCounts()` 循环内对每个 node 执行 `prisma.comment.count()`，性能问题 `[comments.repository.ts:140-153]`
+- [x] [AI-Review][MEDIUM-2] **replyToId 数据一致性未校验** - 创建评论不校验 reply 是否同 node/mindmap，可导致 thread 串线 `[comments.service.ts:46-52]`
+- [x] [AI-Review][MEDIUM-3] **MENTION 通知点击后未打开评论面板** - 导航到节点但不触发 CommentPanel 打开 `[NotificationList.tsx:180-186]`
 
 #### 🟢 低危问题 (LOW - 建议修复)
 
-- [ ] [AI-Review][LOW-1] **配置/风格不一致** - `NEXT_PUBLIC_API_URL` vs `NEXT_PUBLIC_API_BASE_URL`；`useComments.ts:193` 残留 console.log `[CommentInput.tsx:27, useComments.ts:11,193]`
+- [x] [AI-Review][LOW-1] **配置/风格不一致** - `NEXT_PUBLIC_API_URL` vs `NEXT_PUBLIC_API_BASE_URL`；`useComments.ts:193` 残留 console.log `[CommentInput.tsx:27, useComments.ts:11,193]`
 
 ---
 
@@ -718,4 +718,5 @@ apps/web/hooks/
 - **2025-12-24**: Quality validation applied - added 7 critical fixes, 5 enhancements, 3 optimizations
 - **2025-12-24 20:51**: **[AI Code Review]** 对抗性代码审查完成，发现 6 个高危、4 个中危、3 个低危问题。主要问题：AC 4 未读指示器未实现、权限校验形同虚设、关键测试缺失。已创建 13 个待办事项。
 - **2025-12-24 21:20**: **[AI Code Review - 二次验证]** 根据用户反馈进行深度验证，确认 10 个问题全部属实。新增发现：实时同步 Gateway 缺 join handler、中文提及 regex 不支持、未读计数 N+1 查询、replyToId 未校验一致性。更新待办事项为 7 HIGH + 3 MEDIUM + 1 LOW。
+- **2025-12-24 22:15**: **[Implementation Complete]** 修复了所有 Code Review 问题 (High/Medium/Low)，包括权限校验、实时同步、@提及支持、未读指示器等。所有 AC 已满足。
 
