@@ -35,9 +35,9 @@ export class ApprovalListener {
 
         try {
             // Story 4.1 FIX-10: Use Repository pattern for data access
-            const nodeLabel = await this.approvalRepo.getNodeLabel(event.nodeId);
+            const nodeInfo = await this.approvalRepo.getNodeForNotification(event.nodeId);
 
-            if (!nodeLabel) {
+            if (!nodeInfo) {
                 this.logger.warn(`Node ${event.nodeId} not found for notification`);
                 return;
             }
@@ -48,16 +48,21 @@ export class ApprovalListener {
             await this.notificationService.createAndNotify({
                 recipientId: event.approverId,
                 type: 'APPROVAL_REQUESTED',
-                title: `需要您审批: ${nodeLabel}`,
+                title: `需要您审批: ${nodeInfo.label}`,
                 content: {
                     nodeId: event.nodeId,
-                    nodeName: nodeLabel,
+                    nodeName: nodeInfo.label,
                     action: 'approval_requested',
                     senderName: requesterName || 'Unknown User',
                     stepIndex: event.stepIndex,
                 },
                 refNodeId: event.nodeId,
             });
+
+            // Story 4.1: Sync approval status (PENDING / step transitions) to Yjs for real-time node header updates
+            if (nodeInfo.approval) {
+                await this.syncApprovalToYjs(event.nodeId, nodeInfo.graphId, nodeInfo.approval);
+            }
         } catch (error) {
             this.logger.error(`Failed to send approval requested notification: ${error}`);
         }
@@ -131,10 +136,7 @@ export class ApprovalListener {
 
             // Story 4.1 FIX-3: Sync approval status to Yjs for real-time client updates
             if (nodeInfo.approval) {
-                await this.syncApprovalToYjs(
-                    event.nodeId,
-                    nodeInfo.approval as unknown as ApprovalPipeline
-                );
+                await this.syncApprovalToYjs(event.nodeId, nodeInfo.graphId, nodeInfo.approval as unknown as ApprovalPipeline);
             }
 
             // If approved, unlock dependent tasks
@@ -193,23 +195,15 @@ export class ApprovalListener {
      * Story 4.1 FIX-3: Sync approval status to Yjs for real-time client updates
      * Updates the node's approval field in the active Yjs document
      */
-    private async syncApprovalToYjs(nodeId: string, approval: ApprovalPipeline): Promise<void> {
+    private async syncApprovalToYjs(nodeId: string, graphId: string, approval: ApprovalPipeline): Promise<void> {
         try {
-            // Story 4.1 FIX-10: Use Repository pattern for data access
-            const nodeInfo = await this.approvalRepo.getNodeWithGraph(nodeId);
-
-            if (!nodeInfo?.graphId) {
-                this.logger.warn(`Cannot sync to Yjs: node ${nodeId} has no graphId`);
-                return;
-            }
-
             const server = this.collabService.getServer();
             if (!server) {
                 this.logger.warn('Hocuspocus server not available for Yjs sync');
                 return;
             }
 
-            const documentName = `graph:${nodeInfo.graphId}`;
+            const documentName = `graph:${graphId}`;
             const documents = (server as unknown as { documents?: Map<string, YDoc> }).documents;
 
             if (!documents || !documents.has(documentName)) {

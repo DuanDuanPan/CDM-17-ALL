@@ -7,6 +7,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   AppProps, // Story 2.9
+  type ApprovalPipeline,
   DataProps,
   NodeResponse,
   NodeType,
@@ -183,6 +184,7 @@ export class NodesService {
       updatedAt: node.updatedAt.toISOString(),
       creator: (node as { creatorName?: string }).creatorName || DEFAULT_CREATOR_NAME,
       props,
+      approval: (node as { approval?: unknown }).approval as ApprovalPipeline | null,
       // Story 2.5: Tags & Archive support
       tags: (node as { tags?: string[] }).tags ?? [],
       isArchived: (node as { isArchived?: boolean }).isArchived ?? false,

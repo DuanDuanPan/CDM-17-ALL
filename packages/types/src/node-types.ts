@@ -316,6 +316,8 @@ export interface NodeResponse {
   updatedAt: string;
   creator: string;
   props: NodeProps;
+  // Story 4.1: Approval Workflow (stored on Node.approval in DB)
+  approval?: import('./approval').ApprovalPipeline | null;
   // Story 2.5: Tags & Archive support
   tags?: string[];
   isArchived?: boolean;

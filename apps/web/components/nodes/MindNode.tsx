@@ -18,6 +18,12 @@ import {
 import { NodeType, type TaskProps, type RequirementProps, type PBSProps, type DataProps, type AppProps, type AppOutput, type AppExecutionStatus, type ApprovalStatus, type ApprovalPipeline } from '@cdm/types';
 import type { MindNodeData } from '@cdm/types';
 import { updateNode, updateNodeProps } from '@/lib/api/nodes';
+// Rich Node UI components
+import { RichNodeLayout } from './rich/RichNodeLayout';
+import { TitleRow } from './rich/TitleRow';
+import { MetricsRow } from './rich/MetricsRow';
+import { HangingPill } from './rich/HangingPill';
+import { Footer, getNodeRenderer } from './rich'; // Kept from original as getNodeRenderer is used
 
 type MindNodeOperation = 'addChild' | 'addSibling';
 
@@ -133,9 +139,9 @@ const getApprovalDecoration = (approvalStatus: ApprovalStatus | undefined) => {
   switch (approvalStatus) {
     case 'PENDING':
       return {
-        // 审批中: 蓝色虚线边框 + 微弱蓝底
-        containerClass: 'border-2 border-dashed border-blue-400 bg-blue-50/30',
-        badgeClass: 'bg-blue-100 text-blue-700',
+        // 审批中: 橙黄色条纹 Header（由 RichNodeLayout 控制） + 同色系徽标
+        containerClass: 'border-2 border-dashed border-amber-400 bg-amber-50/30',
+        badgeClass: 'bg-amber-100 text-amber-800',
         badgeText: '待审批',
       };
     case 'APPROVED':
@@ -229,6 +235,7 @@ export function MindNode({ node }: MindNodeProps) {
   // Note: approval is stored at Node level (data.approval), NOT in data.props
   const approval = data.approval as ApprovalPipeline | undefined;
   const approvalStatus = approval?.status;
+
   const approvalDecoration = getApprovalDecoration(approvalStatus);
 
   // Dynamic pills based on props
@@ -269,43 +276,44 @@ export function MindNode({ node }: MindNodeProps) {
   // Auto-resize logic - OPTIMIZED FOR FIXED WIDTH
   useLayoutEffect(() => {
     // Force fixed width for ALL nodes to ensure grid alignment
-    // Height is dynamic based on content but we try to keep it minimal
-    const currentSize = node.getSize();
+    if (!containerRef.current || !node) return;
 
-    // Calculate required height based on content or use defaults
-    // Note: We don't actually measure DOM here anymore for strict compactness
-    // unless editing. For view mode, we trust CSS content flow.
-    // However, X6 needs explicit size.
+    const container = containerRef.current;
+    const { width, height } = container.getBoundingClientRect();
 
-    const titleEl = titleMeasureRef.current;
+    const renderer = getNodeRenderer(nodeType);
 
-    // Base height calculation
-    let targetHeight = 40; // Default for ordinary
+    if (renderer) {
+      // Rich Node (PBS, Task, Requirement, App, Data): Fixed 240px width
+      const RICH_NODE_WIDTH = 240;
+      const minHeight = 100;
+      const newHeight = Math.max(height + 8, minHeight); // +8 for padding buffer
 
-    if (nodeType !== NodeType.ORDINARY) {
-      // Calculation for Card Nodes
-      // Header (24) + Body (Text) + Footer (24) + Padding (16)
-      // Approx minimal height = 64px
-      targetHeight = 64;
-
-      if (description) {
-        targetHeight += 16; // Add space for 1 line of description
+      // Only resize if dimensions actually changed (prevent layout thrashing)
+      const currentSize = node.getSize();
+      if (currentSize.width !== RICH_NODE_WIDTH || Math.abs(currentSize.height - newHeight) > 2) {
+        node.resize(RICH_NODE_WIDTH, newHeight);
       }
     } else {
-      // Ordinary node
-      targetHeight = 36;
-    }
+      // Legacy nodes (ORDINARY): Keep existing logic
+      const newWidth = nodeType === NodeType.ORDINARY ? width : Math.max(width, 180);
+      const newHeight = Math.max(height, nodeType === NodeType.ORDINARY ? 40 : 80);
 
-    // If editing, let it grow
-    if (isEditing && descMeasureRef.current && titleEl) {
-      targetHeight = Math.max(targetHeight, titleEl.scrollHeight + descMeasureRef.current.scrollHeight + 32);
+      const currentSize = node.getSize();
+      if (Math.abs(currentSize.width - newWidth) > 2 || Math.abs(currentSize.height - newHeight) > 2) {
+        node.resize(newWidth, newHeight);
+      }
     }
-
-    if (currentSize.width !== NODE_WIDTH || Math.abs(currentSize.height - targetHeight) > 2) {
-      node.resize(NODE_WIDTH, targetHeight);
-    }
-  }, [node, label, description, isEditing, nodeType]);
-
+  }, [
+    node,
+    label,
+    description,
+    tags,
+    nodeType,
+    isTaskDone,
+    approvalDecoration,
+    // Don't include renderer itself to avoid infinite loops
+  ]);
 
   const focusGraphContainer = useCallback(() => {
     // Ensure browse-mode shortcuts (Enter/Tab) keep working after commit/cancel.
@@ -393,7 +401,6 @@ export function MindNode({ node }: MindNodeProps) {
       if (el) dispatchNodeOperation(el, 'addChild', node.id);
       // We don't strictly need to focus graph container here because the new node will take focus?
       // Actually, AddChildCommand creates a new node which auto-focuses.
-      // However, if for some reason it fails, we should return focus.
       // But wait, if we focus container, and then new node mounts and steals focus, that's fine.
       focusGraphContainer();
     }
@@ -532,7 +539,137 @@ export function MindNode({ node }: MindNodeProps) {
     );
   }
 
-  // 2. CARD NODE RENDERING (Task, Req, PBS, Data)
+  // 2. RICH NODE RENDERING (PBS, Task) - NEW UI
+  const renderer = getNodeRenderer(nodeType);
+  if (renderer) {
+    const headerColor = renderer.getHeaderColor(approvalStatus);
+    const headerPattern = renderer.getHeaderPattern(approvalStatus);
+    const metricsContent = renderer.renderMetrics(data);
+
+    // Get rejection reason if status is REJECTED
+    const rejectionReason = approvalStatus === 'REJECTED'
+      ? (approval?.history?.find(h => h.action === 'rejected')?.reason || '未提供驳回原因')
+      : null;
+
+    return (
+      <div ref={containerRef}>
+        <RichNodeLayout
+          headerColor={headerColor}
+          headerPattern={headerPattern}
+          isSelected={isSelected}
+          nodeType={nodeType}
+          onDoubleClick={startEditing}
+          hangingPill={rejectionReason ? <HangingPill reason={rejectionReason} /> : undefined}
+        >
+          <TitleRow
+            icon={renderer.getIcon()}
+            title={label}
+            isEditing={isEditing}
+            isDone={isTaskDone}
+            onTitleChange={setLabel}
+            inputRef={titleInputRef as React.RefObject<HTMLInputElement>}
+            onKeyDown={handleKeyDown}
+          />
+
+          {metricsContent && <MetricsRow>{metricsContent}</MetricsRow>}
+
+          <Footer
+            leftContent={
+              <>
+                {/* Approval Badge */}
+                {approvalDecoration && (
+                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${approvalDecoration.badgeClass}`}>
+                    {approvalDecoration.badgeText}
+                  </span>
+                )}
+
+                {/* Version/Status Pill */}
+                {pill && (
+                  <div
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-medium leading-none truncate ${pill.bg} ${pill.text}`}
+                    title={pill.label}
+                  >
+                    {pill.label}
+                  </div>
+                )}
+
+                {/* Tags */}
+                {tags && tags.length > 0 && (
+                  <div className="flex items-center gap-0.5 overflow-hidden">
+                    {tags.slice(0, 2).map((tag: string) => (
+                      <button
+                        key={tag}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const el = containerRef.current;
+                          if (el) {
+                            el.dispatchEvent(
+                              new CustomEvent('mindmap:tag-search', {
+                                bubbles: true,
+                                detail: { tag },
+                              })
+                            );
+                          }
+                        }}
+                        className="px-1 py-0.5 rounded text-[8px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer truncate max-w-[50px] flex-shrink-0"
+                        title={`搜索标签: #${tag}`}
+                      >
+                        #{tag}
+                      </button>
+                    ))}
+                    {tags.length > 2 && (
+                      <span className="text-[8px] text-gray-400 flex-shrink-0">+{tags.length - 2}</span>
+                    )}
+                  </div>
+                )}
+              </>
+            }
+            rightContent={
+              <>
+                {/* Assignee for Task nodes */}
+                {nodeType === NodeType.TASK && (
+                  <span className="text-[10px] text-gray-500 flex items-center gap-0.5">
+                    👤 {(data.props as any)?.assigneeId?.slice(0, 6) || '未分配'}
+                  </span>
+                )}
+
+                {/* Story 2.9: APP Execute Button */}
+                {nodeType === NodeType.APP && (
+                  <button
+                    onClick={handleAppExecute}
+                    disabled={appRunning}
+                    className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors ${appRunning
+                      ? 'bg-yellow-100 text-yellow-700 cursor-wait'
+                      : 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100'
+                      }`}
+                    title={appRunning ? '执行中...' : '启动应用'}
+                  >
+                    {appRunning ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Play className="w-3 h-3" />
+                    )}
+                    <span>启动</span>
+                  </button>
+                )}
+                <span className="text-[10px] text-gray-400 font-mono">{node.id.slice(0, 6)}</span>
+              </>
+            }
+          />
+        </RichNodeLayout>
+
+        {/* Hidden Measures for auto-resize */}
+        <div
+          ref={titleMeasureRef}
+          className="absolute opacity-0 pointer-events-none text-sm font-bold w-[200px]"
+        >
+          {label}
+        </div>
+      </div>
+    );
+  }
+
+  // 3. LEGACY CARD NODE RENDERING (Requirement, Data, App) - OLD UI
   return (
     <div
       ref={containerRef}

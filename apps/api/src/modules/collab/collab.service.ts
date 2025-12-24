@@ -135,6 +135,8 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                                         tags: node.tags,
                                         isArchived: node.isArchived,
                                         archivedAt: node.archivedAt ? node.archivedAt.toISOString() : null,
+                                        // Story 4.1: Include approval data in initial load
+                                        approval: node.approval as unknown,
                                         createdAt: node.createdAt.toISOString(),
                                         updatedAt: node.updatedAt.toISOString(),
                                         metadata: (node.metadata as Record<string, unknown>) || {},
@@ -204,6 +206,22 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                         Logger.log(`Initialized ${graph.nodes?.length || 0} nodes and ${edgeCount} edges from relational DB`, 'CollabService');
                     }
 
+                    // Story 4.1: Merge approval state from relational DB into Yjs
+                    // When yjsState was persisted before approval fields existed (or when approval changed while the doc was closed),
+                    // the stored Yjs snapshot may miss the latest approval pipeline. DB is authoritative for approval.
+                    if (graph.nodes && graph.nodes.length > 0) {
+                        const yNodes = document.getMap<Record<string, unknown>>('nodes');
+                        document.transact(() => {
+                            for (const node of graph.nodes) {
+                                const existing = yNodes.get(node.id);
+                                if (!existing || typeof existing !== 'object') continue;
+                                yNodes.set(node.id, {
+                                    ...(existing as Record<string, unknown>),
+                                    approval: node.approval as unknown,
+                                });
+                            }
+                        });
+                    }
                 } catch (error) {
                     Logger.error(`Failed to load document ${documentName}:`, error, 'CollabService');
                     // Continue with empty document on error - Yjs handles this gracefully

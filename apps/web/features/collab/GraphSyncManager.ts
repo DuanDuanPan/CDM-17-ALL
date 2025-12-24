@@ -1,6 +1,6 @@
 import { Graph, Node, Edge, Cell } from '@antv/x6';
 import * as Y from 'yjs';
-import { LayoutMode, NodeType, TaskProps, RequirementProps, PBSProps, DataProps, EdgeMetadata } from '@cdm/types';
+import { LayoutMode, NodeType, TaskProps, RequirementProps, PBSProps, DataProps, EdgeMetadata, type ApprovalPipeline } from '@cdm/types';
 import { syncLogger as logger } from '@/lib/logger';
 
 /**
@@ -33,6 +33,9 @@ export interface YjsNodeData {
     tags?: string[];
     isArchived?: boolean;
     archivedAt?: string | null;
+
+    // Story 4.1: Approval data sync
+    approval?: ApprovalPipeline;
 }
 
 /**
@@ -390,6 +393,8 @@ export class GraphSyncManager {
             tags: Array.isArray(data.tags) ? data.tags : undefined,
             isArchived: typeof data.isArchived === 'boolean' ? data.isArchived : undefined,
             archivedAt: data.archivedAt !== undefined ? data.archivedAt : undefined,
+            // Story 4.1: Sync approval data
+            approval: data.approval as ApprovalPipeline | undefined,
         };
 
         this.yDoc.transact(() => {
@@ -511,6 +516,8 @@ export class GraphSyncManager {
                 tags: data.tags,
                 isArchived: data.isArchived,
                 archivedAt: data.archivedAt,
+                // Story 4.1: Apply approval data
+                approval: data.approval,
             }, { overwrite: true });
 
             // Story 2.7: Handle visibility based on isArchived state (multi-client sync)
@@ -533,7 +540,7 @@ export class GraphSyncManager {
                 });
             }
 
-            logger.debug('Updated existing node', { id: data.id, mindmapType, nodeType: data.nodeType, isArchived: data.isArchived });
+            logger.debug('Updated existing node', { id: data.id, mindmapType, nodeType: data.nodeType, isArchived: data.isArchived, approval: data.approval?.status });
         } else if (!existingCell) {
             // Add new node with mind-node shape for proper rendering
             // Story 2.7: Check if node should be visible based on archive status
@@ -564,6 +571,8 @@ export class GraphSyncManager {
                     tags: data.tags,
                     isArchived: data.isArchived,
                     archivedAt: data.archivedAt,
+                    // Story 4.1: Apply approval data
+                    approval: data.approval,
                 },
             });
 
@@ -572,7 +581,7 @@ export class GraphSyncManager {
                 newNode.hide();
             }
 
-            logger.debug('Added new node', { id: data.id, mindmapType, nodeType: data.nodeType, isArchived: data.isArchived });
+            logger.debug('Added new node', { id: data.id, mindmapType, nodeType: data.nodeType, isArchived: data.isArchived, approval: data.approval?.status });
         }
     }
 
@@ -798,6 +807,8 @@ export class GraphSyncManager {
                     tags: Array.isArray(data.tags) ? data.tags : undefined,
                     isArchived: typeof data.isArchived === 'boolean' ? data.isArchived : undefined,
                     archivedAt: data.archivedAt !== undefined ? data.archivedAt : undefined,
+                    // Story 4.1: Sync approval data
+                    approval: data.approval as ApprovalPipeline | undefined,
                 };
 
                 this.yNodes?.set(node.id, yjsNodeData);

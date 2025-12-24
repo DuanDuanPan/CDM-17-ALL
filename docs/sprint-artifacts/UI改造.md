@@ -1,78 +1,88 @@
----
-artifactType: implementation_plan
-title: "UI/UX Enhancement & Vertical Layout Impact Analysis"
-description: "Analysis of implementing Rich Card UI and Top-Down Layout leveraging existing data structures."
----
+# Story 4.2: Rich Node UI & Visual Hierarchy
+Status: planned
 
-## 1. 总体影响评估 (Overall Impact Assessment)
+## Story
 
-| 领域 (Area) | 影响等级 (Impact Level) | 描述 (Description) |
-| :--- | :--- | :--- |
-| **Frontend Components** | **High** | `MindNode.tsx` 需要从单一渲染逻辑重构为多变体（Variant）架构，以支持“极简模式”和“详情卡片模式”的切换。 |
-| **Layout Engine** | **Medium** | 需要新增全新的 `OrgChartLayout`（自上而下布局），并解决与现有思维导图布局的切换时的连线锚点兼容性问题。 |
-| **Data & Types** | **Low** | 主要复用现有的 `TaskProps` 和 `AppProps`。无需修改数据库 Schema，只需前端适配数据展示格式。 |
-| **Performance** | **Medium** | 渲染复杂的“卡片模式”包含更多 DOM 元素（图标、多行文本、头像），在大规模节点（>100）场景下需关注渲染性能。 |
+As a **User**,
+I want **task and PBS nodes to display rich, context-aware information directly on the canvas**,
+so that **I can understand project status, budget, and responsibilities at a glance without diving into side panels.**
 
----
+## Context
+Derived from "Zephir Project" design analysis. This story focuses on upgrading the node visual presentation to a "Premium" level, separating the visual overhaul from the functional logic of Story 4.1.
 
-## 2. 前端组件影响 (MindNode.tsx)
 
-### 现状
-目前 `MindNode` 是一个单一组件，内部通过大量的 `if/else` 判断来处理不同类型 (`TASK`, `PBS`, `REQUIREMENT`) 的样式。代码行数已超过 500 行，维护成本较高。
+## Visual Reference
+![Rich Node Design Ref](../images/rich-node-design-ref.png)
 
-### 改造影响
-引入“参考图”中的**卡片 UI** 意味着每个节点需要展示的信息量翻倍（工期、时间范围、成本、负责人、图标）。
+### High-Fidelity Mockup (CDM-17 Design System)
+![Rich Node Variants](../images/rich-node-ui-variants.png)
 
-**建议方案**:
-1.  **拆分组件**: 必须对 `MindNode` 进行拆分，否则文件将变得不可维护。
-    *   `MindNode` (Container): 负责逻辑状态（选中、编辑、Hover）、事件分发。
-    *   `NodeRenderers` (Folder):
-        *   `CompactRenderer`: 现有的单行文本样式（用于普通思维导图）。
-        *   `CardRenderer`: **新增**，支持 Header(Icon+Title) + Body(Metadata) + Footer(Status/User) 的布局。
-2.  **状态映射**: 需要编写 Utilities 函数，将 `TaskStatus` / `Priority` 映射为具体的 Tailwind 颜色类（如左侧的状态色条）。
+## Acceptance Criteria - Rich Node Variants
 
-## 3. 布局引擎影响 (Layout Engine)
+### 1. The Unified 4-Layer Chassis
+All "Rich Nodes" (Zoom > 60%) MUST strictly follow this vertical stack layout to ensure visual rhythm:
 
-### 现状
-现有 `MindmapLayout` (水平) 和 `LogicLayout` (向右)。
+| Layer | Height | Description | Visual Style |
+| :--- | :--- | :--- | :--- |
+| **1. Status Header** | **6px** | Indicates Status or Node Type Theme | Solid Color / Striped if Pending |
+| **2. Title Row** | **32px** | Icon + Truncated Title | Bold Text, Flex Row, 24px Icon |
+| **3. Metrics Row** | **Auto** | Context-specific key data (The "Dashboard") | Small Text (11px), Grids or Progress Bars |
+| **4. Footer** | **32px** | Ownership & Global Status | Border-top separator, Avatars, Badges |
+| *(Extension)* | *Auto* | Hanging Capsule (if Rejected/Error) | Floating element below footer |
 
-### 改造影响
-1.  **新增策略**: 实现 `OrgChartLayout` 类。
-    *   **算法**: 复用 `antv/hierarchy` 的 `mindmap` 算法，但参数设为垂直方向 (`V`)。
-    *   **间距策略**: 垂直布局需要更大的垂直间距 (`vGap: 80-100px`) 来容纳 S 型连线，避免连线穿过节点文本。
-2.  **连线锚点 (Anchors)**:
-    *   **水平布局**: 锚点通常是 `Right` (Source) -> `Left` (Target)。
-    *   **垂直布局**: 锚点必须强制变为 `Bottom` (Source) -> `Top` (Target)。
-    *   **影响**: `GraphComponent` 需要根据当前 `LayoutMode` 动态更新所有 Edge 的锚点配置，否则切换布局时连线位置会错乱。
+### 2. Node Type Content Mapping
 
-## 4. 连线与交互影响 (Edges & Interaction)
+| Node Type | **1. Header Color** | **2. Title Icon** | **3. Metrics Row Content** | **4. Footer Content** |
+| :--- | :--- | :--- | :--- | :--- |
+| **PBS** | **Deep Blue** `#1E3A8A` | `Layers` | **Aggr Stats**: `5 Tasks` • `2 Risks` • `60% Done` | **Owner**: Manager Avatar<br>**Ver**: `v1.0` |
+| **Task** | **Status/Approval**<br>(Gray/Blue/Green/Orange) | `CheckSquare` | **Execution**: `06/21 - 07/15` • `Progress Bar` | **Assignee**: Avatar<br>**Badge**: `Pending` |
+| **Requirement**| **Purple** `#7C3AED` | `Target` | **Scope**: `Functional` • `Must Have` • `3 Criteria` | **Source**: Stakeholder<br>**Status**: `Verified` |
+| **App** | **Neon/Dark** `#111827` | `Cpu` | **Runtime**: `Local` • `Last: 2m ago` • `2 In / 1 Out` | **Status**: 🟢 `Success` / 🔴 `Error` |
+| **Data** | **Teal** `#0D9488` | `Database` | **Asset**: `PDF` • `2.4 MB` • `Secret` | **Loc**: Cloud Icon<br>**Ver**: `v2.1` |
 
-### 连接器 (Connector)
-*   **现状**: 使用 `smooth` 或 `rounded`。
-*   **改造**: 垂直组织图的最佳实践是使用 **"S-Curve"**（三次贝塞尔曲线，`connector: 'smooth'`），且需要调整贝塞尔的控制点方向 (`direction: 'vertical'`) 以确保线条从底部垂直向下延伸后再弯曲。
 
-### 交互体验
-*   **平移/缩放**: 垂直布局通常比水平布局更“高”，用户可能需要更多地进行垂直滚动。
-*   **折叠/展开**: 垂直树的折叠逻辑与水平导图一致，视觉效果上是收起下方的子树。
+### 3. Visual Rules
+1.  **Approval Overlay**:
+    *   If a node (any type) is under approval, the **Header** adopts the "Striped Warning" texture.
+    *   **Rejected**: The Header turns Red, and a "Reason Pill" hangs below the node.
+2.  **Connections**:
+    *   Use **Bezier Curves** with rounded anchor points.
+    *   Line color matches the Source Node's base theme transparency (e.g., PBS edge is faint blue).
+3.  **Responsiveness**:
+    *   **Zoom < 40%**: Minimal View (Icon + Title + Status Color Dot).
+    *   **Zoom > 40%**: Rich View (Full Card).
 
-## 5. 数据聚合计算 (App-level Enhancement)
+## Tasks
 
-### 需求
-参考图中，父节点往往显示汇总信息。虽然我们不改后端，但前端可以做**实时聚合**。
+- [ ] **1. Design System Update**
+    - [ ] Define `RichNode` component tokens (colors for headers, typography for metrics)
+    - [ ] Create `NodeHeader`, `NodeBody`, `NodeFooter` sub-components
+    - [ ] Implement color palettes:
+        - `Pending`: Orange/Yellow stripes
+        - `Approved`: Emerald/Green
+        - `Rejected`: Rose/Red
+        - `PBS`: Indigo/Blue
 
-### 影响
-需要在 `GraphComponent` 或 `MindNode` 父容器层级引入简单的计算逻辑：
-*   **Effort 汇总**: 父节点检测子节点是否包含 `effort` 字段，若有，则在渲染父节点时显示 `∑ effort`。
-*   **Progress 汇总**: 简单的加权平均。
-*   **注意**: 这属于纯前端的“视图层增强”，不会回写数据库，保持数据纯净。
+- [ ] **2. Frontend: Rich Task Node Component**
+    - [ ] Create `apps/web/features/graph/nodes/RichTaskNode.tsx`
+    - [ ] Implement conditional rendering based on Zoom Level (use `useGraphZoom` hook?)
+    - [ ] **Header**: Title + Type Icon + Status Color
+    - [ ] **Metrics**: Date Range pill (Red if overdue), Circular or Linear Progress bar
+    - [ ] **Footer**: AvatarGroup (Assignees) + Status Pill
 
----
+- [ ] **3. Frontend: PBS Node Component**
+    - [ ] Create `apps/web/features/graph/nodes/PBSNode.tsx`
+    - [ ] Implement backend or frontend logic to aggregate child stats (Task count, etc.)
+    - [ ] Render "Big Number" dashboard style
 
-## 结论与推荐路径
+- [ ] **4. Frontend: Approval Decorations**
+    - [ ] Implement "Hanging Capsule" for Rejection Reason (positioned absolute bottom)
+    - [ ] Ensure "Halo" effects from Story 4.1 are harmonized with the new Card style
 
-此次改造主要集中在 **视图层（View Layer）**，风险可控。
+- [ ] **5. Graph Config & Layout**
+    - [ ] Update X6 Node Registry to use new components
+    - [ ] Tune edge router/connector for Bezier style aesthetics
 
-**推荐实施顺序**：
-1.  **Refactor**: 先将 `MindNode` 拆分为 `Container` + `Renderers` 模式。（降低复杂度）
-2.  **UI**: 实现 `CardRenderer`，复刻参考图的“白底卡片+状态色条+富信息”样式。（提升颜值）
-3.  **Layout**: 实现 `OrgChartLayout` 及垂直连线逻辑。（支持架构视图）
+## Dev Notes
+- **Performance**: Rich nodes are heavy. Ensure we use `React.memo` and only render details when visible/zoomed in.
+- **Story 4.1 Pre-req**: This story assumes the *data* (approval status, dates) exists. Story 4.1 provides the backend logic.
