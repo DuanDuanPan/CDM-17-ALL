@@ -92,3 +92,6 @@ export * from './approval';
 
 // Story 4.3: Export comment types for contextual comments
 export * from './comment';
+
+// Story 4.4: Export subscription types for watch & subscription
+export * from './subscription-types';

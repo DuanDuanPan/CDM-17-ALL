@@ -62,11 +62,11 @@ development_status:
   epic-2-retrospective: done
 
   epic-4: in-progress
-  4-1-approval-driven-workflow: review
-  4-2-rich-node-design: planned # New story for Rich UI/UX
-  4-3-contextual-comments-and-mentions: review # Story 4.3: 评论系统实现完成
-  4-4-smart-notification-center: backlog
-  4-5-watch-subscription: backlog
+  4-1-approval-driven-workflow: done
+  4-2-rich-node-design: done # New story for Rich UI/UX
+  4-3-contextual-comments-and-mentions: done # Story 4.3: 评论系统实现完成
+  4-4-watch-subscription: ready-for-dev
+  4-5-smart-notification-center: backlog
   epic-4-retrospective: optional
 
   epic-5: backlog

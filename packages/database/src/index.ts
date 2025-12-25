@@ -62,7 +62,8 @@ export { Database, db } from './Database';
 // Re-export Prisma generated types (available after prisma generate)
 // Story 2.9: Added NodeApp export
 // Story 4.3: Added Comment, CommentRead exports
-export type { User, Project, Graph, Node, Edge, Notification, NodePBS, NodeTask, NodeRequirement, NodeData, NodeApp, Comment, CommentRead } from '@prisma/client';
+// Story 4.4: Added Subscription export
+export type { User, Project, Graph, Node, Edge, Notification, NodePBS, NodeTask, NodeRequirement, NodeData, NodeApp, Comment, CommentRead, Subscription } from '@prisma/client';
 
 // HIGH-1 Fix: Export Prisma namespace as both type and value for DbNull access
 export { Prisma } from '@prisma/client';

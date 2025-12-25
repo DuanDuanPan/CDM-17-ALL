@@ -5,7 +5,8 @@
 
 'use client';
 
-import { CheckCircle, XCircle, Send, RefreshCw, CheckCheck, X, AtSign } from 'lucide-react';
+import { CheckCircle, XCircle, Send, RefreshCw, CheckCheck, X, AtSign, Eye } from 'lucide-react';
+import type { WatchNotificationContent } from '@cdm/types';
 import type { Notification, NotificationContent } from '@cdm/types';
 
 export interface NotificationListProps {
@@ -17,6 +18,8 @@ export interface NotificationListProps {
   onClose: () => void;
   /** Story 2.4: Navigate to the related node when clicking a notification */
   onNavigate?: (nodeId: string) => void;
+  /** Story 4.4: Unsubscribe callback for WATCH_UPDATE notifications (AC#3) */
+  onUnsubscribe?: (nodeId: string) => Promise<void>;
 }
 
 export function NotificationList({
@@ -27,6 +30,7 @@ export function NotificationList({
   onRefresh,
   onClose,
   onNavigate,
+  onUnsubscribe,
 }: NotificationListProps) {
   const hasNotifications = notifications.length > 0;
   const hasUnread = notifications.some((n) => !n.isRead);
@@ -57,6 +61,9 @@ export function NotificationList({
       case 'MENTION':
         // Story 4.3: @mention notification icon
         return <AtSign className="w-4 h-4 text-purple-600" />;
+      case 'WATCH_UPDATE':
+        // Story 4.4: Watch subscription notification icon
+        return <Eye className="w-4 h-4 text-amber-600" />;
       default:
         return <Send className="w-4 h-4 text-gray-600" />;
     }
@@ -122,6 +129,7 @@ export function NotificationList({
                   onMarkAsRead={onMarkAsRead}
                   onNavigate={onNavigate}
                   onClose={onClose}
+                  onUnsubscribe={onUnsubscribe}
                 />
               );
             })}
@@ -160,6 +168,8 @@ interface NotificationItemProps {
   onNavigate?: (nodeId: string) => void;
   /** Close the notification panel after navigation */
   onClose: () => void;
+  /** Story 4.4: Unsubscribe callback for WATCH_UPDATE notifications */
+  onUnsubscribe?: (nodeId: string) => Promise<void>;
 }
 
 function NotificationItem({
@@ -170,6 +180,7 @@ function NotificationItem({
   onMarkAsRead,
   onNavigate,
   onClose,
+  onUnsubscribe,
 }: NotificationItemProps) {
   const handleClick = () => {
     // 1. Mark as read if not already
@@ -182,7 +193,13 @@ function NotificationItem({
         ? (content as { nodeId: string }).nodeId
         : undefined;
 
-    const targetNodeId = notification.refNodeId || mentionNodeId;
+    // Story 4.4: Get node ID from WATCH_UPDATE notification
+    const watchNodeId =
+      notification.type === 'WATCH_UPDATE' && 'nodeId' in content
+        ? (content as WatchNotificationContent).nodeId
+        : undefined;
+
+    const targetNodeId = notification.refNodeId || mentionNodeId || watchNodeId;
 
     // 2. Navigate to the related node (if any)
     if (targetNodeId && onNavigate) {
@@ -258,6 +275,35 @@ function NotificationItem({
                 {(content as { taskName: string }).taskName}」
                 {'reason' in content && content.reason && (
                   <span className="block mt-1 text-red-600">理由: {content.reason as string}</span>
+                )}
+              </>
+            )}
+            {/* Story 4.4: WATCH_UPDATE notifications */}
+            {notification.type === 'WATCH_UPDATE' && 'message' in content && (
+              <>
+                <span className="text-amber-700">
+                  {(content as WatchNotificationContent).message}
+                </span>
+                {(content as WatchNotificationContent).changeCount > 1 && (
+                  <span className="block mt-1 text-gray-500 text-[10px]">
+                    共 {(content as WatchNotificationContent).changeCount} 处变更
+                  </span>
+                )}
+                {/* Story 4.4 AC#3: Unsubscribe button directly in notification */}
+                {onUnsubscribe && (content as WatchNotificationContent).nodeId && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const nodeId = (content as WatchNotificationContent).nodeId;
+                      if (nodeId) {
+                        onUnsubscribe(nodeId);
+                        onMarkAsRead(notification.id);
+                      }
+                    }}
+                    className="mt-2 px-2 py-1 text-[10px] text-amber-600 border border-amber-300 rounded hover:bg-amber-50 transition-colors"
+                  >
+                    取消关注
+                  </button>
                 )}
               </>
             )}

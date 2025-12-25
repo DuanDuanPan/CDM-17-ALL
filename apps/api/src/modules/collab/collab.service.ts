@@ -1,9 +1,23 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Server as HocuspocusServer } from '@hocuspocus/server';
 import * as Y from 'yjs';
 import { prisma } from '@cdm/database';
 import { NodeType } from '@cdm/types';
+
+// Event constants for Collab module
+export const COLLAB_EVENTS = {
+    NODE_CHANGED: 'collab.node.changed',
+} as const;
+
+// Event payload for node changes detected via Yjs
+export interface YjsNodeChangedEvent {
+    nodeId: string;
+    nodeName: string;
+    mindmapId: string;
+    changeType: 'update' | 'delete' | 'create';
+}
 
 /**
  * CollabService - Real-time Collaboration Service
@@ -18,7 +32,14 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(CollabService.name);
     private hocuspocus: HocuspocusServer | null = null;
 
-    constructor(private readonly configService: ConfigService) { }
+    // Story 4.4 [PERF FIX]: Track previous node states to detect actual changes
+    // Key: graphId:nodeId, Value: hash of node state (label + relevant props)
+    private previousNodeStates = new Map<string, string>();
+
+    constructor(
+        private readonly configService: ConfigService,
+        private readonly eventEmitter: EventEmitter2,
+    ) { }
 
     async onModuleInit() {
         await this.initializeHocuspocusServer();
@@ -225,6 +246,56 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                 } catch (error) {
                     Logger.error(`Failed to load document ${documentName}:`, error, 'CollabService');
                     // Continue with empty document on error - Yjs handles this gracefully
+                }
+            },
+
+            /**
+             * Story 4.4: onChange hook to detect node changes and emit events
+             * Called on every document update for subscription notifications
+             * 
+             * [PERF FIX]: Only emit events for nodes that actually changed
+             * by comparing with previous state, preventing N events per update
+             */
+            onChange: async ({ documentName, document }) => {
+                try {
+                    // documentName format: "graph:<graphId>"
+                    const graphId = documentName.replace('graph:', '');
+
+                    // Get the nodes map to track changes
+                    const yNodes = document.getMap<Record<string, unknown>>('nodes');
+
+                    // Track which nodes actually changed
+                    yNodes.forEach((nodeData, nodeId) => {
+                        if (nodeData && typeof nodeData === 'object') {
+                            // Create a simple hash of the node's relevant properties
+                            const nodeName = (nodeData as { label?: string }).label || 'Unknown';
+                            const metadata = JSON.stringify((nodeData as { metadata?: unknown }).metadata || {});
+                            const props = JSON.stringify((nodeData as { props?: unknown }).props || {});
+                            const currentHash = `${nodeName}|${metadata}|${props}`;
+
+                            const stateKey = `${graphId}:${nodeId}`;
+                            const previousHash = this.previousNodeStates.get(stateKey);
+
+                            // Only emit if node actually changed
+                            if (previousHash !== currentHash) {
+                                this.previousNodeStates.set(stateKey, currentHash);
+
+                                // Skip initial state population (first time seeing this node)
+                                if (previousHash !== undefined) {
+                                    const event: YjsNodeChangedEvent = {
+                                        nodeId,
+                                        nodeName,
+                                        mindmapId: graphId,
+                                        changeType: 'update',
+                                    };
+                                    this.eventEmitter.emit(COLLAB_EVENTS.NODE_CHANGED, event);
+                                    Logger.debug(`Node changed: ${nodeId} (${nodeName})`, 'CollabService');
+                                }
+                            }
+                        }
+                    });
+                } catch (error) {
+                    Logger.debug(`Error in onChange hook: ${error}`, 'CollabService');
                 }
             },
 

@@ -31,7 +31,7 @@ export interface UseCommentsReturn {
     comments: Comment[];
     isLoading: boolean;
     error: Error | null;
-    createComment: (content: string, replyToId?: string) => Promise<Comment | null>;
+    createComment: (content: string, replyToId?: string, attachmentIds?: string[]) => Promise<Comment | null>;
     deleteComment: (commentId: string) => Promise<boolean>;
     refresh: () => Promise<void>;
     hasMore: boolean;

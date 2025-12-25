@@ -9,6 +9,7 @@ import { z } from 'zod';
 // Notification Type Enum
 // Story 4.1: Added approval workflow notification types
 // Story 4.3: Added MENTION notification type
+// Story 4.4: Added WATCH_UPDATE notification type
 export type NotificationType =
   | 'TASK_DISPATCH'
   | 'TASK_ACCEPTED'
@@ -16,7 +17,8 @@ export type NotificationType =
   | 'APPROVAL_REQUESTED'   // Story 4.1: New
   | 'APPROVAL_APPROVED'    // Story 4.1: New
   | 'APPROVAL_REJECTED'    // Story 4.1: New
-  | 'MENTION';             // Story 4.3: Contextual Comments
+  | 'MENTION'              // Story 4.3: Contextual Comments
+  | 'WATCH_UPDATE';        // Story 4.4: Watch & Subscription
 
 // Base Notification Content (JSON payload for task notifications)
 export interface TaskNotificationContent {
@@ -48,8 +50,18 @@ export interface MentionNotificationContent {
   mindmapId: string;
 }
 
+// Story 4.4: Watch Notification Content
+export interface WatchNotificationContent {
+  mindmapId: string;
+  nodeId: string;
+  nodeName: string;
+  message: string;         // Summary message: "节点A 等 3 个节点发生变更"
+  changeCount: number;     // Number of aggregated changes
+  changedNodes: string[];  // Node names that changed
+}
+
 // Union type for all notification content types
-export type NotificationContent = TaskNotificationContent | ApprovalNotificationContent | MentionNotificationContent;
+export type NotificationContent = TaskNotificationContent | ApprovalNotificationContent | MentionNotificationContent | WatchNotificationContent;
 
 // Notification Entity
 export interface Notification {
@@ -93,10 +105,21 @@ export const MentionNotificationContentSchema = z.object({
   mindmapId: z.string(),
 });
 
+// Story 4.4: Watch Notification Content Schema
+export const WatchNotificationContentSchema = z.object({
+  mindmapId: z.string(),
+  nodeId: z.string(),
+  nodeName: z.string(),
+  message: z.string(),
+  changeCount: z.number(),
+  changedNodes: z.array(z.string()),
+});
+
 export const NotificationContentSchema = z.union([
   TaskNotificationContentSchema,
   ApprovalNotificationContentSchema,
   MentionNotificationContentSchema,
+  WatchNotificationContentSchema,
 ]);
 
 export const NotificationSchema = z.object({
@@ -108,6 +131,7 @@ export const NotificationSchema = z.object({
     'APPROVAL_APPROVED',
     'APPROVAL_REJECTED',
     'MENTION',
+    'WATCH_UPDATE',       // Story 4.4: Watch & Subscription
   ]),
   title: z.string(),
   content: NotificationContentSchema,

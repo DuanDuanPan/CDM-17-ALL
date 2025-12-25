@@ -31,10 +31,13 @@ model User {
 
   projects      Project[]
   notifications Notification[] // Story 2.4: Task dispatch notifications
-  
+
   // Story 4.3: Contextual Comments
   comments      Comment[]
   commentReads  CommentRead[]
+
+  // Story 4.4: Watch & Subscription
+  subscriptions Subscription[]
 }
 
 model Project {
@@ -107,6 +110,9 @@ model Node {
 
   // Story 4.3: Contextual Comments
   comments  Comment[]
+
+  // Story 4.4: Watch & Subscription
+  subscriptions Subscription[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -237,17 +243,23 @@ model Notification {
   recipientId String
   recipient   User     @relation(fields: [recipientId], references: [id])
 
-  type      String // TASK_DISPATCH | TASK_ACCEPTED | TASK_REJECTED
+  type      String // TASK_DISPATCH | TASK_ACCEPTED | TASK_REJECTED | WATCH_UPDATE
   title     String
   content   Json // { taskId, taskName, action, senderName, reason? }
   refNodeId String? // 关联的节点 ID (用于点击跳转)
   isRead    Boolean  @default(false)
+
+  // Story 4.4: Aggregation fields for notification throttling
+  groupKey         String?   // Aggregation key: userId:mindmapId:type
+  batchCount       Int       @default(1) // Number of aggregated events
+  lastAggregatedAt DateTime? // Last time this notification was updated with new events
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([recipientId, isRead])
   @@index([recipientId, createdAt])
+  @@index([recipientId, groupKey, isRead]) // Fast lookup for aggregation
 }
 
 // Story 4.3: Comment Model for Contextual Comments
@@ -297,19 +309,36 @@ model CommentRead {
 // Story 4.3+: CommentAttachment Model for file attachments
 model CommentAttachment {
   id          String   @id @default(cuid())
-  
+
   commentId   String?  // Nullable: null means pending association
   comment     Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  
+
   fileName    String      // Original filename
   fileSize    Int         // Size in bytes
   mimeType    String      // e.g., "image/png", "application/pdf"
   storagePath String      // Local storage path: uploads/comments/{filename}
-  
+
   uploaderId  String      // User who uploaded the file
-  
+
   createdAt   DateTime @default(now())
-  
+
   @@index([commentId])
+}
+
+// Story 4.4: Subscription Model for Watch & Subscription feature
+model Subscription {
+  id        String   @id @default(cuid())
+  userId    String
+  nodeId    String
+  mindmapId String
+
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  node      Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, nodeId]) // Prevent duplicate subscriptions
+  @@index([nodeId])          // Fast lookup: "Who is watching this node?"
+  @@index([userId])          // Fast lookup: "What am I watching?"
 }
 

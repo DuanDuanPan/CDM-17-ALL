@@ -26,6 +26,8 @@ import { useClipboard } from '@/hooks/useClipboard';
 import { useClipboardShortcuts } from '@/hooks/useClipboardShortcuts';
 import { useEditingState } from '@/hooks/useEditingState';
 import { ClipboardToolbar } from '@/components/toolbar/ClipboardToolbar';
+// Story 4.4: Watch & Subscription
+import { useSubscription } from '@/hooks/useSubscription';
 
 // Story 2.2: Dependency type options for context menu
 const DEPENDENCY_TYPES: { value: DependencyType; label: string; description: string }[] = [
@@ -105,13 +107,26 @@ export function GraphComponent({
     }>({ visible: false, x: 0, y: 0, edge: null });
 
     // Story 2.6: Node context menu state for clipboard operations
+    // Story 4.4: Added nodeId for subscription feature
     const [nodeContextMenu, setNodeContextMenu] = useState<{
         visible: boolean;
         x: number;
         y: number;
         graphX: number; // Graph coordinates for paste position
         graphY: number;
-    }>({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0 });
+        nodeId: string | null; // Story 4.4: Node ID for subscription
+    }>({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0, nodeId: null });
+
+    // Story 4.4: Watch & Subscription hook
+    const {
+        isSubscribed,
+        isLoading: isSubscriptionLoading,
+        subscribe,
+        unsubscribe,
+    } = useSubscription({
+        nodeId: nodeContextMenu.nodeId,
+        userId: user.id,
+    });
 
     // Story 1.4 HIGH-3: Throttle cursor updates to prevent WebSocket flooding
     const lastCursorUpdateTime = useRef<number>(0);
@@ -775,10 +790,15 @@ export function GraphComponent({
                 // Apply highlight style
                 edge.attr('line/stroke', '#feb663'); // Amber-400 highlight
                 edge.attr('line/strokeWidth', 3);
-                edge.attr('line/filter', {
-                    name: 'dropShadow',
-                    args: { dx: 0, dy: 0, blur: 4, color: '#feb663' }
-                });
+
+                // Story 2.2 FIX: Don't use dropShadow filter on dependency edges (dashed lines)
+                // as it can cause rendering issues (line disappearance) on some browsers/renderers
+                if (!isDependencyEdge(edge)) {
+                    edge.attr('line/filter', {
+                        name: 'dropShadow',
+                        args: { dx: 0, dy: 0, blur: 4, color: '#feb663' }
+                    });
+                }
             };
 
             const handleEdgeUnselected = ({ edge }: { edge: Edge }) => {
@@ -788,7 +808,7 @@ export function GraphComponent({
                 const isDependency = isDependencyEdge(edge);
                 if (isDependency) {
                     edge.attr('line/stroke', '#9ca3af'); // Revert to gray
-                    edge.attr('line/strokeWidth', 2); // Revert width
+                    edge.attr('line/strokeWidth', 1.5); // Revert width (matches createDependencyEdge)
                 } else {
                     edge.attr('line/stroke', '#3b82f6'); // Revert to blue
                     edge.attr('line/strokeWidth', 2);
@@ -827,10 +847,12 @@ export function GraphComponent({
                     y: e.clientY,
                     graphX: graphPoint.x,
                     graphY: graphPoint.y,
+                    nodeId: null, // Story 4.4: No node for blank area
                 });
             };
 
             // Story 2.6: Node context menu for clipboard operations
+            // Story 4.4: Capture node ID for subscription feature
             const handleNodeContextMenu = ({ e, node }: { e: MouseEvent; node: Node }) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -846,6 +868,7 @@ export function GraphComponent({
                     y: e.clientY,
                     graphX: graphPoint.x,
                     graphY: graphPoint.y,
+                    nodeId: node.id, // Story 4.4: Capture node ID for subscription
                 });
             };
 
@@ -1030,7 +1053,7 @@ export function GraphComponent({
                     {/* Backdrop to close menu */}
                     <div
                         className="fixed inset-0 z-40"
-                        onClick={() => setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0 })}
+                        onClick={() => setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0, nodeId: null })}
                     />
                     {/* Context Menu */}
                     <div
@@ -1045,7 +1068,7 @@ export function GraphComponent({
                             <button
                                 onClick={() => {
                                     copy();
-                                    setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0 });
+                                    setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0, nodeId: null });
                                 }}
                                 className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
                             >
@@ -1060,7 +1083,7 @@ export function GraphComponent({
                             <button
                                 onClick={() => {
                                     cut();
-                                    setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0 });
+                                    setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0, nodeId: null });
                                 }}
                                 className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
                             >
@@ -1077,7 +1100,7 @@ export function GraphComponent({
                         <button
                             onClick={() => {
                                 paste({ x: nodeContextMenu.graphX, y: nodeContextMenu.graphY });
-                                setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0 });
+                                setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0, nodeId: null });
                             }}
                             className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
                         >
@@ -1093,7 +1116,7 @@ export function GraphComponent({
                                     const allNodes = graph.getNodes();
                                     graph.select(allNodes);
                                 }
-                                setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0 });
+                                setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0, nodeId: null });
                             }}
                             className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
                         >
@@ -1101,6 +1124,38 @@ export function GraphComponent({
                             全选
                             <span className="ml-auto text-xs text-gray-400">⌘A</span>
                         </button>
+
+                        {/* Story 4.4: Watch/Unwatch toggle - only shown when right-clicking a node */}
+                        {nodeContextMenu.nodeId && (
+                            <>
+                                <div className="border-t border-gray-100 my-1" />
+                                <button
+                                    onClick={async () => {
+                                        if (isSubscribed) {
+                                            const success = await unsubscribe();
+                                            if (success) {
+                                                addToast({ type: 'success', title: '成功', description: '已取消关注' });
+                                            }
+                                        } else {
+                                            const success = await subscribe();
+                                            if (success) {
+                                                addToast({ type: 'success', title: '成功', description: '已添加关注' });
+                                            }
+                                        }
+                                        setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0, nodeId: null });
+                                    }}
+                                    disabled={isSubscriptionLoading}
+                                    className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm disabled:opacity-50"
+                                >
+                                    <span className="w-4">{isSubscribed ? '🔕' : '🔔'}</span>
+                                    {isSubscriptionLoading
+                                        ? '处理中...'
+                                        : isSubscribed
+                                            ? '取消关注'
+                                            : '关注节点'}
+                                </button>
+                            </>
+                        )}
                     </div>
                 </>
             )}

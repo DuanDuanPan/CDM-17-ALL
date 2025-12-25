@@ -15,6 +15,7 @@ import { ApprovalModule } from './modules/approval'; // Story 4.1
 import { UsersModule } from './modules/users'; // Story 4.1
 import { FileModule } from './modules/file/file.module'; // Story 4.1: FIX-11
 import { CommentsModule } from './modules/comments'; // Story 4.3: Contextual Comments
+import { SubscriptionModule } from './modules/subscriptions/subscriptions.module'; // Story 4.4: Watch & Subscription
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { CommentsModule } from './modules/comments'; // Story 4.3: Contextual Co
     UsersModule, // Story 4.1: User selector API
     FileModule, // Story 4.1: FIX-11 - File upload for deliverables
     CommentsModule, // Story 4.3: Contextual Comments & Mentions
+    SubscriptionModule, // Story 4.4: Watch & Subscription
   ],
   controllers: [AppController],
   providers: [AppService],
