@@ -604,14 +604,44 @@ export function MindNode({ node }: MindNodeProps) {
 
           {metricsContent && <MetricsRow>{metricsContent}</MetricsRow>}
 
+          {/* Tags Row - Moved from Footer for better spacing */}
+          {tags && tags.length > 0 && (
+            <div className="flex items-center gap-1 overflow-hidden w-full min-h-[16px]">
+              {tags.slice(0, 3).map((tag: string) => (
+                <button
+                  key={tag}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const el = containerRef.current;
+                    if (el) {
+                      el.dispatchEvent(
+                        new CustomEvent('mindmap:tag-search', {
+                          bubbles: true,
+                          detail: { tag },
+                        })
+                      );
+                    }
+                  }}
+                  className="px-1.5 py-0.5 rounded-sm text-[9px] font-medium bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer truncate max-w-[80px] flex-shrink-0"
+                  title={`搜索标签: #${tag}`}
+                >
+                  #{tag}
+                </button>
+              ))}
+              {tags.length > 3 && (
+                <span className="text-[9px] text-gray-400 flex-shrink-0">+{tags.length - 3}</span>
+              )}
+            </div>
+          )}
+
           <Footer
             leftContent={
               <>
                 {/* Approval Badge */}
                 {approvalDecoration && (
-                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${approvalDecoration.badgeClass}`}>
+                  <div className={`px-1.5 py-0.5 text-[9px] font-medium leading-none rounded ${approvalDecoration.badgeClass}`}>
                     {approvalDecoration.badgeText}
-                  </span>
+                  </div>
                 )}
 
                 {/* Version/Status Pill */}
@@ -621,36 +651,6 @@ export function MindNode({ node }: MindNodeProps) {
                     title={pill.label}
                   >
                     {pill.label}
-                  </div>
-                )}
-
-                {/* Tags */}
-                {tags && tags.length > 0 && (
-                  <div className="flex items-center gap-0.5 overflow-hidden">
-                    {tags.slice(0, 2).map((tag: string) => (
-                      <button
-                        key={tag}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const el = containerRef.current;
-                          if (el) {
-                            el.dispatchEvent(
-                              new CustomEvent('mindmap:tag-search', {
-                                bubbles: true,
-                                detail: { tag },
-                              })
-                            );
-                          }
-                        }}
-                        className="px-1 py-0.5 rounded text-[8px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer truncate max-w-[50px] flex-shrink-0"
-                        title={`搜索标签: #${tag}`}
-                      >
-                        #{tag}
-                      </button>
-                    ))}
-                    {tags.length > 2 && (
-                      <span className="text-[8px] text-gray-400 flex-shrink-0">+{tags.length - 2}</span>
-                    )}
                   </div>
                 )}
               </>

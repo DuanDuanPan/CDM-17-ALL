@@ -43,7 +43,7 @@ export const RichNodeLayout = memo(
         return (
             <div
                 className={`
-        relative w-full h-full
+        relative w-full h-full flex flex-col
         rounded-lg overflow-hidden
         transition-all duration-200
         ${isSelected
@@ -58,17 +58,13 @@ export const RichNodeLayout = memo(
                 {/* Status Header - 6px colored bar */}
                 <StatusHeader color={headerColor} pattern={headerPattern} />
 
-                {/* Main Content Area with proper padding */}
-                <div className="bg-white px-3 py-2 space-y-2">
+                {/* Main Content Area - Flex grow to fill space */}
+                <div className="bg-white px-3 py-2 space-y-1 flex-1">
                     {children}
                 </div>
 
-                {/* Hanging Pill (for rejected/error states) */}
-                {hangingPill && (
-                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-                        {hangingPill}
-                    </div>
-                )}
+                {/* Bottom Panel (Rejection/Error) - In-flow to expand height */}
+                {hangingPill}
             </div>
         );
     }
