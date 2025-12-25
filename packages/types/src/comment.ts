@@ -19,6 +19,18 @@ export interface CommentAuthor {
 }
 
 /**
+ * Attachment on a comment (Story 4.3+)
+ */
+export interface CommentAttachment {
+    id: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    url: string;        // Download/preview URL
+    createdAt: string;
+}
+
+/**
  * Comment entity representing a single comment
  */
 export interface Comment {
@@ -30,6 +42,7 @@ export interface Comment {
     author?: CommentAuthor;  // Hydrated on fetch
     replyToId?: string | null;
     replies?: Comment[];
+    attachments?: CommentAttachment[];  // Story 4.3+: File attachments
     createdAt: string;
     updatedAt: string;
 }
@@ -54,6 +67,7 @@ export const CreateCommentSchema = z.object({
     content: z.string().min(1, 'Comment cannot be empty').max(10000, 'Comment too long'),
     nodeId: z.string().min(1, 'Node ID required'),
     replyToId: z.string().optional(),
+    attachmentIds: z.array(z.string()).max(5).optional(),  // Story 4.3+: Up to 5 attachments
 });
 
 export type CreateCommentDto = z.infer<typeof CreateCommentSchema>;

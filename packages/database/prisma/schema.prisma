@@ -273,6 +273,9 @@ model Comment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
+  // Story 4.3+: File attachments
+  attachments CommentAttachment[]
+  
   @@index([nodeId])
   @@index([mindmapId])
   @@index([authorId])
@@ -290,3 +293,23 @@ model CommentRead {
   @@unique([userId, nodeId])
   @@index([nodeId])
 }
+
+// Story 4.3+: CommentAttachment Model for file attachments
+model CommentAttachment {
+  id          String   @id @default(cuid())
+  
+  commentId   String
+  comment     Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  
+  fileName    String      // Original filename
+  fileSize    Int         // Size in bytes
+  mimeType    String      // e.g., "image/png", "application/pdf"
+  storagePath String      // Local storage path: uploads/comments/{commentId}/{filename}
+  
+  uploaderId  String      // User who uploaded the file
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([commentId])
+}
+

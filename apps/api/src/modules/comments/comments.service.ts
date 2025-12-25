@@ -70,11 +70,31 @@ export class CommentsService {
             replyToId: dto.replyToId,
         });
 
+        // 3.1 Associate uploaded attachments with this comment
+        if (dto.attachmentIds && dto.attachmentIds.length > 0) {
+            await prisma.commentAttachment.updateMany({
+                where: {
+                    id: { in: dto.attachmentIds },
+                    uploaderId: userId,
+                    commentId: 'pending', // Only associate pending attachments
+                },
+                data: {
+                    commentId: comment.id,
+                },
+            });
+        }
+
+        // 3.2 Reload comment with attachments
+        const fullComment = await this.repo.findById(comment.id);
+        if (!fullComment) {
+            throw new NotFoundException('Comment creation failed');
+        }
+
         // 4. Parse mentions and notify
-        await this.handleMentions(dto.content, comment, node, userId);
+        await this.handleMentions(dto.content, fullComment, node, userId);
 
         // 5. Emit real-time event
-        const commentResponse = this.mapToComment(comment);
+        const commentResponse = this.mapToComment(fullComment);
         this.gateway.emitCommentCreated(node.graphId, commentResponse);
 
         return commentResponse;
@@ -252,6 +272,15 @@ export class CommentsService {
                 : undefined,
             replyToId: comment.replyToId,
             replies: comment.replies?.map((r) => this.mapToComment(r)),
+            // Story 4.3+: Map attachments
+            attachments: comment.attachments?.map((a) => ({
+                id: a.id,
+                fileName: a.fileName,
+                fileSize: a.fileSize,
+                mimeType: a.mimeType,
+                url: `/api/comments/attachments/${a.id}`,
+                createdAt: a.createdAt.toISOString(),
+            })),
             createdAt: comment.createdAt.toISOString(),
             updatedAt: comment.updatedAt.toISOString(),
         };

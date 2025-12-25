@@ -97,8 +97,8 @@ export function CommentPanel({
     }, []);
 
     // Handle submit comment
-    const handleSubmit = useCallback(async (content: string) => {
-        await createComment(content, replyToId || undefined);
+    const handleSubmit = useCallback(async (content: string, attachmentIds?: string[]) => {
+        await createComment(content, replyToId || undefined, attachmentIds);
         setReplyToId(null);
         setReplyToName(null);
     }, [createComment, replyToId]);
@@ -204,6 +204,7 @@ export function CommentPanel({
                     onSubmit={handleSubmit}
                     replyToName={replyToName || undefined}
                     onCancelReply={handleCancelReply}
+                    userId={userId}
                 />
             </div>
         </div>

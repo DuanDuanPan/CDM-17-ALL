@@ -12,6 +12,14 @@ export interface CommentWithAuthor extends Comment {
         name: string | null;
         email: string;
     };
+    attachments?: {
+        id: string;
+        fileName: string;
+        fileSize: number;
+        mimeType: string;
+        storagePath: string;
+        createdAt: Date;
+    }[];
     replies?: CommentWithAuthor[];
 }
 
@@ -50,6 +58,7 @@ export class CommentsRepository {
             },
             include: {
                 author: { select: this.authorSelect },
+                attachments: true,
             },
         });
     }
@@ -70,9 +79,11 @@ export class CommentsRepository {
             },
             include: {
                 author: { select: this.authorSelect },
+                attachments: true,
                 replies: {
                     include: {
                         author: { select: this.authorSelect },
+                        attachments: true,
                     },
                     orderBy: { createdAt: 'asc' },
                 },
@@ -94,6 +105,7 @@ export class CommentsRepository {
             where: { id },
             include: {
                 author: { select: this.authorSelect },
+                attachments: true,
             },
         });
     }

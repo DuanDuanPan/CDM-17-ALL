@@ -5,6 +5,7 @@
 
 import { Module, forwardRef } from '@nestjs/common';
 import { CommentsController } from './comments.controller';
+import { AttachmentsController } from './attachments.controller';
 import { CommentsService } from './comments.service';
 import { CommentsRepository } from './comments.repository';
 import { CommentsGateway } from './comments.gateway';
@@ -16,7 +17,7 @@ import { UsersModule } from '../users/users.module';
         forwardRef(() => NotificationModule),
         UsersModule,
     ],
-    controllers: [CommentsController],
+    controllers: [CommentsController, AttachmentsController],
     providers: [
         CommentsService,
         CommentsRepository,
@@ -25,3 +26,4 @@ import { UsersModule } from '../users/users.module';
     exports: [CommentsService],
 })
 export class CommentsModule { }
+

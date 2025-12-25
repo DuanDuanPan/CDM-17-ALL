@@ -102,7 +102,8 @@ export function useComments({
     // Create a new comment
     const createComment = useCallback(async (
         content: string,
-        replyToId?: string
+        replyToId?: string,
+        attachmentIds?: string[]
     ): Promise<Comment | null> => {
         if (!nodeId) return null;
 
@@ -113,7 +114,7 @@ export function useComments({
                     'Content-Type': 'application/json',
                     'x-user-id': userId,
                 },
-                body: JSON.stringify({ content, nodeId, replyToId }),
+                body: JSON.stringify({ content, nodeId, replyToId, attachmentIds }),
             });
 
             if (!response.ok) {

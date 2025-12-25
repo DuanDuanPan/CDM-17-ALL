@@ -2,11 +2,13 @@
 
 /**
  * Story 4.3: Contextual Comments & Mentions
- * CommentInput Component - Textarea with @mention suggestions
+ * CommentInput Component - Textarea with @mention suggestions and attachments
  */
 
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
-import { Send, AtSign, Loader2, X } from 'lucide-react';
+import { Send, AtSign, Loader2, X, Paperclip } from 'lucide-react';
+import { useAttachmentUpload } from '@/hooks/useAttachmentUpload';
+import { AttachmentPreview } from './AttachmentPreview';
 
 // Types
 interface UserSuggestion {
@@ -16,11 +18,12 @@ interface UserSuggestion {
 }
 
 interface CommentInputProps {
-    onSubmit: (content: string) => Promise<void>;
+    onSubmit: (content: string, attachmentIds?: string[]) => Promise<void>;
     placeholder?: string;
     replyToName?: string;
     onCancelReply?: () => void;
     disabled?: boolean;
+    userId: string;  // Required for attachment upload
 }
 
 export function CommentInput({
@@ -29,6 +32,7 @@ export function CommentInput({
     replyToName,
     onCancelReply,
     disabled = false,
+    userId,
 }: CommentInputProps) {
     const [content, setContent] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,6 +45,17 @@ export function CommentInput({
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Attachment upload hook
+    const {
+        files: uploadingFiles,
+        upload,
+        remove: removeFile,
+        clear: clearFiles,
+        getAttachmentIds,
+        isUploading,
+    } = useAttachmentUpload({ userId, maxFiles: 5, maxSize: 10 * 1024 * 1024 });
 
     // Fetch user suggestions
     const fetchSuggestions = useCallback(async (query: string) => {
@@ -162,18 +177,37 @@ export function CommentInput({
     // Handle submit
     const handleSubmit = async () => {
         const trimmedContent = content.trim();
-        if (!trimmedContent || isSubmitting) return;
+        // Allow submit if there's content OR attachments
+        if ((!trimmedContent && uploadingFiles.length === 0) || isSubmitting || isUploading) return;
 
         setIsSubmitting(true);
         try {
-            await onSubmit(trimmedContent);
+            const attachmentIds = getAttachmentIds();
+            await onSubmit(trimmedContent || '📎', attachmentIds.length > 0 ? attachmentIds : undefined);
             setContent('');
+            clearFiles();
             onCancelReply?.();
         } catch (err) {
             console.error('[CommentInput] Submit error:', err);
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    // Handle file selection
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files) return;
+
+        for (const file of Array.from(files)) {
+            try {
+                await upload(file);
+            } catch (err) {
+                console.error('[CommentInput] Upload error:', err);
+            }
+        }
+        // Reset input to allow selecting the same file again
+        e.target.value = '';
     };
 
     // Auto-resize textarea
@@ -254,10 +288,23 @@ export function CommentInput({
                     )}
                 </div>
 
+                {/* Attachment button */}
+                <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={disabled || isSubmitting || uploadingFiles.length >= 5}
+                    className="flex-shrink-0 p-2 rounded-lg border border-gray-200 text-gray-500
+                    hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed
+                    transition-colors"
+                    title="添加附件 (最多5个)"
+                >
+                    <Paperclip className="h-4 w-4" />
+                </button>
+
                 {/* Submit button */}
                 <button
                     onClick={handleSubmit}
-                    disabled={!content.trim() || disabled || isSubmitting}
+                    disabled={(!content.trim() && uploadingFiles.length === 0) || disabled || isSubmitting || isUploading}
                     className="flex-shrink-0 p-2 rounded-lg bg-blue-600 text-white
             hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed
             transition-colors"
@@ -271,12 +318,33 @@ export function CommentInput({
                 </button>
             </div>
 
+            {/* Attachment preview */}
+            {uploadingFiles.length > 0 && (
+                <AttachmentPreview
+                    files={uploadingFiles}
+                    onRemove={removeFile}
+                    disabled={isSubmitting}
+                />
+            )}
+
+            {/* Hidden file input */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip"
+                onChange={handleFileSelect}
+                className="hidden"
+            />
+
             {/* Help text */}
             <p className="mt-1 text-xs text-gray-400">
-                使用 <AtSign className="inline h-3 w-3" /> 提及用户，⌘+Enter 发送
+                使用 <AtSign className="inline h-3 w-3" /> 提及用户，<Paperclip className="inline h-3 w-3" /> 添加附件，⌘+Enter 发送
             </p>
         </div>
     );
 }
 
 export default CommentInput;
+
+
