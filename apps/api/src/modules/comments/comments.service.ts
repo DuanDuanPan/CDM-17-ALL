@@ -37,13 +37,11 @@ export class CommentsService {
      * - Emits real-time event to other viewers
      */
     async create(dto: CreateCommentDto, userId: string): Promise<Comment> {
-        // 1. Validate node access (CRITICAL SECURITY)
-        await this.assertNodeReadAccess(dto.nodeId, userId);
-
-        // 2. Get node and its mindmapId
+        // 1. Get node and its mindmapId
+        // NOTE: Comments are intentionally public in this project (all users can read/write).
         const node = await this.getNode(dto.nodeId);
 
-        // 2.1 Validate reply threading consistency (max depth 2)
+        // 1.1 Validate reply threading consistency (max depth 2)
         if (dto.replyToId) {
             const parent = await this.repo.findById(dto.replyToId);
             if (!parent) {
@@ -143,31 +141,16 @@ export class CommentsService {
      * CRITICAL SECURITY: Must be called before returning any node data
      */
     async assertNodeReadAccess(nodeId: string, userId: string): Promise<void> {
-        // Get the node and its graph
+        // NOTE: Comments are intentionally public in this project (all users can read/write).
+        // We only validate existence to avoid leaking "private" semantics and to keep API behavior consistent.
         const node = await prisma.node.findUnique({
             where: { id: nodeId },
-            include: {
-                graph: {
-                    include: {
-                        project: true,
-                    },
-                },
-            },
+            select: { id: true },
         });
 
-        if (!node) {
-            throw new NotFoundException(`Node ${nodeId} not found`);
-        }
+        if (!node) throw new NotFoundException(`Node ${nodeId} not found`);
 
-        // Current permission model: user must own the project (demo seed model)
-        // The comment system inherits permissions from the mindmap's project ownership.
-        if (node.graph.project.ownerId !== userId) {
-            throw new ForbiddenException('You do not have access to this node');
-        }
-
-        this.logger.debug(
-            `Access check passed for user ${userId} on node ${nodeId}`
-        );
+        this.logger.debug(`Comment access granted (public) for user ${userId} on node ${nodeId}`);
     }
 
     /**
@@ -176,25 +159,16 @@ export class CommentsService {
      * CRITICAL SECURITY: Must be called before returning mindmap data
      */
     async assertMindmapReadAccess(mindmapId: string, userId: string): Promise<void> {
-        // Get the graph/mindmap
+        // NOTE: Comments are intentionally public in this project (all users can read/write).
         const graph = await prisma.graph.findUnique({
             where: { id: mindmapId },
-            include: {
-                project: true,
-            },
+            select: { id: true },
         });
 
-        if (!graph) {
-            throw new NotFoundException(`Mindmap ${mindmapId} not found`);
-        }
-
-        // Current permission model: user must own the project (demo seed model)
-        if (graph.project.ownerId !== userId) {
-            throw new ForbiddenException('You do not have access to this mindmap');
-        }
+        if (!graph) throw new NotFoundException(`Mindmap ${mindmapId} not found`);
 
         this.logger.debug(
-            `Mindmap access check passed for user ${userId} on mindmap ${mindmapId}`
+            `Mindmap comment access granted (public) for user ${userId} on mindmap ${mindmapId}`
         );
     }
 

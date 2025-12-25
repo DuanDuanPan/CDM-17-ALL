@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { setUnreadCounts as setGlobalUnreadCounts } from '@/lib/commentCountStore';
 
 export interface UseCommentCountOptions {
     mindmapId: string | null;
@@ -44,6 +45,8 @@ export function useCommentCount({
             if (response.ok) {
                 const data = await response.json();
                 setUnreadCounts(data);
+                // Sync to global store for X6 portal components (MindNode)
+                setGlobalUnreadCounts(data);
             }
         } catch (err) {
             console.error('[useCommentCount] Fetch error:', err);

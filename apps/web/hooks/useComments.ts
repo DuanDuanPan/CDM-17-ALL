@@ -11,6 +11,16 @@ import { COMMENT_SOCKET_EVENTS } from '@cdm/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
+function commentExists(list: Comment[], commentId: string): boolean {
+    for (const item of list) {
+        if (item.id === commentId) return true;
+        if (item.replies && item.replies.length > 0) {
+            if (commentExists(item.replies, commentId)) return true;
+        }
+    }
+    return false;
+}
+
 export interface UseCommentsOptions {
     nodeId: string | null;
     userId: string;
@@ -115,16 +125,20 @@ export function useComments({
             // Optimistic update - add to beginning of list
             if (replyToId) {
                 // Add as reply
-                setComments((prev) =>
-                    prev.map((c) =>
+                setComments((prev) => {
+                    if (commentExists(prev, newComment.id)) return prev;
+                    return prev.map((c) =>
                         c.id === replyToId
                             ? { ...c, replies: [...(c.replies || []), newComment] }
                             : c
-                    )
-                );
+                    );
+                });
             } else {
                 // Add as top-level comment
-                setComments((prev) => [newComment, ...prev]);
+                setComments((prev) => {
+                    if (commentExists(prev, newComment.id)) return prev;
+                    return [newComment, ...prev];
+                });
             }
 
             return newComment;
@@ -196,22 +210,21 @@ export function useComments({
 
         socket.on(COMMENT_SOCKET_EVENTS.CREATED, (comment: Comment) => {
             if (comment.nodeId === nodeId) {
-                if (comment.replyToId) {
-                    // Add as reply
-                    setComments((prev) =>
-                        prev.map((c) =>
-                            c.id === comment.replyToId
-                                ? { ...c, replies: [...(c.replies || []), comment] }
-                                : c
-                        )
-                    );
-                } else {
-                    // Add as top-level comment (avoid duplicates)
-                    setComments((prev) => {
-                        if (prev.find((c) => c.id === comment.id)) return prev;
-                        return [comment, ...prev];
-                    });
-                }
+                setComments((prev) => {
+                    if (commentExists(prev, comment.id)) return prev;
+                    if (comment.replyToId) {
+                        let inserted = false;
+                        const next = prev.map((c) => {
+                            if (c.id === comment.replyToId) {
+                                inserted = true;
+                                return { ...c, replies: [...(c.replies || []), comment] };
+                            }
+                            return c;
+                        });
+                        return inserted ? next : prev;
+                    }
+                    return [comment, ...prev];
+                });
             }
         });
 

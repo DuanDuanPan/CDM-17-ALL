@@ -4,7 +4,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- Jest mocks */
 
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CommentsService } from '../comments.service';
 
 // Mock Prisma
@@ -69,24 +69,12 @@ describe('CommentsService', () => {
             );
         });
 
-        it('throws ForbiddenException when user is not project owner', async () => {
+        it('passes when node exists (public comment access)', async () => {
             (mockPrisma.node.findUnique as jest.Mock).mockResolvedValue({
                 id: 'node-1',
-                graph: { project: { ownerId: 'owner-1' } },
             });
 
-            await expect(service.assertNodeReadAccess('node-1', 'user-2')).rejects.toThrow(
-                ForbiddenException
-            );
-        });
-
-        it('passes when user is project owner', async () => {
-            (mockPrisma.node.findUnique as jest.Mock).mockResolvedValue({
-                id: 'node-1',
-                graph: { project: { ownerId: 'user-1' } },
-            });
-
-            await expect(service.assertNodeReadAccess('node-1', 'user-1')).resolves.toBeUndefined();
+            await expect(service.assertNodeReadAccess('node-1', 'user-2')).resolves.toBeUndefined();
         });
     });
 
@@ -99,45 +87,23 @@ describe('CommentsService', () => {
             ).rejects.toThrow(NotFoundException);
         });
 
-        it('throws ForbiddenException when user is not project owner', async () => {
+        it('passes when mindmap exists (public comment access)', async () => {
             (mockPrisma.graph.findUnique as jest.Mock).mockResolvedValue({
                 id: 'graph-1',
-                project: { ownerId: 'owner-1' },
             });
 
             await expect(
                 service.assertMindmapReadAccess('graph-1', 'user-2')
-            ).rejects.toThrow(ForbiddenException);
-        });
-
-        it('passes when user is project owner', async () => {
-            (mockPrisma.graph.findUnique as jest.Mock).mockResolvedValue({
-                id: 'graph-1',
-                project: { ownerId: 'user-1' },
-            });
-
-            await expect(
-                service.assertMindmapReadAccess('graph-1', 'user-1')
             ).resolves.toBeUndefined();
         });
     });
 
     describe('create', () => {
         beforeEach(() => {
-            (mockPrisma.node.findUnique as jest.Mock).mockImplementation(async (args: any) => {
-                if (args?.include) {
-                    // assertNodeReadAccess()
-                    return {
-                        id: 'node-1',
-                        graph: { project: { ownerId: 'user-1' } },
-                    };
-                }
-                // getNode()
-                return {
-                    id: 'node-1',
-                    label: 'Node 1',
-                    graphId: 'graph-1',
-                };
+            (mockPrisma.node.findUnique as jest.Mock).mockResolvedValue({
+                id: 'node-1',
+                label: 'Node 1',
+                graphId: 'graph-1',
             });
         });
 
@@ -209,4 +175,3 @@ describe('CommentsService', () => {
         });
     });
 });
-

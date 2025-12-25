@@ -19,7 +19,7 @@ import {
 import { NodeType, type TaskProps, type RequirementProps, type PBSProps, type DataProps, type AppProps, type AppOutput, type AppExecutionStatus, type ApprovalStatus, type ApprovalPipeline } from '@cdm/types';
 import type { MindNodeData } from '@cdm/types';
 import { updateNode, updateNodeProps } from '@/lib/api/nodes';
-import { useCommentCountContext } from '@/contexts';
+import { getUnreadCount as getGlobalUnreadCount, subscribe as subscribeToUnreadCounts } from '@/lib/commentCountStore';
 // Rich Node UI components
 import { RichNodeLayout } from './rich/RichNodeLayout';
 import { TitleRow } from './rich/TitleRow';
@@ -192,8 +192,16 @@ export function MindNode({ node }: MindNodeProps) {
   const [appRunning, setAppRunning] = useState(false);
 
   // Story 4.3: Unread comment indicator (AC4)
-  const { getUnreadCount } = useCommentCountContext();
-  const unreadCount = getUnreadCount(node.id);
+  // Use global store instead of Context because X6 renders via portal outside React tree
+  const [unreadCount, setUnreadCount] = useState(() => getGlobalUnreadCount(node.id));
+
+  // Subscribe to unread count changes from global store
+  useEffect(() => {
+    const unsubscribe = subscribeToUnreadCounts(() => {
+      setUnreadCount(getGlobalUnreadCount(node.id));
+    });
+    return unsubscribe;
+  }, [node.id]);
 
   // Sync state with node data
   useEffect(() => {

@@ -134,11 +134,10 @@ export function AppLibraryDialog({ open, onOpenChange, onSelect }: AppLibraryDia
             <div className="flex flex-wrap gap-2 mt-3">
               <button
                 onClick={() => setSelectedCategory(null)}
-                className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
-                  selectedCategory === null
+                className={`px-2.5 py-1 text-xs rounded-full transition-colors ${selectedCategory === null
                     ? 'bg-cyan-100 text-cyan-700 font-medium'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 全部
               </button>
@@ -146,11 +145,10 @@ export function AppLibraryDialog({ open, onOpenChange, onSelect }: AppLibraryDia
                 <button
                   key={category}
                   onClick={() => setSelectedCategory(category)}
-                  className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
-                    selectedCategory === category
+                  className={`px-2.5 py-1 text-xs rounded-full transition-colors ${selectedCategory === category
                       ? 'bg-cyan-100 text-cyan-700 font-medium'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   {category}
                 </button>
@@ -177,19 +175,16 @@ export function AppLibraryDialog({ open, onOpenChange, onSelect }: AppLibraryDia
                 <button
                   key={entry.id}
                   onClick={() => setSelectedEntry(entry)}
-                  className={`p-4 text-left rounded-lg border-2 transition-all ${
-                    selectedEntry?.id === entry.id
+                  className={`p-4 text-left rounded-lg border-2 transition-all ${selectedEntry?.id === entry.id
                       ? 'border-cyan-500 bg-cyan-50'
                       : 'border-gray-200 hover:border-cyan-300 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-lg ${
-                      selectedEntry?.id === entry.id ? 'bg-cyan-100' : 'bg-gray-100'
-                    }`}>
-                      <Grid3X3 className={`w-5 h-5 ${
-                        selectedEntry?.id === entry.id ? 'text-cyan-600' : 'text-gray-500'
-                      }`} />
+                    <div className={`p-2 rounded-lg ${selectedEntry?.id === entry.id ? 'bg-cyan-100' : 'bg-gray-100'
+                      }`}>
+                      <Grid3X3 className={`w-5 h-5 ${selectedEntry?.id === entry.id ? 'text-cyan-600' : 'text-gray-500'
+                        }`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -239,11 +234,10 @@ export function AppLibraryDialog({ open, onOpenChange, onSelect }: AppLibraryDia
             <button
               onClick={handleSelect}
               disabled={!selectedEntry}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                selectedEntry
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${selectedEntry
                   ? 'bg-cyan-500 text-white hover:bg-cyan-600'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
+                }`}
             >
               选择应用
             </button>
