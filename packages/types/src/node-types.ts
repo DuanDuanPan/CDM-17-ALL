@@ -361,7 +361,7 @@ export const TaskPropsSchema = z
     // Story 2.8: Knowledge association
     knowledgeRefs: z.array(KnowledgeReferenceSchema).optional(),
     // Story 4.1: Approval deliverables (synced via Yjs)
-    deliverables: z.array(DeliverableSchema).optional(),
+    deliverables: z.array(DeliverableSchema).nullable().optional(),
   })
   .strict();
 
