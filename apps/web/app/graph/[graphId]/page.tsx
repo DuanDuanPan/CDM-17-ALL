@@ -157,6 +157,20 @@ function GraphPageContent() {
         };
     }, [handleOpenComments]);
 
+    // Story 4.3+: Sync comment panel with selected node when panel is open
+    useEffect(() => {
+        // If comment panel is open and user selects a different node, update the panel
+        if (commentNodeId && selectedNodeId && commentNodeId !== selectedNodeId && graph) {
+            // Use X6 Graph API to get node data
+            const cell = graph.getCellById(selectedNodeId);
+            if (cell && cell.isNode()) {
+                const nodeLabel = cell.getData()?.label || cell.getAttrs()?.text?.text || '未命名节点';
+                setCommentNodeId(selectedNodeId);
+                setCommentNodeLabel(String(nodeLabel));
+            }
+        }
+    }, [selectedNodeId, commentNodeId, graph]);
+
 
     return (
         <CollaborationUIProvider
@@ -221,13 +235,13 @@ function GraphPageContent() {
                                 onClose={handleCloseComments}
                                 onMarkAsRead={refreshCommentCounts}
                             />
-	                        )}
-	                    </div>
-	                </GraphProvider>
-	            </CommentCountContext.Provider>
-	        </CollaborationUIProvider>
-	    );
-	}
+                        )}
+                    </div>
+                </GraphProvider>
+            </CommentCountContext.Provider>
+        </CollaborationUIProvider>
+    );
+}
 
 export default function GraphPage() {
     return (

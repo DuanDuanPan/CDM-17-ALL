@@ -6,7 +6,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Trash2, CornerDownRight } from 'lucide-react';
+import { Trash2, CornerDownRight, FileText, Download, Image as ImageIcon } from 'lucide-react';
 import type { Comment } from '@cdm/types';
 
 // Helper: Format relative time
@@ -130,6 +130,43 @@ export function CommentItem({
                     <div className="mt-1 text-sm text-gray-700 whitespace-pre-wrap break-words">
                         {highlightMentions(comment.content)}
                     </div>
+
+                    {/* Attachments */}
+                    {comment.attachments && comment.attachments.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {comment.attachments.map((attachment) => {
+                                const isImage = attachment.mimeType.startsWith('image/');
+                                return (
+                                    <a
+                                        key={attachment.id}
+                                        href={attachment.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`group/att flex items-center gap-2 px-2 py-1.5 rounded-lg border border-gray-200 
+                                            hover:border-blue-300 hover:bg-blue-50 transition-colors max-w-[200px]
+                                            ${isImage ? 'flex-col p-1' : ''}`}
+                                        title={attachment.fileName}
+                                    >
+                                        {isImage ? (
+                                            <img
+                                                src={attachment.url}
+                                                alt={attachment.fileName}
+                                                className="w-24 h-24 object-cover rounded"
+                                            />
+                                        ) : (
+                                            <>
+                                                <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                                <span className="text-xs text-gray-600 truncate flex-1">
+                                                    {attachment.fileName}
+                                                </span>
+                                                <Download className="h-3 w-3 text-gray-400 group-hover/att:text-blue-500 flex-shrink-0" />
+                                            </>
+                                        )}
+                                    </a>
+                                );
+                            })}
+                        </div>
+                    )}
 
                     {/* Actions (hover) */}
                     <div

@@ -136,10 +136,18 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
   useEffect(() => {
     if (!graph || !isReady || currentMode === 'free') return;
 
-    const handleGraphChange = () => {
-      const layoutManager = layoutPlugin.getLayoutManager();
-      if (layoutManager) {
-        // Recalculate layout with animation
+    // Debounce recalculation to avoid thrashing when many nodes mount/resize at once.
+    // This is especially important on page refresh: React-shape nodes are created with
+    // a small default size, then auto-resized after render. If we layout too early,
+    // siblings can overlap because the layout algorithm used outdated heights.
+    let recalcTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRecalculate = () => {
+      if (recalcTimer) clearTimeout(recalcTimer);
+      recalcTimer = setTimeout(() => {
+        recalcTimer = null;
+        const layoutManager = layoutPlugin.getLayoutManager();
+        if (!layoutManager) return;
         layoutManager.recalculate(true).catch((err) => {
           console.error('Failed to recalculate layout:', err);
           addToast({
@@ -148,22 +156,29 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
             description: err instanceof Error ? err.message : '无法重新计算布局',
           });
         });
-      }
+      }, 120);
     };
 
     // Listen for node add/remove events
-    graph.on('node:added', handleGraphChange);
-    graph.on('node:removed', handleGraphChange);
+    graph.on('node:added', scheduleRecalculate);
+    graph.on('node:removed', scheduleRecalculate);
 
     // Story 2.7: Listen for node visibility changes (archive/restore)
     // When a node is archived (hidden) or restored (shown), recalculate layout
-    graph.on('node:change:visible', handleGraphChange);
+    graph.on('node:change:visible', scheduleRecalculate);
+    // When a node auto-resizes after render (React shape), recalculate layout to prevent overlap
+    graph.on('node:change:size', scheduleRecalculate);
 
     return () => {
+      if (recalcTimer) {
+        clearTimeout(recalcTimer);
+        recalcTimer = null;
+      }
       if (graph && typeof graph.off === 'function') {
-        graph.off('node:added', handleGraphChange);
-        graph.off('node:removed', handleGraphChange);
-        graph.off('node:change:visible', handleGraphChange);
+        graph.off('node:added', scheduleRecalculate);
+        graph.off('node:removed', scheduleRecalculate);
+        graph.off('node:change:visible', scheduleRecalculate);
+        graph.off('node:change:size', scheduleRecalculate);
       }
     };
   }, [graph, isReady, currentMode, addToast]);

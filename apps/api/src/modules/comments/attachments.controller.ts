@@ -103,15 +103,25 @@ export class AttachmentsController {
             throw new BadRequestException('No file uploaded');
         }
 
+        // Decode UTF-8 filename (Multer may return Latin-1 encoded string)
+        let decodedFileName = file.originalname;
+        try {
+            // Try to decode if it looks like corrupted UTF-8
+            decodedFileName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        } catch {
+            // If decoding fails, use original
+            decodedFileName = file.originalname;
+        }
+
         // Create attachment record (pending association with comment)
         const attachment = await prisma.commentAttachment.create({
             data: {
-                fileName: file.originalname,
+                fileName: decodedFileName,
                 fileSize: file.size,
                 mimeType: file.mimetype,
                 storagePath: file.filename, // Just the filename, not full path
                 uploaderId: userId,
-                commentId: 'pending', // Will be updated when comment is created
+                // commentId is null by default - will be set when comment is created
             },
         });
 

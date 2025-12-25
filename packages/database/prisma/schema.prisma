@@ -298,13 +298,13 @@ model CommentRead {
 model CommentAttachment {
   id          String   @id @default(cuid())
   
-  commentId   String
-  comment     Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId   String?  // Nullable: null means pending association
+  comment     Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
   
   fileName    String      // Original filename
   fileSize    Int         // Size in bytes
   mimeType    String      // e.g., "image/png", "application/pdf"
-  storagePath String      // Local storage path: uploads/comments/{commentId}/{filename}
+  storagePath String      // Local storage path: uploads/comments/{filename}
   
   uploaderId  String      // User who uploaded the file
   

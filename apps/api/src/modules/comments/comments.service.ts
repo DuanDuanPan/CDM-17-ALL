@@ -76,7 +76,7 @@ export class CommentsService {
                 where: {
                     id: { in: dto.attachmentIds },
                     uploaderId: userId,
-                    commentId: 'pending', // Only associate pending attachments
+                    commentId: null, // Only associate pending (unassigned) attachments
                 },
                 data: {
                     commentId: comment.id,

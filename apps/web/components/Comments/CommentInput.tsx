@@ -243,88 +243,96 @@ export function CommentInput({
             )}
 
             {/* Input container */}
-            <div className="flex gap-2 items-end">
-                <div className="flex-1 relative">
-                    <textarea
-                        ref={textareaRef}
-                        value={content}
-                        onChange={handleChange}
-                        onKeyDown={handleKeyDown}
-                        placeholder={placeholder}
-                        disabled={disabled || isSubmitting}
-                        rows={1}
-                        className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm
-              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-              disabled:bg-gray-50 disabled:cursor-not-allowed
-              placeholder:text-gray-400"
-                    />
+            <div className={`group relative border rounded-xl bg-white transition-all duration-200 ease-in-out
+                ${isSubmitting ? 'bg-gray-50' : ''}
+                ${disabled ? 'opacity-60 cursor-not-allowed' : ''}
+                border-gray-200 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/10
+            `}>
+                <textarea
+                    ref={textareaRef}
+                    value={content}
+                    onChange={handleChange}
+                    onKeyDown={handleKeyDown}
+                    placeholder={placeholder}
+                    disabled={disabled || isSubmitting}
+                    rows={1}
+                    className="w-full resize-none border-none bg-transparent px-4 py-3 text-sm focus:ring-0 placeholder:text-gray-400 min-h-[48px]"
+                />
 
-                    {/* Mention suggestions popover */}
-                    {showSuggestions && suggestions.length > 0 && (
-                        <div
-                            ref={suggestionsRef}
-                            className="absolute bottom-full left-0 mb-1 w-full max-h-[200px] overflow-y-auto
-                bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+                {/* Toolbar */}
+                <div className="flex justify-between items-center px-2 pb-2">
+                    <div className="flex items-center gap-1">
+                        {/* Attachment button */}
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={disabled || isSubmitting || uploadingFiles.length >= 5}
+                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                            title="添加附件 (最多5个)"
                         >
-                            {suggestions.map((user, index) => (
-                                <div
-                                    key={user.id}
-                                    onClick={() => handleSelectSuggestion(user)}
-                                    className={`flex items-center gap-2 px-3 py-2 cursor-pointer
-                    ${index === selectedIndex ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-                                >
-                                    <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-medium text-blue-700">
-                                        {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 truncate">
-                                            {user.name || '未命名用户'}
-                                        </p>
-                                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                            <Paperclip className="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-gray-300 hidden sm:inline-block">⌘+Enter 发送</span>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={(!content.trim() && uploadingFiles.length === 0) || disabled || isSubmitting || isUploading}
+                            className={`p-2 rounded-lg transition-all duration-200
+                                ${(!content.trim() && uploadingFiles.length === 0) || disabled || isSubmitting || isUploading
+                                    ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow'
+                                }`}
+                            title="发送"
+                        >
+                            {isSubmitting ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Send className="h-4 w-4" />
+                            )}
+                        </button>
+                    </div>
                 </div>
 
-                {/* Attachment button */}
-                <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={disabled || isSubmitting || uploadingFiles.length >= 5}
-                    className="flex-shrink-0 p-2 rounded-lg border border-gray-200 text-gray-500
-                    hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed
-                    transition-colors"
-                    title="添加附件 (最多5个)"
-                >
-                    <Paperclip className="h-4 w-4" />
-                </button>
-
-                {/* Submit button */}
-                <button
-                    onClick={handleSubmit}
-                    disabled={(!content.trim() && uploadingFiles.length === 0) || disabled || isSubmitting || isUploading}
-                    className="flex-shrink-0 p-2 rounded-lg bg-blue-600 text-white
-            hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed
-            transition-colors"
-                    title="发送 (⌘+Enter)"
-                >
-                    {isSubmitting ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                        <Send className="h-4 w-4" />
-                    )}
-                </button>
+                {/* Mention suggestions popover */}
+                {showSuggestions && suggestions.length > 0 && (
+                    <div
+                        ref={suggestionsRef}
+                        className="absolute bottom-full left-0 mb-2 w-full max-h-[200px] overflow-y-auto
+                bg-white border border-gray-100 rounded-xl shadow-xl z-50 p-1"
+                    >
+                        {suggestions.map((user, index) => (
+                            <div
+                                key={user.id}
+                                onClick={() => handleSelectSuggestion(user)}
+                                className={`flex items-center gap-3 px-3 py-2 cursor-pointer rounded-lg transition-colors
+                    ${index === selectedIndex ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                            >
+                                <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-600">
+                                    {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                        {user.name || '未命名用户'}
+                                    </p>
+                                    <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Attachment preview */}
             {uploadingFiles.length > 0 && (
-                <AttachmentPreview
-                    files={uploadingFiles}
-                    onRemove={removeFile}
-                    disabled={isSubmitting}
-                />
+                <div className="mt-2">
+                    <AttachmentPreview
+                        files={uploadingFiles}
+                        onRemove={removeFile}
+                        disabled={isSubmitting}
+                    />
+                </div>
             )}
 
             {/* Hidden file input */}
@@ -336,11 +344,6 @@ export function CommentInput({
                 onChange={handleFileSelect}
                 className="hidden"
             />
-
-            {/* Help text */}
-            <p className="mt-1 text-xs text-gray-400">
-                使用 <AtSign className="inline h-3 w-3" /> 提及用户，<Paperclip className="inline h-3 w-3" /> 添加附件，⌘+Enter 发送
-            </p>
         </div>
     );
 }
