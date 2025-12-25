@@ -17,6 +17,10 @@ import { useToast } from '@cdm/ui';
 export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMode: LayoutMode) {
   const [gridEnabled, setGridEnabled] = useState(false);
   const { addToast } = useToast();
+  const isDocumentVisible = useCallback(
+    () => typeof document === 'undefined' || document.visibilityState === 'visible',
+    []
+  );
 
   // Initialize layout plugin when graph is ready
   useEffect(() => {
@@ -47,15 +51,20 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     }
 
     // Apply initial layout
-    layoutPlugin.changeLayout(currentMode, false).catch((err) => {
-      console.error('Failed to apply initial layout:', err);
-      addToast({
-        type: 'error',
-        title: '布局初始化失败',
-        description: err instanceof Error ? err.message : '无法应用初始布局',
+    // In collaboration scenarios, a hidden/minimized browser can have stale node sizes
+    // (React-shape auto-resize doesn't run), which leads to incorrect auto-layout that
+    // then gets synced to other clients. Avoid running layout while document is hidden.
+    if (isDocumentVisible()) {
+      layoutPlugin.changeLayout(currentMode, false).catch((err) => {
+        console.error('Failed to apply initial layout:', err);
+        addToast({
+          type: 'error',
+          title: '布局初始化失败',
+          description: err instanceof Error ? err.message : '无法应用初始布局',
+        });
       });
-    });
-  }, [graph, isReady, currentMode, addToast]);
+    }
+  }, [graph, isReady, currentMode, addToast, isDocumentVisible]);
 
   // React to external layout mode changes (e.g., toolbar toggle)
   useEffect(() => {
@@ -81,15 +90,17 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     } else {
       graph.disableSelectionMovable();
     }
-    layoutPlugin.changeLayout(currentMode, true).catch((err) => {
-      console.error('Failed to change layout:', err);
-      addToast({
-        type: 'error',
-        title: '布局切换失败',
-        description: err instanceof Error ? err.message : '无法切换到新布局',
+    if (isDocumentVisible()) {
+      layoutPlugin.changeLayout(currentMode, true).catch((err) => {
+        console.error('Failed to change layout:', err);
+        addToast({
+          type: 'error',
+          title: '布局切换失败',
+          description: err instanceof Error ? err.message : '无法切换到新布局',
+        });
       });
-    });
-  }, [graph, isReady, currentMode, addToast]);
+    }
+  }, [graph, isReady, currentMode, addToast, isDocumentVisible]);
 
   // Handle layout mode change
   const handleLayoutChange = useCallback(
@@ -143,9 +154,11 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     let recalcTimer: ReturnType<typeof setTimeout> | null = null;
 
     const scheduleRecalculate = () => {
+      if (!isDocumentVisible()) return;
       if (recalcTimer) clearTimeout(recalcTimer);
       recalcTimer = setTimeout(() => {
         recalcTimer = null;
+        if (!isDocumentVisible()) return;
         const layoutManager = layoutPlugin.getLayoutManager();
         if (!layoutManager) return;
         layoutManager.recalculate(true).catch((err) => {
@@ -181,7 +194,7 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
         graph.off('node:change:size', scheduleRecalculate);
       }
     };
-  }, [graph, isReady, currentMode, addToast]);
+  }, [graph, isReady, currentMode, addToast, isDocumentVisible]);
 
   // In non-free mode, transform drag-drop into hierarchy/order changes
   useEffect(() => {
