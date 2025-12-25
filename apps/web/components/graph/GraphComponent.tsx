@@ -27,7 +27,8 @@ import { useClipboardShortcuts } from '@/hooks/useClipboardShortcuts';
 import { useEditingState } from '@/hooks/useEditingState';
 import { ClipboardToolbar } from '@/components/toolbar/ClipboardToolbar';
 // Story 4.4: Watch & Subscription
-import { useSubscription } from '@/hooks/useSubscription';
+import { useSubscription, useSubscriptionList } from '@/hooks/useSubscription';
+import { setSubscriptions } from '@/lib/subscriptionStore';
 
 // Story 2.2: Dependency type options for context menu
 const DEPENDENCY_TYPES: { value: DependencyType; label: string; description: string }[] = [
@@ -220,6 +221,15 @@ export function GraphComponent({
     useEffect(() => {
         setHasInitializedGraphState(false);
     }, [graphId]);
+
+    // Story 4.4: Fetch user's subscriptions and hydrate global store
+    const { subscriptions } = useSubscriptionList(user.id);
+
+    useEffect(() => {
+        // Extract node IDs from subscriptions and hydrate the global store
+        const nodeIds = subscriptions.map((sub) => sub.nodeId);
+        setSubscriptions(nodeIds);
+    }, [subscriptions]);
 
     // Story 1.4 MED-12: Report remote users to context (for TopBar)
     // Use ref to track previous value and avoid infinite loop

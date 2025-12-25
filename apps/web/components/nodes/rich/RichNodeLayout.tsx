@@ -43,7 +43,7 @@ export const RichNodeLayout = memo(
         return (
             <div
                 className={`
-        relative w-full h-full flex flex-col
+        relative w-full flex flex-col
         rounded-lg overflow-hidden
         transition-all duration-200
         ${isSelected
@@ -59,7 +59,7 @@ export const RichNodeLayout = memo(
                 <StatusHeader color={headerColor} pattern={headerPattern} />
 
                 {/* Main Content Area - Flex grow to fill space */}
-                <div className="bg-white px-3 py-2 space-y-1 flex-1">
+                <div className="bg-white px-3 py-2 space-y-1">
                     {children}
                 </div>
 

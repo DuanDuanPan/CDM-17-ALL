@@ -304,6 +304,8 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
              *
              * Called periodically (debounced) when document changes.
              * Saves the binary Yjs state to PostgreSQL Graph.yjsState field.
+             * 
+             * Story 4.4 FIX: Also sync nodes to Node table for subscription feature
              */
             async onStoreDocument({ documentName, document }) {
                 Logger.log(`Storing document: ${documentName}`, 'CollabService');
@@ -313,6 +315,7 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                     const graphId = documentName.replace('graph:', '');
                     const state = Y.encodeStateAsUpdate(document);
 
+                    // 1. Save Yjs binary state to Graph table
                     await prisma.graph.update({
                         where: { id: graphId },
                         data: { yjsState: Buffer.from(state) },
@@ -322,6 +325,88 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                         `Document ${documentName} stored (graphId: ${graphId}, size: ${state.byteLength} bytes)`,
                         'CollabService',
                     );
+
+                    // 2. Story 4.4 FIX: Sync nodes from Yjs to Node table
+                    // This ensures nodes exist in relational DB for subscription feature
+                    const yNodes = document.getMap<Record<string, unknown>>('nodes');
+                    const nodeUpdates: Array<{
+                        id: string;
+                        label: string;
+                        graphId: string;
+                        type: string;
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        parentId: string | null;
+                        creatorName: string;
+                        description: string | null;
+                        tags: string[];
+                        isArchived: boolean;
+                    }> = [];
+
+                    yNodes.forEach((nodeData, nodeId) => {
+                        if (nodeData && typeof nodeData === 'object') {
+                            nodeUpdates.push({
+                                id: nodeId,
+                                label: (nodeData as { label?: string }).label || 'Untitled',
+                                graphId,
+                                type: (nodeData as { nodeType?: string }).nodeType || 'ORDINARY',
+                                x: (nodeData as { x?: number }).x || 0,
+                                y: (nodeData as { y?: number }).y || 0,
+                                width: (nodeData as { width?: number }).width || 120,
+                                height: (nodeData as { height?: number }).height || 40,
+                                parentId: (nodeData as { parentId?: string | null }).parentId || null,
+                                creatorName: (nodeData as { creatorName?: string | null }).creatorName || 'Mock User',
+                                description: (nodeData as { description?: string | null }).description || null,
+                                tags: (nodeData as { tags?: string[] }).tags || [],
+                                isArchived: (nodeData as { isArchived?: boolean }).isArchived || false,
+                            });
+                        }
+                    });
+
+                    // Upsert nodes to database (create if not exists, update if exists)
+                    if (nodeUpdates.length > 0) {
+                        const upsertPromises = nodeUpdates.map(node =>
+                            prisma.node.upsert({
+                                where: { id: node.id },
+                                create: {
+                                    id: node.id,
+                                    label: node.label,
+                                    graphId: node.graphId,
+                                    type: node.type as 'ORDINARY' | 'TASK' | 'REQUIREMENT' | 'PBS' | 'DATA' | 'APP',
+                                    x: node.x,
+                                    y: node.y,
+                                    width: node.width,
+                                    height: node.height,
+                                    parentId: node.parentId,
+                                    creatorName: node.creatorName,
+                                    description: node.description,
+                                    tags: node.tags,
+                                    isArchived: node.isArchived,
+                                },
+                                update: {
+                                    label: node.label,
+                                    type: node.type as 'ORDINARY' | 'TASK' | 'REQUIREMENT' | 'PBS' | 'DATA' | 'APP',
+                                    x: node.x,
+                                    y: node.y,
+                                    width: node.width,
+                                    height: node.height,
+                                    parentId: node.parentId,
+                                    creatorName: node.creatorName,
+                                    description: node.description,
+                                    tags: node.tags,
+                                    isArchived: node.isArchived,
+                                },
+                            })
+                        );
+
+                        await Promise.all(upsertPromises);
+                        Logger.log(
+                            `Synced ${nodeUpdates.length} nodes to Node table for graph ${graphId}`,
+                            'CollabService',
+                        );
+                    }
                 } catch (error) {
                     Logger.error(`Failed to store document ${documentName}:`, error, 'CollabService');
                 }

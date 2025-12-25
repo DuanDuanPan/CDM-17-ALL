@@ -15,11 +15,13 @@ import {
   Play, // Story 2.9: APP execution
   Loader2, // Story 2.9: APP running state
   MessageSquare, // Story 4.3: Comments
+  Eye, // Story 4.4: Subscription indicator
 } from 'lucide-react';
 import { NodeType, type TaskProps, type RequirementProps, type PBSProps, type DataProps, type AppProps, type AppOutput, type AppExecutionStatus, type ApprovalStatus, type ApprovalPipeline } from '@cdm/types';
 import type { MindNodeData } from '@cdm/types';
 import { updateNode, updateNodeProps } from '@/lib/api/nodes';
 import { getUnreadCount as getGlobalUnreadCount, subscribe as subscribeToUnreadCounts } from '@/lib/commentCountStore';
+import { isSubscribed as isNodeSubscribed, subscribe as subscribeToSubscriptionStore } from '@/lib/subscriptionStore';
 // Rich Node UI components
 import { RichNodeLayout } from './rich/RichNodeLayout';
 import { TitleRow } from './rich/TitleRow';
@@ -203,6 +205,17 @@ export function MindNode({ node }: MindNodeProps) {
     return unsubscribe;
   }, [node.id]);
 
+  // Story 4.4: Subscription indicator state
+  const [isWatched, setIsWatched] = useState(() => isNodeSubscribed(node.id));
+
+  // Subscribe to subscription store changes
+  useEffect(() => {
+    const unsubscribe = subscribeToSubscriptionStore(() => {
+      setIsWatched(isNodeSubscribed(node.id));
+    });
+    return unsubscribe;
+  }, [node.id]);
+
   // Sync state with node data
   useEffect(() => {
     if (!node) return;
@@ -293,7 +306,9 @@ export function MindNode({ node }: MindNodeProps) {
     if (!containerRef.current || !node) return;
 
     const container = containerRef.current;
-    const { width, height } = container.getBoundingClientRect();
+    // Use offset* to avoid transform feedback loops (e.g. selected scale, graph zoom)
+    const width = container.offsetWidth;
+    const height = container.offsetHeight;
 
     const renderer = getNodeRenderer(nodeType);
 
@@ -543,9 +558,19 @@ export function MindNode({ node }: MindNodeProps) {
     return (
       <div
         ref={containerRef}
-        className={containerClasses}
+        className={`${containerClasses} relative`}
         onDoubleClick={startEditing}
       >
+        {/* Story 4.4: Subscription indicator badge - top right */}
+        {isWatched && (
+          <div
+            className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center shadow-sm z-10"
+            title="已关注"
+          >
+            <Eye className="w-2.5 h-2.5 text-white" />
+          </div>
+        )}
+
         {/* Measures */}
         <div ref={titleMeasureRef} className="absolute opacity-0 pointer-events-none text-sm font-medium px-2 text-center w-full break-words">
           {label || 'New Topic'}
@@ -583,7 +608,16 @@ export function MindNode({ node }: MindNodeProps) {
       : null;
 
     return (
-      <div ref={containerRef}>
+      <div ref={containerRef} className="relative">
+        {/* Story 4.4: Subscription indicator badge - top right */}
+        {isWatched && (
+          <div
+            className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center shadow-sm z-10"
+            title="已关注"
+          >
+            <Eye className="w-2.5 h-2.5 text-white" />
+          </div>
+        )}
         <RichNodeLayout
           headerColor={headerColor}
           headerPattern={headerPattern}
@@ -718,10 +752,19 @@ export function MindNode({ node }: MindNodeProps) {
   return (
     <div
       ref={containerRef}
-      className={containerClasses}
+      className={`${containerClasses} relative`}
       onDoubleClick={startEditing}
       title={label} // Native tooltip for full text
     >
+      {/* Story 4.4: Subscription indicator badge - top right */}
+      {isWatched && (
+        <div
+          className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center shadow-sm z-10"
+          title="已关注"
+        >
+          <Eye className="w-2.5 h-2.5 text-white" />
+        </div>
+      )}
       {/* === HEADER (Icon + Title) === */}
       <div className="flex items-center gap-2 w-full">
         <div className="flex-shrink-0">

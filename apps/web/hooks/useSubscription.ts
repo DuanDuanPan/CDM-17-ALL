@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { addSubscription, removeSubscription } from '@/lib/subscriptionStore';
 import type {
   CheckSubscriptionResponse,
   Subscription,
@@ -122,6 +123,9 @@ export function useSubscription({
       setIsSubscribed(true);
       setSubscriptionId(result.subscription?.id);
 
+      // Sync to global store for immediate UI feedback across all nodes
+      addSubscription(nodeId);
+
       return true;
     } catch (err) {
       setError(err as Error);
@@ -158,6 +162,9 @@ export function useSubscription({
       // Update state
       setIsSubscribed(false);
       setSubscriptionId(undefined);
+
+      // Sync to global store for immediate UI feedback across all nodes
+      removeSubscription(nodeId);
 
       return true;
     } catch (err) {

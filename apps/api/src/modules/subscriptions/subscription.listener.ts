@@ -40,8 +40,9 @@ export class SubscriptionListener implements OnModuleInit, OnModuleDestroy {
   // [MEDIUM FIX] Timer map for OnModuleDestroy cleanup
   private timerMap = new Map<string, NodeJS.Timeout>();
 
-  // Throttle interval: 5 minutes in milliseconds (AC#2: 5分钟节流)
-  private readonly THROTTLE_INTERVAL = 5 * 60 * 1000;
+  // Throttle interval: 5 seconds for development/testing (AC#2: 生产环境建议 5 分钟)
+  // Production: private readonly THROTTLE_INTERVAL = 5 * 60 * 1000;
+  private readonly THROTTLE_INTERVAL = 5 * 1000;
 
   constructor(
     private readonly eventEmitter: EventEmitter2,
