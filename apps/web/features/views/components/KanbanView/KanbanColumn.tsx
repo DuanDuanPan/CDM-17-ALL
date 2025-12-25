@@ -93,16 +93,50 @@ function KanbanColumnBase({ column, activeId, onCardClick, isFullWidth }: Kanban
 
   const colors = getColumnColor(column.id);
 
+  // Determine header style based on column ID or title
+  // Determine header classes
+  const getHeaderClasses = () => {
+    const id = column.id.toLowerCase();
+    const title = column.title.toLowerCase();
+
+    if (id === '__unassigned__' || title === '未归类' || title.includes('uncategorized')) {
+      return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+    if (id === 'todo' || title === '待办' || title.includes('to do')) {
+      return 'bg-blue-600 text-white border-blue-700 shadow-md';
+    }
+    if (id === 'in-progress' || title === '进行中' || title.includes('doing')) {
+      return 'bg-sky-500 text-white border-sky-600 shadow-md';
+    }
+    if (id === 'done' || title === '已完成' || title.includes('done')) {
+      return 'bg-emerald-500 text-white border-emerald-600 shadow-md';
+    }
+    // Default: Return basic shape classes, color handled by style
+    return 'text-white border-gray-400 shadow-sm';
+  };
+
+  const headerClass = getHeaderClasses();
+
+  // Custom background color style to avoid Tailwind purge issues
+  const isCustomStage = !['__unassigned__', 'todo', 'in-progress', 'done'].includes(column.id.toLowerCase())
+    && !column.title.includes('未归类')
+    && !column.title.includes('待办')
+    && !column.title.includes('进行中')
+    && !column.title.includes('已完成');
+
+  const customHeaderStyle = isCustomStage ? { backgroundColor: '#475569' } : {}; // Slate-600 hex
+
   return (
     <div
       className={`
         flex flex-col
-        ${isFullWidth ? 'flex-1 min-w-[280px]' : 'w-72 min-w-72 max-w-72'}
-        bg-white rounded-xl
-        border border-gray-200/80
+        ${isFullWidth ? 'flex-1 min-w-[280px]' : 'w-80 min-w-80 max-w-80'}
+        bg-white/50 backdrop-blur-sm rounded-xl
+        border border-gray-200/50
         shadow-sm
         ${isOver ? 'ring-2 ring-blue-400 ring-opacity-50' : ''}
         transition-all duration-200
+        h-full
       `}
       data-testid={`kanban-column-${column.id}`}
     >
@@ -110,20 +144,20 @@ function KanbanColumnBase({ column, activeId, onCardClick, isFullWidth }: Kanban
       <div
         className={`
           flex items-center justify-between
-          px-3 py-2.5
+          px-4 py-3
           rounded-t-xl
-          ${colors.bg}
-          border-b ${colors.border}
+          ${headerClass}
+          border-b
         `}
+        style={customHeaderStyle}
       >
-        <h3 className={`font-semibold text-sm ${colors.text}`}>{column.title}</h3>
+        <h3 className="font-semibold text-sm tracking-wide">{column.title}</h3>
         <span
           className={`
             inline-flex items-center justify-center
-            w-6 h-6 rounded-full
-            text-xs font-medium
-            ${colors.bg} ${colors.text}
-            border ${colors.border}
+            px-2.5 py-0.5 rounded-full
+            text-xs font-bold
+            bg-white/20 text-current
           `}
         >
           {column.cards.length}
@@ -135,8 +169,9 @@ function KanbanColumnBase({ column, activeId, onCardClick, isFullWidth }: Kanban
         ref={setNodeRef}
         className={`
           flex-1 overflow-y-auto
-          p-2
+          p-3
           min-h-[200px]
+          custom-scrollbar
           ${isOver ? 'bg-blue-50/30' : ''}
           transition-colors duration-200
         `}
@@ -152,8 +187,8 @@ function KanbanColumnBase({ column, activeId, onCardClick, isFullWidth }: Kanban
             />
           ))
         ) : (
-          <div className="flex items-center justify-center h-20 text-gray-400 text-sm">
-            无任务
+          <div className="flex flex-col items-center justify-center h-20 text-gray-400 text-sm gap-2">
+            <span>暂无任务</span>
           </div>
         )}
       </div>

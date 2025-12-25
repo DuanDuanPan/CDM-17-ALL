@@ -176,51 +176,59 @@ function KanbanBoardBase({ yDoc, onCardClick }: KanbanBoardProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-gray-50/50">
       {/* Toolbar - Premium glassmorphism style */}
-      <div className="flex items-start justify-between px-4 py-2.5 border-b border-gray-200/60 bg-white/80 backdrop-blur-sm">
+      <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200/60 bg-white/80 backdrop-blur-sm z-10 sticky top-0">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-4">
             {/* Group By Toggle */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100/80 rounded-lg">
-              <span className="text-xs font-medium text-gray-500">分组:</span>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setKanbanGroupBy('status')}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200 ${groupBy === 'status'
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-white hover:text-gray-900'
-                    }`}
-                >
-                  状态
-                </button>
-                <button
-                  onClick={() => setKanbanGroupBy('customStage')}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200 ${groupBy === 'customStage'
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-white hover:text-gray-900'
-                    }`}
-                >
-                  阶段
-                </button>
-              </div>
+            <div className="flex items-center gap-2 px-1 py-1 bg-gray-100/80 rounded-lg p-1">
+              <button
+                onClick={() => setKanbanGroupBy('status')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${groupBy === 'status'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
+              >
+                状态视图
+              </button>
+              <button
+                onClick={() => setKanbanGroupBy('customStage')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${groupBy === 'customStage'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
+              >
+                阶段视图
+              </button>
             </div>
 
             {/* Show Completed Toggle */}
-            <label className="flex items-center gap-2 px-3 py-1.5 bg-gray-100/80 rounded-lg cursor-pointer hover:bg-gray-200/60 transition-colors">
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <div className={`
+                w-9 h-5 rounded-full p-1 transition-colors duration-200 ease-in-out
+                ${kanbanState.showCompleted ? 'bg-blue-500' : 'bg-gray-200'}
+              `}>
+                <div className={`
+                  w-3 h-3 rounded-full bg-white shadow-sm transform transition-transform duration-200 ease-in-out
+                  ${kanbanState.showCompleted ? 'translate-x-4' : 'translate-x-0'}
+                `} />
+              </div>
               <input
                 type="checkbox"
                 checked={kanbanState.showCompleted}
                 onChange={(e) => setShowCompleted(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-500 focus:ring-emerald-500"
+                className="hidden"
               />
-              <span className="text-xs font-medium text-gray-600">显示已完成</span>
+              <span className="text-xs font-medium text-gray-600 group-hover:text-gray-900 transition-colors">
+                显示已完成
+              </span>
             </label>
           </div>
 
           {/* Custom Stage Management */}
           {groupBy === 'customStage' && (
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap mt-2">
               <div className="flex items-center gap-2">
                 <input
                   value={newStage}
@@ -231,12 +239,12 @@ function KanbanBoardBase({ yDoc, onCardClick }: KanbanBoardProps) {
                       handleAddStage();
                     }
                   }}
-                  placeholder="新增阶段"
-                  className="w-28 text-xs border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  placeholder="新阶段名称..."
+                  className="w-32 text-xs border border-gray-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white"
                 />
                 <button
                   onClick={handleAddStage}
-                  className="px-2.5 py-1 text-xs font-medium rounded-md bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                 >
                   添加
                 </button>
@@ -244,14 +252,13 @@ function KanbanBoardBase({ yDoc, onCardClick }: KanbanBoardProps) {
               {customStages.map((stage) => (
                 <span
                   key={stage}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-white border border-gray-100 text-gray-600 shadow-sm"
                 >
                   {stage}
                   <button
                     type="button"
                     onClick={() => removeCustomStage(stage)}
-                    className="text-emerald-600 hover:text-emerald-800"
-                    aria-label={`移除阶段 ${stage}`}
+                    className="text-gray-400 hover:text-red-500 transition-colors w-4 h-4 flex items-center justify-center rounded-full hover:bg-red-50"
                   >
                     ×
                   </button>
@@ -262,13 +269,16 @@ function KanbanBoardBase({ yDoc, onCardClick }: KanbanBoardProps) {
         </div>
 
         {/* Task Count */}
-        <div className="text-xs text-gray-500 px-3 py-1.5 bg-gray-100/60 rounded-lg">
-          共 <span className="font-semibold text-gray-700">{totalTasks}</span> 个任务
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-gray-100 shadow-sm">
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span className="text-xs text-gray-600">
+            总任务 <span className="font-bold text-gray-900 ml-1">{totalTasks}</span>
+          </span>
         </div>
       </div>
 
       {/* Kanban Columns */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 bg-gray-100/50">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-6">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
@@ -276,7 +286,7 @@ function KanbanBoardBase({ yDoc, onCardClick }: KanbanBoardProps) {
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex gap-4 h-full min-h-0">
+          <div className="flex gap-6 h-full min-h-0 min-w-max pb-2">
             {columns.map((column) => (
               <KanbanColumn
                 key={column.id}
@@ -288,11 +298,13 @@ function KanbanBoardBase({ yDoc, onCardClick }: KanbanBoardProps) {
             ))}
           </div>
 
-          {/* Drag Overlay - Shows card being dragged */}
-          <DragOverlay>
+          <DragOverlay dropAnimation={{
+            duration: 200,
+            easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+          }}>
             {activeCard && (
-              <div className="opacity-90 rotate-2">
-                <KanbanCard card={activeCard} isDragging />
+              <div className="opacity-90 rotate-2 scale-105 cursor-grabbing">
+                <KanbanCard card={activeCard!} isDragging />
               </div>
             )}
           </DragOverlay>

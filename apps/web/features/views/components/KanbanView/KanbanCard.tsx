@@ -2,10 +2,10 @@
  * Story 2.3: KanbanCard Component
  * Draggable task card for the Kanban board
  *
- * Design: Magic UI glassmorphism style (from Story 2.2)
- * - White background with thin border and subtle shadow
- * - Rounded corners
- * - Task metadata display (priority, due date, assignee)
+ * Design: Glassmorphism style with rich details
+ * - White/Translucent background with shadow
+ * - Left colored border for priority
+ * - Task metadata: Date range, Workdays, Assignee, Sub-task count
  */
 
 'use client';
@@ -13,7 +13,7 @@
 import React, { memo } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, User, Flag } from 'lucide-react';
+import { Calendar, CheckSquare, Clock, User } from 'lucide-react';
 import type { KanbanCardData } from './useKanbanData';
 
 // ==========================================
@@ -34,50 +34,43 @@ export interface KanbanCardProps {
 // ==========================================
 
 /**
- * Get priority color and label
+ * Get priority styling (Left border color)
  */
-function getPriorityDisplay(priority?: 'low' | 'medium' | 'high' | null): {
-  color: string;
-  bgColor: string;
-  label: string;
-} {
+function getPriorityColor(priority?: 'low' | 'medium' | 'high' | null): string {
   switch (priority) {
     case 'high':
-      return { color: 'text-red-600', bgColor: 'bg-red-50', label: '高' };
+      return 'bg-red-500';
     case 'medium':
-      return { color: 'text-amber-600', bgColor: 'bg-amber-50', label: '中' };
+      return 'bg-amber-500';
     case 'low':
-      return { color: 'text-green-600', bgColor: 'bg-green-50', label: '低' };
+      return 'bg-emerald-500';
     default:
-      return { color: 'text-gray-400', bgColor: 'bg-gray-50', label: '无' };
+      return 'bg-gray-300';
   }
 }
 
 /**
- * Format date for display
+ * Format date range for display
  */
-function formatDate(dateStr?: string | null): string | null {
-  if (!dateStr) return null;
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-  } catch {
-    return null;
-  }
-}
+function formatDateRange(startDate?: string | null, dueDate?: string | null): string | null {
+  if (!startDate && !dueDate) return null;
 
-/**
- * Check if date is overdue
- */
-function isOverdue(dateStr?: string | null): boolean {
-  if (!dateStr) return false;
-  try {
-    const date = new Date(dateStr);
-    const now = new Date();
-    return date < now;
-  } catch {
-    return false;
-  }
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const start = startDate ? formatDate(startDate) : '';
+  const end = dueDate ? formatDate(dueDate) : '';
+
+  if (start && end) return `${start} - ${end}`;
+  if (start) return `${start} 起`;
+  if (end) return `截止 ${end}`;
+  return null;
 }
 
 // ==========================================
@@ -85,14 +78,7 @@ function isOverdue(dateStr?: string | null): boolean {
 // ==========================================
 
 /**
- * KanbanCard - Draggable task card component
- *
- * Features:
- * - Drag and drop support via dnd-kit
- * - Priority indicator
- * - Due date display with overdue warning
- * - Progress bar (optional)
- * - Assignee avatar placeholder
+ * KanbanCard - Draggable task card component with Glassmorphism design
  */
 function KanbanCardBase({ card, isDragging, onClick }: KanbanCardProps) {
   const {
@@ -114,9 +100,9 @@ function KanbanCardBase({ card, isDragging, onClick }: KanbanCardProps) {
     opacity: isDragActive || isDragging ? 0.5 : 1,
   };
 
-  const priority = getPriorityDisplay(card.priority);
-  const dueDate = formatDate(card.dueDate);
-  const overdue = card.status !== 'done' && isOverdue(card.dueDate);
+  const priorityColor = getPriorityColor(card.priority);
+  const dateRange = formatDateRange(card.startDate, card.dueDate);
+  const showSubTasks = (card.subTaskCount || 0) > 0;
 
   return (
     <div
@@ -127,86 +113,86 @@ function KanbanCardBase({ card, isDragging, onClick }: KanbanCardProps) {
       onClick={() => onClick?.(card)}
       className={`
         group relative
-        bg-white rounded-lg border border-gray-200
-        p-3 mb-2
-        shadow-sm hover:shadow-md
+        flex flex-row overflow-hidden
+        bg-white rounded-xl shadow-sm border border-gray-100
+        hover:shadow-md hover:border-gray-200
         cursor-grab active:cursor-grabbing
-        transition-shadow duration-200
-        ${isDragActive || isDragging ? 'shadow-lg ring-2 ring-blue-400' : ''}
+        transition-all duration-200
+        mb-3
+        ${isDragActive || isDragging ? 'shadow-lg ring-2 ring-indigo-400 rotate-2' : ''}
       `}
       data-testid={`kanban-card-${card.id}`}
     >
-      {/* Card Title */}
-      <h4 className="font-medium text-sm text-gray-900 mb-2 line-clamp-2">
-        {card.label}
-      </h4>
+      {/* Priority Indicator Stripe */}
+      <div className={`w-1.5 shrink-0 ${priorityColor}`} />
 
-      {/* Progress Bar (if progress is set) */}
-      {card.progress !== undefined && card.progress !== null && (
-        <div className="mb-2">
-          <div className="w-full bg-gray-100 rounded-full h-1.5">
-            <div
-              className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
-              style={{ width: `${card.progress}%` }}
-            />
+      {/* Content Area */}
+      <div className="flex-1 p-3 min-w-0">
+        {/* Title */}
+        <h4 className="font-semibold text-sm text-gray-800 mb-2 line-clamp-2 leading-relaxed">
+          {card.label}
+        </h4>
+
+        {/* Metadata Grid */}
+        <div className="space-y-2">
+
+          {/* Row 1: Date Range & Workdays */}
+          {(dateRange || card.workdays) && (
+            <div className="flex items-center gap-3 text-xs text-gray-500">
+              {dateRange && (
+                <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-md">
+                  <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                  <span>{dateRange}</span>
+                </div>
+              )}
+
+              {card.workdays ? (
+                <div className="text-gray-400 font-medium">
+                  : {card.workdays} 工时
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* Row 2: Assignee & Sub-tasks */}
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-50">
+            {/* Assignee */}
+            <div className="flex items-center gap-2">
+              {card.assigneeId ? (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-indigo-50 text-indigo-700">
+                  <User className="w-3 h-3" />
+                  <span className="text-xs font-medium">
+                    {/* Placeholder for assignee name resolution */}
+                    {/* In a real app, looking up user name from store */}
+                    人员 {card.assigneeId.slice(0, 2)}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 text-gray-400">
+                  <User className="w-3 h-3" />
+                  <span className="text-xs">未分配</span>
+                </div>
+              )}
+            </div>
+
+            {/* Sub-tasks Count (Only show if > 0) */}
+            {showSubTasks && (
+              <div className="flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-50 px-2 py-1 rounded-md">
+                <CheckSquare className="w-3.5 h-3.5 text-blue-500" />
+                <span>{card.subTaskCount} 子任务</span>
+              </div>
+            )}
+
+            {/* If no subtasks, maybe show a generic icon or nothing */}
+            {/* Showing nothing keeps UI clean as per design concept */}
           </div>
-          <span className="text-xs text-gray-400 mt-0.5">{card.progress}%</span>
         </div>
-      )}
-
-      {/* Metadata Row */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* Priority Badge */}
-        {card.priority && (
-          <span
-            className={`
-              inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs
-              ${priority.bgColor} ${priority.color}
-            `}
-          >
-            <Flag className="w-3 h-3" />
-            {priority.label}
-          </span>
-        )}
-
-        {/* Due Date */}
-        {dueDate && (
-          <span
-            className={`
-              inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs
-              ${overdue ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-600'}
-            `}
-          >
-            <Calendar className="w-3 h-3" />
-            {dueDate}
-          </span>
-        )}
-
-        {/* Assignee */}
-        {card.assigneeId && (
-          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
-            <User className="w-3 h-3" />
-            {/* TODO: Resolve assignee name from user store */}
-            {card.assigneeId.slice(0, 4)}...
-          </span>
-        )}
       </div>
-
-      {/* Custom Stage Badge (when grouped by status, show stage if set) */}
-      {card.customStage && (
-        <div className="mt-2">
-          <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-purple-50 text-purple-600">
-            {card.customStage}
-          </span>
-        </div>
-      )}
     </div>
   );
 }
 
-// Story 2.3: Memoize KanbanCard to prevent unnecessary re-renders
 export const KanbanCard = memo(KanbanCardBase);
 KanbanCard.displayName = 'KanbanCard';
 
 export default KanbanCard;
-

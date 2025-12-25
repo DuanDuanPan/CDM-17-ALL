@@ -50,6 +50,10 @@ export interface KanbanCardData {
   updatedAt?: string;
   /** Creator name */
   creator?: string;
+  /** Calculated workdays duration */
+  workdays?: number;
+  /** Number of sub-tasks */
+  subTaskCount?: number;
 }
 
 /**
@@ -119,7 +123,32 @@ function extractTaskData(node: YjsNodeData): KanbanCardData | null {
     createdAt: node.createdAt,
     updatedAt: node.updatedAt,
     creator: node.creator,
+    workdays: calculateWorkdays(props?.startDate, props?.dueDate),
   };
+}
+
+/**
+ * Calculate workdays between two dates (inclusive)
+ */
+function calculateWorkdays(start?: string | null, end?: string | null): number {
+  if (!start || !end) return 0;
+  try {
+    const s = new Date(start);
+    const e = new Date(end);
+    // Set to noon to avoid timezone issues affecting day difference
+    s.setHours(12, 0, 0, 0);
+    e.setHours(12, 0, 0, 0);
+
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
+
+    const diffTime = e.getTime() - s.getTime();
+    if (diffTime < 0) return 0;
+
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays + 1; // Inclusive
+  } catch {
+    return 0;
+  }
 }
 
 /**
@@ -206,7 +235,7 @@ function groupByCustomStage(
   if (unassignedCards.length > 0) {
     columns.push({
       id: unassignedKey,
-      title: '未分配',
+      title: '未归类',
       cards: unassignedCards,
       isDefault: true,
     });
@@ -262,9 +291,19 @@ export function useKanbanData(yDoc: Y.Doc | null): UseKanbanDataReturn {
     const yNodes = yDoc.getMap<YjsNodeData>('nodes');
     const cards: KanbanCardData[] = [];
 
+    // First pass: Count sub-tasks for each parent
+    const subTaskCounts = new Map<string, number>();
+    yNodes.forEach((node) => {
+      if (node.parentId && node.nodeType === NodeType.TASK) {
+        subTaskCounts.set(node.parentId, (subTaskCounts.get(node.parentId) || 0) + 1);
+      }
+    });
+
     yNodes.forEach((node) => {
       const card = extractTaskData(node);
       if (card) {
+        // Add sub-task count
+        card.subTaskCount = subTaskCounts.get(card.id) || 0;
         cards.push(card);
       }
     });
