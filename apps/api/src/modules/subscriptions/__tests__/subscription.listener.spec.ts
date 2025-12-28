@@ -5,7 +5,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Test mocks commonly use any */
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { SubscriptionListener, NodeChangedEvent } from '../subscription.listener';
+import { SubscriptionListener, NodeChangedEvent, THROTTLE_WINDOW_MS } from '../subscription.listener';
 import { SubscriptionRepository } from '../subscriptions.repository';
 import { NotificationService } from '../../notification/notification.service';
 
@@ -17,6 +17,7 @@ jest.mock('@cdm/database', () => ({
         },
         node: {
             findFirst: jest.fn(),
+            findUnique: jest.fn(),
         },
     },
 }));
@@ -54,6 +55,9 @@ describe('SubscriptionListener', () => {
             mockSubscriptionRepo,
             mockNotificationService
         );
+
+        // Default: no parent chain (no ancestor subscribers)
+        (prisma.node.findUnique as jest.Mock).mockResolvedValue({ parentId: null });
     });
 
     afterEach(() => {
@@ -114,8 +118,8 @@ describe('SubscriptionListener', () => {
             // Should still only be 1 notification (throttled)
             expect(mockNotificationService.createAndNotify).toHaveBeenCalledTimes(1);
 
-            // Fast-forward past throttle window (5 minutes)
-            jest.advanceTimersByTime(5 * 60 * 1000 + 100);
+            // Fast-forward past throttle window
+            jest.advanceTimersByTime(THROTTLE_WINDOW_MS + 100);
 
             // Wait for async operations
             await Promise.resolve();

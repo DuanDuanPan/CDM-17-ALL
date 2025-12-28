@@ -1,15 +1,16 @@
 /**
  * Story 4.4: Watch & Subscription
  * E2E Tests for Watch/Unwatch functionality
- * 
- * Note: These tests require nodes to exist in the database.
- * The subscription API depends on the Node table having entries.
- * If nodes only exist in Yjs and not in DB, some tests will skip gracefully.
- * 
+ *
+ * Notes:
+ * - Tests create a real Graph via API (no hardcoded graphId).
+ * - For subscribe/unsubscribe flows we also ensure the target node exists in DB,
+ *   because the subscription service validates Node existence.
+ *
  * Test Coverage:
  * - TC-4.4.01: Subscribe to node (AC#1)
  * - TC-4.4.02: Unsubscribe from node (AC#3)
- * - TC-4.4.03: Subscription persistence (AC#4)
+ * - TC-4.4.03: Context menu shows subscription toggle (AC#4 prerequisite)
  * - TC-4.4.04: Notification on node change (AC#2)
  * - TC-4.4.06: Unsubscribe from notification panel (AC#3)
  * - TC-4.4.07: Click notification to navigate (AC#2)
@@ -18,321 +19,238 @@
  * - TC-4.4.10: Multi-device sync
  */
 
-import { test, expect, BrowserContext, Page } from '@playwright/test';
+import { test, expect, BrowserContext, Page, type APIRequestContext } from '@playwright/test';
+import { createTestGraph, makeTestGraphUrl, DEFAULT_E2E_USER_ID } from './testUtils';
 
-// API base URL
-const API_BASE = 'http://localhost:3001/api';
-// Use a graphId that has persisted nodes in DB
-const MINDMAP_ID = 'cmjlc33gf000haslrkskfeoxi';
-// Valid user IDs from User table (required for Subscription foreign key)
-const TEST_USER_ID = 'test1';
-
-// Type definitions for graph API
-type ExposedGraphCell = {
-    isNode: () => boolean;
-    getBBox?: () => { center?: { x: number; y: number } };
-    id?: string;
-};
-
-type ExposedGraph = {
-    getCellById?: (id: string) => ExposedGraphCell | null;
-    getNodes?: () => ExposedGraphCell[];
-    cleanSelection?: () => void;
-    select: (cell: ExposedGraphCell) => void;
-    getSelectedCells: () => ExposedGraphCell[];
-    localToClient: (x: number, y: number) => { x: number; y: number };
-};
-
-// Helper to wait for collab connection
 async function waitForCollabConnection(page: Page) {
-    await page.waitForSelector('[data-testid="collab-status"]', { timeout: 15000 });
+  await page.waitForSelector('[data-testid="collab-status"]', { timeout: 15000 });
 }
 
-// Helper to wait for graph to be ready
 async function waitForGraph(page: Page) {
-    await page.waitForFunction(() => (window as unknown as { __cdmGraph?: unknown }).__cdmGraph, null, { timeout: 15000 });
+  await page.waitForSelector('#graph-container', { timeout: 15000 });
+  await page.locator('.x6-node').first().waitFor({ state: 'visible', timeout: 15000 });
 }
 
-// Helper to get node center coordinates using graph API
-async function getNodeCenterClientPoint(page: Page, nodeId?: string) {
-    return page.evaluate((id) => {
-        const graph = (window as unknown as { __cdmGraph?: ExposedGraph }).__cdmGraph;
-        if (!graph) throw new Error('Graph not exposed on window');
-        // Try to find by ID first, otherwise get first node
-        let cell = id ? graph.getCellById?.(id) : null;
-        if (!cell) {
-            const nodes = graph.getNodes?.() ?? [];
-            cell = nodes[0];
-        }
-        if (!cell) throw new Error('No nodes found on graph');
-        const bbox = cell.getBBox?.();
-        if (!bbox?.center) throw new Error('No bbox for node');
-        const p = graph.localToClient(bbox.center.x, bbox.center.y);
-        return { x: p.x, y: p.y };
-    }, nodeId);
+function getNodeLocator(page: Page, nodeId: string) {
+  return page.locator(`.x6-node[data-cell-id="${nodeId}"]`);
 }
 
-// Helper to get first node ID from graph
-async function getFirstNodeId(page: Page): Promise<string | null> {
-    return page.evaluate(() => {
-        const graph = (window as unknown as { __cdmGraph?: ExposedGraph }).__cdmGraph;
-        if (!graph) return null;
-        const nodes = graph.getNodes?.() ?? [];
-        if (nodes.length === 0) return null;
-        return (nodes[0] as { id?: string }).id ?? null;
-    });
+function getNodeContextMenu(page: Page) {
+  return page.locator('div.fixed.z-50').filter({ hasText: '粘贴到此处' }).first();
 }
 
-// Helper to right-click a node (uses first node if nodeId not specified)
-async function rightClickNode(page: Page, nodeId?: string) {
-    await waitForGraph(page);
-    const center = await getNodeCenterClientPoint(page, nodeId);
-    await page.mouse.click(center.x, center.y, { button: 'right' });
+async function closeNodeContextMenu(page: Page) {
+  const menu = getNodeContextMenu(page);
+  if (!(await menu.isVisible().catch(() => false))) return;
+
+  // Use a coordinate click to avoid "detached from DOM" flakiness while the menu is closing.
+  await page.mouse.click(1, 1);
+
+  await menu.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 }
 
-// Helper to subscribe to a node using graph API
-async function subscribeToNode(page: Page, nodeId?: string): Promise<boolean> {
-    try {
-        await rightClickNode(page, nodeId);
-        // Check if subscribe option is available
-        const subscribeBtn = page.locator('text=关注节点');
-        if (await subscribeBtn.isVisible({ timeout: 3000 })) {
-            await subscribeBtn.click();
-            await page.waitForTimeout(1000);
-            return true;
-        }
-        return false;
-    } catch (e) {
-        console.log('Subscribe failed:', e);
-        return false;
+async function rightClickNode(page: Page, nodeId: string) {
+  await closeNodeContextMenu(page);
+  await waitForGraph(page);
+  const node = getNodeLocator(page, nodeId);
+  await node.waitFor({ state: 'visible', timeout: 15000 });
+  await node.click({ button: 'right' });
+  await getNodeContextMenu(page).waitFor({ state: 'visible', timeout: 5000 });
+}
+
+async function createChildNode(page: Page): Promise<string> {
+  const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
+  await expect(centerNode).toBeVisible({ timeout: 15000 });
+  await centerNode.click();
+
+  // In browse-mode, Tab creates a child and selects it.
+  await page.keyboard.press('Tab');
+
+  const selected = page.locator('.x6-node.x6-node-selected').first();
+  await expect(selected).toBeVisible({ timeout: 15000 });
+
+  const nodeId = await selected.getAttribute('data-cell-id');
+  if (!nodeId || nodeId === 'center-node') {
+    throw new Error('Failed to create a child node for subscription tests');
+  }
+
+  // Exit edit mode (child nodes are created in edit mode by default).
+  await page.keyboard.press('Escape');
+  return nodeId;
+}
+
+async function ensureDbNodeExists(
+  request: APIRequestContext,
+  graphId: string,
+  nodeId: string,
+  label: string = 'E2E Subscription Node'
+) {
+  // The app may be persisting nodes in the background (RightSidebar ensureNodeExists).
+  // To avoid races (404 -> concurrent create -> 500 unique), poll briefly before attempting to create.
+  for (let i = 0; i < 10; i++) {
+    const existing = await request.get(`/api/nodes/${encodeURIComponent(nodeId)}`);
+    if (existing.ok()) return;
+    if (existing.status() !== 404) {
+      const text = await existing.text().catch(() => '');
+      throw new Error(`Failed to check node existence (status=${existing.status()}): ${text || existing.statusText()}`);
     }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+
+  const created = await request.post('/api/nodes', {
+    data: {
+      id: nodeId,
+      label,
+      graphId,
+      // Intentionally omit parentId to avoid parent FK coupling in tests.
+    },
+  });
+  if (created.ok()) return;
+
+  // If create fails (e.g. concurrent create), re-check existence before failing the test.
+  const after = await request.get(`/api/nodes/${encodeURIComponent(nodeId)}`);
+  if (after.ok()) return;
+
+  const text = await created.text().catch(() => '');
+  throw new Error(`Failed to create node (status=${created.status()}): ${text || created.statusText()}`);
 }
 
-// Helper to check if context menu shows subscribe/unsubscribe option
-async function getSubscriptionMenuState(page: Page, nodeId?: string): Promise<'subscribe' | 'unsubscribe' | 'none'> {
-    await rightClickNode(page, nodeId);
-    await page.waitForTimeout(300);
+async function ensureUnsubscribed(request: APIRequestContext, userId: string, nodeId: string) {
+  const res = await request.delete(`/api/subscriptions?nodeId=${encodeURIComponent(nodeId)}`, {
+    headers: { 'x-user-id': userId },
+  });
+  if (![200, 404].includes(res.status())) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to ensure unsubscribe (status=${res.status()}): ${text || res.statusText()}`);
+  }
+}
 
-    if (await page.locator('text=取消关注').isVisible({ timeout: 1000 }).catch(() => false)) {
-        return 'unsubscribe';
-    }
-    if (await page.locator('text=关注节点').isVisible({ timeout: 1000 }).catch(() => false)) {
-        return 'subscribe';
-    }
-    return 'none';
+async function ensureSubscribed(request: APIRequestContext, userId: string, nodeId: string) {
+  const res = await request.post('/api/subscriptions', {
+    headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+    data: { nodeId },
+  });
+  if (![201, 409].includes(res.status())) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to ensure subscribe (status=${res.status()}): ${text || res.statusText()}`);
+  }
+}
+
+async function checkIsSubscribed(request: APIRequestContext, userId: string, nodeId: string): Promise<boolean> {
+  const res = await request.get(`/api/subscriptions/check?nodeId=${encodeURIComponent(nodeId)}`, {
+    headers: { 'x-user-id': userId },
+  });
+  if (!res.ok()) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to check subscription (status=${res.status()}): ${text || res.statusText()}`);
+  }
+  const data = (await res.json()) as { isSubscribed?: boolean };
+  return Boolean(data.isSubscribed);
+}
+
+async function subscribeToNodeViaMenu(page: Page, nodeId: string) {
+  await rightClickNode(page, nodeId);
+  const menu = getNodeContextMenu(page);
+  await expect(menu.getByRole('button', { name: /关注节点/ })).toBeVisible({ timeout: 5000 });
+  await menu.getByRole('button', { name: /关注节点/ }).click();
+  await closeNodeContextMenu(page);
+}
+
+async function unsubscribeFromNodeViaMenu(page: Page, nodeId: string) {
+  await rightClickNode(page, nodeId);
+  const menu = getNodeContextMenu(page);
+  await expect(menu.getByRole('button', { name: /取消关注/ })).toBeVisible({ timeout: 5000 });
+  await menu.getByRole('button', { name: /取消关注/ }).click();
+  await closeNodeContextMenu(page);
+}
+
+async function getSubscriptionMenuState(page: Page, nodeId: string): Promise<'subscribe' | 'unsubscribe' | 'none'> {
+  await rightClickNode(page, nodeId);
+  await page.waitForTimeout(100);
+
+  const menu = getNodeContextMenu(page);
+  const hasUnsubscribe = await menu.getByRole('button', { name: /取消关注/ }).isVisible().catch(() => false);
+  const hasSubscribe = await menu.getByRole('button', { name: /关注节点/ }).isVisible().catch(() => false);
+
+  await closeNodeContextMenu(page);
+
+  if (hasUnsubscribe) return 'unsubscribe';
+  if (hasSubscribe) return 'subscribe';
+  return 'none';
 }
 
 test.describe('Watch & Subscription Feature', () => {
-    test.beforeEach(async ({ page }) => {
-        // Navigate to a mindmap with userId parameter
-        await page.goto(`/graph/${MINDMAP_ID}?userId=test-e2e-user`);
+  let graphId: string;
+  let userId: string;
+  let nodeId: string;
 
-        // Wait for graph to load
-        await waitForCollabConnection(page);
-        await waitForGraph(page);
-    });
+  test.beforeEach(async ({ page }, testInfo) => {
+    userId = DEFAULT_E2E_USER_ID;
+    graphId = await createTestGraph(page, testInfo, userId);
+    await page.goto(makeTestGraphUrl(graphId, userId));
+
+    await waitForCollabConnection(page);
+    await waitForGraph(page);
+
+    nodeId = await createChildNode(page);
+    await ensureDbNodeExists(page.request, graphId, nodeId);
+    await ensureUnsubscribed(page.request, userId, nodeId);
+  });
 
     // ============================================
     // TC-4.4.01: Subscribe to Node (AC#1)
     // ============================================
-    test('TC-4.4.01: User can subscribe to a node via context menu', async ({ page }) => {
-        // Right-click to open context menu
-        await rightClickNode(page);
+  test('TC-4.4.01: User can subscribe to a node via context menu', async ({ page }) => {
+    await subscribeToNodeViaMenu(page, nodeId);
 
-        // Verify context menu has subscribe option
-        const subscribeBtn = page.locator('text=关注节点');
-        const unsubscribeBtn = page.locator('text=取消关注');
+    // Menu state should flip to "取消关注"
+    await rightClickNode(page, nodeId);
+    await expect(getNodeContextMenu(page).getByRole('button', { name: /取消关注/ })).toBeVisible({ timeout: 5000 });
+    await closeNodeContextMenu(page);
 
-        // Check if subscription feature is available in menu
-        const hasSubscribe = await subscribeBtn.isVisible({ timeout: 3000 }).catch(() => false);
-        const hasUnsubscribe = await unsubscribeBtn.isVisible({ timeout: 3000 }).catch(() => false);
-
-        if (!hasSubscribe && !hasUnsubscribe) {
-            test.skip(true, 'Subscription feature not available in context menu');
-            return;
-        }
-
-        // Click subscribe if available
-        if (hasSubscribe) {
-            await subscribeBtn.click();
-
-            // Wait for potential API response
-            await page.waitForTimeout(1000);
-
-            // Re-open context menu and verify state changed (or API error was handled)
-            await page.keyboard.press('Escape');
-            await page.waitForTimeout(300);
-            await rightClickNode(page);
-
-            // After subscription, should show "取消关注"
-            // Note: If backend returns error (node not in DB), this may not change
-            const postState = await page.locator('text=取消关注').isVisible({ timeout: 3000 }).catch(() => false);
-
-            // Log for debugging
-            console.log('After subscribe click, menu shows unsubscribe:', postState);
-        }
-
-        // Test passes if the UI elements are present and clickable
-        expect(hasSubscribe || hasUnsubscribe).toBe(true);
-    });
+    // Backend state should be subscribed
+    await expect.poll(async () => checkIsSubscribed(page.request, userId, nodeId)).toBe(true);
+  });
 
     // ============================================
     // TC-4.4.02: Unsubscribe from Node (AC#3)
     // ============================================
-    test('TC-4.4.02: User can unsubscribe from a node via context menu', async ({ page }) => {
-        // First check if node is already subscribed, if not subscribe first
-        const initialState = await getSubscriptionMenuState(page);
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(300);
+  test('TC-4.4.02: User can unsubscribe from a node via context menu', async ({ page }) => {
+    await ensureSubscribed(page.request, userId, nodeId);
 
-        if (initialState === 'subscribe') {
-            await subscribeToNode(page);
-            await page.keyboard.press('Escape');
-            await page.waitForTimeout(300);
-        }
+    // Menu should show unsubscribe
+    await rightClickNode(page, nodeId);
+    await expect(getNodeContextMenu(page).getByRole('button', { name: /取消关注/ })).toBeVisible({ timeout: 5000 });
+    await closeNodeContextMenu(page);
 
-        // Open context menu and try to unsubscribe
-        await rightClickNode(page);
-        const unsubscribeBtn = page.locator('text=取消关注');
+    await unsubscribeFromNodeViaMenu(page, nodeId);
 
-        if (await unsubscribeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await unsubscribeBtn.click();
-            await page.waitForTimeout(1000);
+    // Menu should flip back to subscribe
+    await rightClickNode(page, nodeId);
+    await expect(getNodeContextMenu(page).getByRole('button', { name: /关注节点/ })).toBeVisible({ timeout: 5000 });
+    await closeNodeContextMenu(page);
 
-            // Verify state changed back
-            await page.keyboard.press('Escape');
-            await page.waitForTimeout(300);
-            await rightClickNode(page);
-
-            // Should now show "关注节点" again
-            const hasSubscribe = await page.locator('text=关注节点').isVisible({ timeout: 3000 }).catch(() => false);
-            console.log('After unsubscribe, shows subscribe option:', hasSubscribe);
-        } else {
-            console.log('Unsubscribe not available (node may not be subscribed)');
-        }
-
-        // Test passes if UI is interactive
-        expect(true).toBe(true);
-    });
+    // Backend state should be unsubscribed
+    await expect.poll(async () => checkIsSubscribed(page.request, userId, nodeId)).toBe(false);
+  });
 
     // ============================================
     // TC-4.4.03: Context menu displays subscription toggle (AC#4 prerequisite)
     // ============================================
-    test('TC-4.4.03: Context menu shows subscription toggle option', async ({ page }) => {
-        const state = await getSubscriptionMenuState(page);
-
-        // Should have either subscribe or unsubscribe option
-        expect(['subscribe', 'unsubscribe']).toContain(state);
-    });
+  test('TC-4.4.03: Context menu shows subscription toggle option', async ({ page }) => {
+    // Fresh graph/node should be unsubscribed
+    expect(await getSubscriptionMenuState(page, nodeId)).toBe('subscribe');
+  });
 
     // ============================================
     // TC-4.4.11: Subscription indicator (Eye icon) appears on subscribed nodes
     // ============================================
-    test('TC-4.4.11: Subscription indicator appears after subscribing', async ({ page }) => {
-        // Get the first node ID
-        const nodeId = await getFirstNodeId(page);
-        if (!nodeId) {
-            test.skip(true, 'No nodes found on graph');
-            return;
-        }
+  test('TC-4.4.11: Subscription indicator appears after subscribing', async ({ page }) => {
+    await subscribeToNodeViaMenu(page, nodeId);
 
-        // Check initial menu state
-        const initialState = await getSubscriptionMenuState(page);
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(300);
-
-        // If already subscribed, verify indicator is visible
-        if (initialState === 'unsubscribe') {
-            // Node is already subscribed, check for Eye icon indicator
-            const indicator = page.locator('[title="已关注"]');
-            const hasIndicator = await indicator.first().isVisible({ timeout: 3000 }).catch(() => false);
-            expect(hasIndicator).toBe(true);
-            return;
-        }
-
-        // Subscribe to the node
-        const subscribed = await subscribeToNode(page, nodeId);
-        if (!subscribed) {
-            test.skip(true, 'Failed to subscribe to node');
-            return;
-        }
-
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
-
-        // Verify the subscription indicator (Eye icon with title="已关注") appears
-        const indicator = page.locator('[title="已关注"]');
-        const hasIndicator = await indicator.first().isVisible({ timeout: 3000 }).catch(() => false);
-
-        // Log for debugging
-        console.log('After subscription, Eye indicator visible:', hasIndicator);
-
-        // The indicator should be visible on the subscribed node
-        expect(hasIndicator).toBe(true);
-    });
-
-    // ============================================
-    // API Endpoint Tests - Test API structure
-    // ============================================
-    test('Subscription API endpoints respond correctly', async ({ request }) => {
-        // Use valid user ID from User table
-        const testUserId = TEST_USER_ID;
-        const testNodeId = 'center-node'; // Known to exist in DB
-
-        // Test subscribe endpoint - expect structured response
-        const subscribeResponse = await request.post(`${API_BASE}/subscriptions`, {
-            headers: {
-                'Content-Type': 'application/json',
-                'x-user-id': testUserId,
-            },
-            data: { nodeId: testNodeId },
-        });
-
-        // Accept any valid HTTP response (success, conflict, not found, or server error for missing node)
-        expect(subscribeResponse.status()).toBeGreaterThanOrEqual(200);
-        expect(subscribeResponse.status()).toBeLessThan(600);
-
-        // Test check subscription endpoint
-        const checkResponse = await request.get(`${API_BASE}/subscriptions/check?nodeId=${testNodeId}`, {
-            headers: {
-                'x-user-id': testUserId,
-            },
-        });
-
-        expect(checkResponse.ok()).toBe(true);
-        const checkData = await checkResponse.json();
-        expect(checkData).toHaveProperty('isSubscribed');
-        expect(typeof checkData.isSubscribed).toBe('boolean');
-
-        // Test unsubscribe endpoint
-        const unsubscribeResponse = await request.delete(`${API_BASE}/subscriptions?nodeId=${testNodeId}`, {
-            headers: {
-                'x-user-id': testUserId,
-            },
-        });
-
-        // Should return 200 or 404 gracefully
-        expect([200, 404]).toContain(unsubscribeResponse.status());
-    });
-
-    // ============================================
-    // API - Check subscription status works correctly
-    // ============================================
-    test('Check subscription API returns proper structure', async ({ request }) => {
-        const testUserId = TEST_USER_ID;
-        const testNodeId = 'center-node'; // Use real node
-
-        const response = await request.get(`${API_BASE}/subscriptions/check?nodeId=${testNodeId}`, {
-            headers: {
-                'x-user-id': testUserId,
-            },
-        });
-
-        expect(response.ok()).toBe(true);
-        const data = await response.json();
-        expect(data).toHaveProperty('isSubscribed');
-        expect(data.isSubscribed).toBe(false); // Non-existent subscription should be false
-    });
+    const indicator = page.locator('[title="已关注"]').first();
+    await expect(indicator).toBeVisible({ timeout: 5000 });
+  });
 });
 
 // ============================================
@@ -361,127 +279,164 @@ test.describe('Watch & Subscription - Multi-User Scenarios', () => {
     // ============================================
     // TC-4.4.04: Both users can access subscription UI
     // ============================================
-    test('TC-4.4.04: Multiple users can access subscription feature', async () => {
-        // User A navigates (test1 is valid user)
-        await pageA.goto(`/graph/${MINDMAP_ID}?userId=test1`);
-        await waitForCollabConnection(pageA);
-        await waitForGraph(pageA);
+  test('TC-4.4.04: Multiple users can access subscription feature', async ({}, testInfo) => {
+    const userA = 'test-e2e-user-a';
+    const userB = 'test-e2e-user-b';
 
-        // User B navigates (test2 is valid user)
-        await pageB.goto(`/graph/${MINDMAP_ID}?userId=test2`);
-        await waitForCollabConnection(pageB);
-        await waitForGraph(pageB);
+    const graphId = await createTestGraph(pageA, testInfo, userA);
 
-        // Both should have context menu with subscription option
-        const stateA = await getSubscriptionMenuState(pageA);
-        await pageA.keyboard.press('Escape');
+    await pageA.goto(makeTestGraphUrl(graphId, userA));
+    await waitForCollabConnection(pageA);
+    await waitForGraph(pageA);
 
-        const stateB = await getSubscriptionMenuState(pageB);
-        await pageB.keyboard.press('Escape');
+    await pageB.goto(makeTestGraphUrl(graphId, userB));
+    await waitForCollabConnection(pageB);
+    await waitForGraph(pageB);
 
-        expect(['subscribe', 'unsubscribe']).toContain(stateA);
-        expect(['subscribe', 'unsubscribe']).toContain(stateB);
-    });
+    // Both should have context menu with subscription option.
+    expect(await getSubscriptionMenuState(pageA, 'center-node')).toBe('subscribe');
+    expect(await getSubscriptionMenuState(pageB, 'center-node')).toBe('subscribe');
+  });
 });
 
 // ============================================
 // Notification Panel Interaction Tests
 // ============================================
 test.describe('Watch & Subscription - Notification Panel', () => {
-    test.beforeEach(async ({ page }) => {
-        await page.goto(`/graph/${MINDMAP_ID}?userId=test3`);
-        await waitForCollabConnection(page);
-        await waitForGraph(page);
-    });
+  const userId = 'test-e2e-user-notifications';
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    const graphId = await createTestGraph(page, testInfo, userId);
+    await page.goto(makeTestGraphUrl(graphId, userId));
+    await waitForCollabConnection(page);
+    await waitForGraph(page);
+  });
 
     // ============================================
     // TC-4.4.06: Notification panel is accessible
     // ============================================
-    test('TC-4.4.06: Notification panel button is visible', async ({ page }) => {
-        // Use aria-label selector as the button uses that instead of data-testid
-        const notificationButton = page.locator('button[aria-label^="Notifications"]');
-        await expect(notificationButton).toBeVisible({ timeout: 5000 });
+  test('TC-4.4.06: Notification panel button is visible', async ({ page }) => {
+    const notificationButton = page.locator('button[aria-label^="Notifications"]');
+    await expect(notificationButton).toBeVisible({ timeout: 5000 });
 
-        // Click to open notification panel
-        await notificationButton.click();
+    // Open dropdown
+    await notificationButton.click();
+    await expect(page.getByText('通知中心')).toBeVisible({ timeout: 5000 });
 
-        // Panel should open (may show empty state or notifications)
-        await page.waitForTimeout(500);
-
-        // Close by clicking elsewhere or escape
-        await page.keyboard.press('Escape');
-    });
+    // Close by clicking outside
+    await page.mouse.click(0, 0);
+  });
 
     // ============================================
     // TC-4.4.07: Notification panel can be interacted with
     // ============================================
-    test('TC-4.4.07: Notification panel responds to interaction', async ({ page }) => {
-        const notificationButton = page.locator('button[aria-label^="Notifications"]');
+  test('TC-4.4.07: Notification panel responds to interaction', async ({ page }) => {
+    const notificationButton = page.locator('button[aria-label^="Notifications"]');
+    await expect(notificationButton).toBeVisible({ timeout: 5000 });
 
-        if (await notificationButton.isVisible({ timeout: 3000 })) {
-            await notificationButton.click();
-            await page.waitForTimeout(500);
+    await notificationButton.click();
+    await expect(page.getByText('通知中心')).toBeVisible({ timeout: 5000 });
 
-            // Panel should be in some visible state
-            // Look for any notification-related content
-            const hasContent = await page.locator('[data-testid="notification-panel"], [role="dialog"], .notification').first().isVisible().catch(() => false);
+    // Either empty-state or list; both are acceptable.
+    const emptyState = page.getByText('暂无通知');
+    const listItem = page.locator('div.divide-y.divide-gray-100 > *').first();
+    const hasAnyContent = (await emptyState.isVisible().catch(() => false)) || (await listItem.isVisible().catch(() => false));
+    expect(hasAnyContent).toBe(true);
 
-            // Even if no content, the interaction should not crash
-            console.log('Notification panel has content:', hasContent);
+    await page.mouse.click(0, 0);
+  });
+});
 
-            await page.keyboard.press('Escape');
-        }
+test.describe('Watch & Subscription - API Endpoints', () => {
+  test('Subscription API endpoints respond correctly', async ({ request }, testInfo) => {
+    const userId = `test-e2e-api-${testInfo.testId}`;
+    const graphRes = await request.post(`/api/graphs?userId=${encodeURIComponent(userId)}`, { data: { name: 'e2e-api-graph' } });
+    expect(graphRes.ok()).toBe(true);
+    const graph = (await graphRes.json()) as { id?: string };
+    expect(graph.id).toBeTruthy();
 
-        expect(true).toBe(true);
+    const nodeId = `e2e-api-node-${Date.now()}`;
+    const nodeRes = await request.post('/api/nodes', { data: { id: nodeId, label: 'E2E API Node', graphId: graph.id } });
+    expect(nodeRes.ok()).toBe(true);
+
+    const subscribeResponse = await request.post('/api/subscriptions', {
+      headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+      data: { nodeId },
     });
+    expect([201, 409]).toContain(subscribeResponse.status());
+
+    const checkResponse = await request.get(`/api/subscriptions/check?nodeId=${encodeURIComponent(nodeId)}`, {
+      headers: { 'x-user-id': userId },
+    });
+    expect(checkResponse.ok()).toBe(true);
+    const checkData = await checkResponse.json();
+    expect(checkData).toHaveProperty('isSubscribed');
+    expect(typeof checkData.isSubscribed).toBe('boolean');
+
+    const unsubscribeResponse = await request.delete(`/api/subscriptions?nodeId=${encodeURIComponent(nodeId)}`, {
+      headers: { 'x-user-id': userId },
+    });
+    expect([200, 404]).toContain(unsubscribeResponse.status());
+  });
+
+  test('Check subscription API returns proper structure', async ({ request }, testInfo) => {
+    const userId = `test-e2e-api-check-${testInfo.testId}`;
+    const nodeId = `e2e-non-subscribed-${Date.now()}`;
+
+    const graphRes = await request.post(`/api/graphs?userId=${encodeURIComponent(userId)}`, { data: { name: 'e2e-api-graph' } });
+    expect(graphRes.ok()).toBe(true);
+    const graph = (await graphRes.json()) as { id?: string };
+    expect(graph.id).toBeTruthy();
+
+    const nodeRes = await request.post('/api/nodes', { data: { id: nodeId, label: 'E2E API Node', graphId: graph.id } });
+    expect(nodeRes.ok()).toBe(true);
+
+    const response = await request.get(`/api/subscriptions/check?nodeId=${encodeURIComponent(nodeId)}`, {
+      headers: { 'x-user-id': userId },
+    });
+    expect(response.ok()).toBe(true);
+    const data = await response.json();
+    expect(data).toHaveProperty('isSubscribed');
+    expect(data.isSubscribed).toBe(false);
+  });
 });
 
 // ============================================
 // Edge Cases & Error Handling
 // ============================================
 test.describe('Watch & Subscription - Edge Cases', () => {
-    test('Check subscription for invalid node returns false', async ({ request }) => {
-        const testUserId = TEST_USER_ID;
-        const invalidNodeId = 'nonexistent-node-id-12345';
+  const userId = 'test-e2e-edge';
 
-        const res = await request.get(`${API_BASE}/subscriptions/check?nodeId=${invalidNodeId}`, {
-            headers: {
-                'x-user-id': testUserId,
-            },
-        });
+  test('Check subscription for invalid node returns false', async ({ request }) => {
+    const invalidNodeId = 'nonexistent-node-id-12345';
 
-        expect(res.ok()).toBe(true);
-        const data = await res.json();
-        expect(data.isSubscribed).toBe(false);
+    const res = await request.get(`/api/subscriptions/check?nodeId=${encodeURIComponent(invalidNodeId)}`, {
+      headers: { 'x-user-id': userId },
     });
 
-    test('Unsubscribe from non-subscribed node returns 404', async ({ request }) => {
-        const testUserId = TEST_USER_ID;
-        const testNodeId = 'never-subscribed-node';
+    expect(res.ok()).toBe(true);
+    const data = await res.json();
+    expect(data.isSubscribed).toBe(false);
+  });
 
-        const res = await request.delete(`${API_BASE}/subscriptions?nodeId=${testNodeId}`, {
-            headers: {
-                'x-user-id': testUserId,
-            },
-        });
+  test('Unsubscribe from non-subscribed node returns 404', async ({ request }) => {
+    const testNodeId = 'never-subscribed-node';
 
-        // Should return 404 (not found) gracefully
-        expect(res.status()).toBe(404);
+    const res = await request.delete(`/api/subscriptions?nodeId=${encodeURIComponent(testNodeId)}`, {
+      headers: { 'x-user-id': userId },
     });
 
-    test('Subscribe endpoint validates node existence', async ({ request }) => {
-        const testUserId = TEST_USER_ID;
-        const nonExistentNodeId = 'definitely-not-a-real-node-' + Date.now();
+    expect(res.status()).toBe(404);
+  });
 
-        const res = await request.post(`${API_BASE}/subscriptions`, {
-            headers: {
-                'Content-Type': 'application/json',
-                'x-user-id': testUserId,
-            },
-            data: { nodeId: nonExistentNodeId },
-        });
+  test('Subscribe endpoint validates node existence', async ({ request }) => {
+    const nonExistentNodeId = `definitely-not-a-real-node-${Date.now()}`;
 
-        // Should return 404 (node not found) or 500 (if not handled gracefully)
-        expect([404, 500]).toContain(res.status());
+    const res = await request.post('/api/subscriptions', {
+      headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+      data: { nodeId: nonExistentNodeId },
     });
+
+    expect(res.status()).toBe(404);
+  });
 });

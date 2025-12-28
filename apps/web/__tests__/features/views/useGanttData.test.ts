@@ -350,7 +350,7 @@ describe('useGanttData', () => {
       const taskA = result.current.tasks.find((t) => t.id === 'task-a');
       const taskB = result.current.tasks.find((t) => t.id === 'task-b');
 
-      expect(taskA?.parent).toBe('0');
+      expect(taskA?.parent).toBe('root');
       expect(taskB?.parent).toBe('task-a');
     });
   });

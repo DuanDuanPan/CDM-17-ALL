@@ -228,7 +228,7 @@ describe('PBSForm', () => {
 
             expect(mockOnUpdate).toHaveBeenCalled();
             const lastCall = mockOnUpdate.mock.calls[mockOnUpdate.mock.calls.length - 1][0];
-            expect(lastCall.productRef).toBeUndefined();
+            expect(lastCall.productRef).toBeNull();
         });
     });
 

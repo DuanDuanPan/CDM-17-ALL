@@ -4,20 +4,29 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { gotoTestGraph } from './testUtils';
 
 const waitForApi = (page: Page, method: string, path: string) =>
   page.waitForResponse((res) => res.url().includes(path) && res.request().method() === method && res.ok());
 
-const waitForNodeReady = (page: Page) =>
-  Promise.race([
-    page.waitForResponse((res) => res.url().includes('/api/nodes/') && res.request().method() === 'GET' && res.status() === 200),
-    page.waitForResponse((res) => res.url().includes('/api/nodes') && res.request().method() === 'POST' && res.status() < 300),
-  ]);
+const waitForNodeReady = async (page: Page) => {
+  const timeout = 5000;
+  await Promise.race([
+    page.waitForResponse(
+      (res) => res.url().includes('/api/nodes/') && res.request().method() === 'GET' && res.status() === 200,
+      { timeout }
+    ),
+    page.waitForResponse(
+      (res) => res.url().includes('/api/nodes') && res.request().method() === 'POST' && res.status() < 300,
+      { timeout }
+    ),
+    page.locator('aside:has-text("属性面板")').waitFor({ state: 'visible', timeout }),
+  ]).catch(() => {});
+};
 
 test.describe('Story 2.9: APP Node Type', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('#graph-container');
+  test.beforeEach(async ({ page }, testInfo) => {
+    await gotoTestGraph(page, testInfo);
   });
 
   test('AC2.2/AC2.3/AC4.2: Select library app, defaults populate, execute, outputs show', async ({ page }) => {
@@ -37,24 +46,23 @@ test.describe('Story 2.9: APP Node Type', () => {
 
     // Open library dialog
     await propertyPanel.getByRole('button', { name: '从应用库选择' }).click();
-    const dialog = page.locator('text=卫星应用库');
-    await expect(dialog).toBeVisible();
+    await expect(page.getByRole('heading', { name: '卫星应用库' })).toBeVisible();
 
     // Select app and confirm
     await page.getByRole('button', { name: /Orbit Designer Pro/ }).click();
     await page.getByRole('button', { name: '选择应用' }).click();
 
     // Defaults should be populated
-    await expect(propertyPanel.locator('input[value="Orbit Altitude"]')).toBeVisible();
-    await expect(propertyPanel.locator('input[value="Inclination"]')).toBeVisible();
-    await expect(propertyPanel.locator('input[value="Trajectory File"]')).toBeVisible();
+    await expect(propertyPanel.locator('input[placeholder="参数名称"][value="轨道高度"]')).toBeVisible();
+    await expect(propertyPanel.locator('input[placeholder="参数名称"][value="轨道倾角"]')).toBeVisible();
+    await expect(propertyPanel.locator('input[placeholder="参数名称"][value="偏心率"]')).toBeVisible();
 
     // Execute
     await propertyPanel.getByRole('button', { name: '启动应用' }).click();
     await waitForApi(page, 'POST', '/execute');
 
     // Output download/preview buttons visible
-    await expect(propertyPanel.locator('button[title="下载"]')).toBeVisible();
-    await expect(propertyPanel.locator('button[title="预览"]')).toBeVisible();
+    await expect(propertyPanel.locator('button[title="下载"]').first()).toBeVisible();
+    await expect(propertyPanel.locator('button[title="预览"]').first()).toBeVisible();
   });
 });

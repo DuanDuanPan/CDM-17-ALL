@@ -581,7 +581,11 @@ export function MindNode({ node }: MindNodeProps) {
             ref={titleInputRef}
             value={label}
             onChange={e => setLabel(e.target.value)}
-            onBlur={commit}
+            onBlur={() => {
+              // Avoid committing when edit mode was already exited via keyboard (e.g., Escape cancel).
+              // In those cases, the blur event still fires due to focus changes/unmounting.
+              if (getData().isEditing) commit();
+            }}
             onKeyDown={handleKeyDown}
             className="w-full bg-transparent text-center text-sm font-medium text-gray-900 outline-none placeholder-gray-300"
             placeholder="New Topic"

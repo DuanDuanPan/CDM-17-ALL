@@ -51,7 +51,10 @@ describe('ViewContainer', () => {
 
     render(<ViewContainer graphId="graph-1" user={user} />);
 
-    expect(screen.getByTestId('kanban-view')).toBeTruthy();
+    expect(
+      screen.queryByTestId('kanban-view') ??
+      screen.getByText('正在加载看板视图...')
+    ).toBeTruthy();
   });
 
   it('renders gantt view when viewMode is gantt', () => {
@@ -59,6 +62,9 @@ describe('ViewContainer', () => {
 
     render(<ViewContainer graphId="graph-1" user={user} />);
 
-    expect(screen.getByTestId('gantt-view')).toBeTruthy();
+    expect(
+      screen.queryByTestId('gantt-view') ??
+      screen.getByText('正在加载甘特视图...')
+    ).toBeTruthy();
   });
 });

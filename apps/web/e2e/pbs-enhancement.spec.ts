@@ -3,20 +3,11 @@
  * Tests for PBS indicators and product library linking persistence
  */
 import { test, expect } from '@playwright/test';
+import { gotoTestGraph } from './testUtils';
 
 test.describe('PBS Node Enhancement', () => {
-    test.beforeEach(async ({ page }) => {
-        // Go to the app and wait for it to load
-        await page.goto('/');
-        // If we land on graph list, enter the first graph
-        const graphContainer = page.locator('#graph-container');
-        if (!(await graphContainer.isVisible({ timeout: 3000 }).catch(() => false))) {
-            // Wait for graph cards to render and click the first card
-            await page.waitForSelector('main .cursor-pointer', { timeout: 15000 });
-            const firstGraphCard = page.locator('main .cursor-pointer').first();
-            await firstGraphCard.click();
-        }
-        await page.waitForSelector('#graph-container', { timeout: 15000 });
+    test.beforeEach(async ({ page }, testInfo) => {
+        await gotoTestGraph(page, testInfo);
     });
 
     test.describe('PBS Node Indicators', () => {
@@ -270,36 +261,30 @@ test.describe('PBS Node Enhancement', () => {
 });
 
 test.describe('Product Library Search (Front-end)', () => {
-    test('Search filters results by keyword and filters', async ({ page }) => {
-        // Open product search modal
-        await page.click('#graph-container');
-        await page.keyboard.press('Tab');
-        await page.waitForTimeout(500);
-        await page.keyboard.press('Escape');
+    test.beforeEach(async ({ page }, testInfo) => {
+        await gotoTestGraph(page, testInfo);
+    });
 
-        const node = page.locator('.x6-node').first();
-        await node.click();
+    test('Search filters results by keyword and filters', async ({ page }) => {
+        const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
+        await expect(centerNode).toBeVisible();
+        await centerNode.click();
+
+        const propertyPanel = page.locator('aside:has-text("属性面板")');
+        await expect(propertyPanel).toBeVisible();
+
+        const typeSelect = propertyPanel.locator('select').first();
+        await typeSelect.selectOption('PBS');
         await page.waitForTimeout(300);
 
-        const typeDropdown = page.locator('[data-testid="node-type-dropdown"]');
-        if (await typeDropdown.isVisible()) {
-            await typeDropdown.click();
-            await page.locator('text=PBS').click();
-            await page.waitForTimeout(500);
+        await propertyPanel.getByRole('button', { name: '关联产品库产品' }).click();
+        await expect(page.locator('text=产品库搜索')).toBeVisible();
 
-            await page.locator('text=关联产品库产品').click();
-            await page.waitForTimeout(500);
+        // Use actual front-end mock products from `apps/web/lib/productLibrary.ts`
+        const searchInput = page.locator('input[placeholder*="输入产品名称"]').first();
+        await expect(searchInput).toBeVisible();
+        await searchInput.fill('Sentinel-1A');
 
-            // HIGH-2 Fix: Use actual mock product names from product-library.controller.ts
-            const searchInput = page.locator('input[placeholder*="产品名称"]');
-            await searchInput.fill('Solar');
-            await page.waitForTimeout(300);
-
-            // Verify search returns matching products
-            await expect(page.locator('text=Solar Panel Type-A')).toBeVisible();
-
-            // MEDIUM-1 Fix: Removed invalid filter test ('轨道类型'/'SSO' don't exist in ProductSearchDialog)
-            // The mock implementation only supports simple text search, not category filters
-        }
+        await expect(page.locator('text=Sentinel-1A')).toBeVisible();
     });
 });

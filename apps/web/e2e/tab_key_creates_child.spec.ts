@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { gotoTestGraph } from './testUtils';
 
 test.describe('Tab Key Creates Child Node', () => {
-  test('should create a child node and enter edit mode', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('#graph-container');
+  test.beforeEach(async ({ page }, testInfo) => {
+    await gotoTestGraph(page, testInfo);
+  });
 
-    const centerNode = page.locator('text=中心主题').first();
+  test('should create a child node and enter edit mode', async ({ page }) => {
+    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
     await expect(centerNode).toBeVisible();
     await centerNode.click();
 
@@ -13,7 +15,7 @@ test.describe('Tab Key Creates Child Node', () => {
 
     await page.keyboard.press('Tab');
 
-    const editInput = page.locator('input[type="text"]');
+    const editInput = page.locator('#graph-container input[placeholder="New Topic"]').first();
     await expect(editInput).toBeVisible();
     await expect(editInput).toBeFocused();
 
@@ -22,25 +24,25 @@ test.describe('Tab Key Creates Child Node', () => {
   });
 
   test('should create multiple children under the same parent', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('#graph-container');
-
-    const centerNode = page.locator('text=中心主题').first();
+    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
     await expect(centerNode).toBeVisible();
     await centerNode.click();
 
     // Child 1
     await page.keyboard.press('Tab');
-    await page.keyboard.type('子节点1');
-    await page.keyboard.press('Enter'); // save
-    await expect(page.locator('text=子节点1')).toBeVisible();
+    const child1Input = page.locator('#graph-container input[placeholder="New Topic"]').first();
+    await expect(child1Input).toBeVisible();
+    await child1Input.fill('子节点1');
+    await child1Input.press('Enter'); // save
+    await expect(page.locator('.x6-node', { hasText: '子节点1' }).first()).toBeVisible();
 
     // Re-select parent and create Child 2
     await centerNode.click();
     await page.keyboard.press('Tab');
-    await page.keyboard.type('子节点2');
-    await page.keyboard.press('Enter'); // save
-    await expect(page.locator('text=子节点2')).toBeVisible();
+    const child2Input = page.locator('#graph-container input[placeholder="New Topic"]').first();
+    await expect(child2Input).toBeVisible();
+    await child2Input.fill('子节点2');
+    await child2Input.press('Enter'); // save
+    await expect(page.locator('.x6-node', { hasText: '子节点2' }).first()).toBeVisible();
   });
 });
-

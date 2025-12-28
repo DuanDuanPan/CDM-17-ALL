@@ -1,4 +1,5 @@
 import { test, expect, BrowserContext, Page } from '@playwright/test';
+import { createTestGraph, gotoTestGraph, makeTestGraphUrl } from './testUtils';
 
 /**
  * E2E Tests for Permanent Delete Feature
@@ -12,12 +13,12 @@ import { test, expect, BrowserContext, Page } from '@playwright/test';
  */
 
 test.describe('Permanent Delete Feature', () => {
-    const TEST_URL = 'http://localhost:3000';
+    test.beforeEach(async ({ page }, testInfo) => {
+        await gotoTestGraph(page, testInfo);
+    });
 
     test.describe('Archive Drawer Delete', () => {
         test('can permanently delete node from archive drawer', async ({ page }) => {
-            // Navigate to page
-            await page.goto(TEST_URL);
             await page.waitForLoadState('networkidle');
 
             // Wait for initial sync
@@ -29,11 +30,11 @@ test.describe('Permanent Delete Feature', () => {
             await page.keyboard.press('Tab');
             await page.waitForTimeout(300);
             await page.keyboard.type('Node To Delete');
-            await page.keyboard.press('Escape');
+            await page.keyboard.press('Enter');
             await page.waitForTimeout(500);
 
             // Find and select the newly created node
-            const newNode = page.locator('text=Node To Delete').first();
+            const newNode = page.locator('.x6-node', { hasText: 'Node To Delete' }).first();
             await newNode.click();
             await page.waitForTimeout(300);
 
@@ -42,17 +43,19 @@ test.describe('Permanent Delete Feature', () => {
             await page.waitForTimeout(1000);
 
             // Open Archive Drawer
-            const archiveButton = page.locator('[data-testid="archive-drawer-trigger"]');
+            const archiveButton = page.getByRole('button', { name: '归档箱' });
             await archiveButton.click();
-            await page.waitForTimeout(500);
+            const archiveDrawer = page.locator('div.fixed', {
+                has: page.getByRole('heading', { name: '归档箱' }),
+            }).first();
+            await expect(archiveDrawer.getByRole('heading', { name: '归档箱' })).toBeVisible();
 
             // Verify node appears in archive
-            const archivedNode = page.locator('[data-testid="archive-drawer"]').locator('text=Node To Delete');
+            const archivedNode = archiveDrawer.getByRole('heading', { name: 'Node To Delete', level: 3 });
             await expect(archivedNode).toBeVisible({ timeout: 5000 });
 
             // Click delete button on the archived node
-            const deleteButton = page.locator('[data-testid="archive-drawer"]').locator('[data-testid="delete-node-btn"]').first();
-            await deleteButton.click();
+            await archiveDrawer.getByRole('button', { name: '删除' }).first().click();
 
             // Confirm deletion dialog should appear
             const confirmDialog = page.locator('text=确认永久删除');
@@ -72,8 +75,6 @@ test.describe('Permanent Delete Feature', () => {
 
     test.describe('Shift+Delete Shortcut', () => {
         test('Shift+Delete shows confirmation dialog', async ({ page }) => {
-            // Navigate to page
-            await page.goto(TEST_URL);
             await page.waitForLoadState('networkidle');
             await page.waitForTimeout(2000);
 
@@ -83,11 +84,11 @@ test.describe('Permanent Delete Feature', () => {
             await page.keyboard.press('Tab');
             await page.waitForTimeout(300);
             await page.keyboard.type('Shift Delete Test');
-            await page.keyboard.press('Escape');
+            await page.keyboard.press('Enter');
             await page.waitForTimeout(500);
 
             // Select the node
-            const testNode = page.locator('text=Shift Delete Test').first();
+            const testNode = page.locator('.x6-node', { hasText: 'Shift Delete Test' }).first();
             await testNode.click();
             await page.waitForTimeout(300);
 
@@ -107,8 +108,6 @@ test.describe('Permanent Delete Feature', () => {
         });
 
         test('Shift+Delete permanently removes node after confirmation', async ({ page }) => {
-            // Navigate to page
-            await page.goto(TEST_URL);
             await page.waitForLoadState('networkidle');
             await page.waitForTimeout(2000);
 
@@ -118,11 +117,11 @@ test.describe('Permanent Delete Feature', () => {
             await page.keyboard.press('Tab');
             await page.waitForTimeout(300);
             await page.keyboard.type('To Be Deleted');
-            await page.keyboard.press('Escape');
+            await page.keyboard.press('Enter');
             await page.waitForTimeout(500);
 
             // Select the node
-            const testNode = page.locator('text=To Be Deleted').first();
+            const testNode = page.locator('.x6-node', { hasText: 'To Be Deleted' }).first();
             await testNode.click();
             await page.waitForTimeout(300);
 
@@ -140,17 +139,18 @@ test.describe('Permanent Delete Feature', () => {
             await expect(testNode).not.toBeVisible({ timeout: 5000 });
 
             // Verify it's not in archive either
-            const archiveButton = page.locator('[data-testid="archive-drawer-trigger"]');
+            const archiveButton = page.getByRole('button', { name: '归档箱' });
             await archiveButton.click();
-            await page.waitForTimeout(500);
+            const archiveDrawer = page.locator('div.fixed', {
+                has: page.getByRole('heading', { name: '归档箱' }),
+            }).first();
+            await expect(archiveDrawer.getByRole('heading', { name: '归档箱' })).toBeVisible();
 
-            const archivedNode = page.locator('[data-testid="archive-drawer"]').locator('text=To Be Deleted');
-            await expect(archivedNode).not.toBeVisible();
+            const archivedNode = archiveDrawer.getByRole('heading', { name: 'To Be Deleted', level: 3 });
+            await expect(archivedNode).toHaveCount(0);
         });
 
         test('Delete key (without Shift) archives node instead of deleting', async ({ page }) => {
-            // Navigate to page
-            await page.goto(TEST_URL);
             await page.waitForLoadState('networkidle');
             await page.waitForTimeout(2000);
 
@@ -160,11 +160,11 @@ test.describe('Permanent Delete Feature', () => {
             await page.keyboard.press('Tab');
             await page.waitForTimeout(300);
             await page.keyboard.type('Archive Not Delete');
-            await page.keyboard.press('Escape');
+            await page.keyboard.press('Enter');
             await page.waitForTimeout(500);
 
             // Select the node
-            const testNode = page.locator('text=Archive Not Delete').first();
+            const testNode = page.locator('.x6-node', { hasText: 'Archive Not Delete' }).first();
             await testNode.click();
             await page.waitForTimeout(300);
 
@@ -178,19 +178,20 @@ test.describe('Permanent Delete Feature', () => {
             await expect(testNode).not.toBeVisible({ timeout: 3000 });
 
             // But should be in archive
-            const archiveButton = page.locator('[data-testid="archive-drawer-trigger"]');
+            const archiveButton = page.getByRole('button', { name: '归档箱' });
             await archiveButton.click();
-            await page.waitForTimeout(500);
+            const archiveDrawer = page.locator('div.fixed', {
+                has: page.getByRole('heading', { name: '归档箱' }),
+            }).first();
+            await expect(archiveDrawer.getByRole('heading', { name: '归档箱' })).toBeVisible();
 
-            const archivedNode = page.locator('[data-testid="archive-drawer"]').locator('text=Archive Not Delete');
+            const archivedNode = archiveDrawer.getByRole('heading', { name: 'Archive Not Delete', level: 3 });
             await expect(archivedNode).toBeVisible({ timeout: 5000 });
         });
     });
 
     test.describe('Root Node Protection', () => {
         test('cannot delete root node', async ({ page }) => {
-            // Navigate to page
-            await page.goto(TEST_URL);
             await page.waitForLoadState('networkidle');
             await page.waitForTimeout(2000);
 
@@ -223,8 +224,6 @@ test.describe('Permanent Delete Multi-Client Sync', () => {
     let pageA: Page;
     let pageB: Page;
 
-    const TEST_URL = 'http://localhost:3000';
-
     test.beforeAll(async ({ browser }) => {
         contextA = await browser.newContext();
         contextB = await browser.newContext();
@@ -237,37 +236,38 @@ test.describe('Permanent Delete Multi-Client Sync', () => {
         await contextB.close();
     });
 
-    test('permanent delete by User A removes node for User B', async () => {
+    test('permanent delete by User A removes node for User B', async ({ }, testInfo) => {
+        const graphId = await createTestGraph(pageA, testInfo, 'e2e-user-a');
+        const urlA = makeTestGraphUrl(graphId, 'e2e-user-a');
+        const urlB = makeTestGraphUrl(graphId, 'e2e-user-b');
+
         // Both users navigate to the same page
         await Promise.all([
-            pageA.goto(TEST_URL),
-            pageB.goto(TEST_URL),
+            pageA.goto(urlA),
+            pageB.goto(urlB),
         ]);
 
         // Wait for collaboration connection
-        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 10000 });
-        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 10000 });
+        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
+        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
 
         // Wait for initial sync
         await pageA.waitForTimeout(2000);
 
         // User A creates a node
-        const centerNodeA = pageA.locator('.x6-node').first();
+        const centerNodeA = pageA.locator('.x6-node[data-cell-id="center-node"]');
         await centerNodeA.click();
         await pageA.keyboard.press('Tab');
         await pageA.waitForTimeout(300);
         await pageA.keyboard.type('Sync Delete Test');
-        await pageA.keyboard.press('Escape');
-
-        // Wait for sync to User B
-        await pageB.waitForTimeout(2000);
+        await pageA.keyboard.press('Enter');
 
         // Verify User B sees the node
-        const nodeOnB = pageB.locator('text=Sync Delete Test').first();
-        await expect(nodeOnB).toBeVisible({ timeout: 5000 });
+        const nodeOnB = pageB.locator('.x6-node', { hasText: 'Sync Delete Test' }).first();
+        await expect(nodeOnB).toBeVisible({ timeout: 15000 });
 
         // User A permanently deletes the node
-        const nodeOnA = pageA.locator('text=Sync Delete Test').first();
+        const nodeOnA = pageA.locator('.x6-node', { hasText: 'Sync Delete Test' }).first();
         await nodeOnA.click();
         await pageA.waitForTimeout(300);
         await pageA.keyboard.press('Shift+Delete');
@@ -276,11 +276,8 @@ test.describe('Permanent Delete Multi-Client Sync', () => {
         const confirmButton = pageA.locator('button:has-text("永久删除")');
         await confirmButton.click();
 
-        // Wait for sync
-        await pageB.waitForTimeout(2000);
-
         // Node should disappear on both pages
-        await expect(nodeOnA).not.toBeVisible({ timeout: 5000 });
-        await expect(nodeOnB).not.toBeVisible({ timeout: 5000 });
+        await expect(nodeOnA).not.toBeVisible({ timeout: 15000 });
+        await expect(nodeOnB).not.toBeVisible({ timeout: 15000 });
     });
 });

@@ -21,9 +21,16 @@ export default defineConfig({
     },
   ],
 
-  webServer: {
-    command: 'pnpm dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: [
+    {
+      command: 'pnpm -C ../api dev:no-watch',
+      url: 'http://localhost:3001/api',
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: 'pnpm exec next dev -H 127.0.0.1 -p 3000',
+      url: 'http://localhost:3000',
+      reuseExistingServer: !process.env.CI,
+    },
+  ],
 });

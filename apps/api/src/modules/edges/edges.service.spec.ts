@@ -15,6 +15,7 @@ jest.mock('@cdm/database', () => ({
   prisma: {
     node: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
     edge: {
       findUnique: jest.fn(),
@@ -42,6 +43,9 @@ describe('EdgesService', () => {
 
     // Reset mocks
     jest.clearAllMocks();
+
+    // Default to no labels; service will fall back to IDs
+    (mockPrisma.node.findMany as jest.Mock).mockResolvedValue([]);
   });
 
   describe('Cycle Detection', () => {

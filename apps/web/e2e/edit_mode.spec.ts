@@ -1,77 +1,82 @@
 import { test, expect } from '@playwright/test';
+import { gotoTestGraph } from './testUtils';
 
 test.describe('Edit Mode', () => {
-  test('should enter edit mode on double-click', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('#graph-container');
+  test.beforeEach(async ({ page }, testInfo) => {
+    await gotoTestGraph(page, testInfo);
+  });
 
-    const centerNode = page.locator('text=中心主题').first();
+  test('should enter edit mode on double-click', async ({ page }) => {
+    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
     await expect(centerNode).toBeVisible();
 
     // Double-click to enter edit mode
     await centerNode.dblclick();
-    await page.waitForTimeout(300);
 
     // Verify edit input is visible and focused
-    const editInput = page.locator('input[type="text"]');
+    const editInput = page.locator('#graph-container input[placeholder="New Topic"]').first();
     await expect(editInput).toBeVisible();
     await expect(editInput).toBeFocused();
   });
 
   test('should enter edit mode on Space key', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('#graph-container');
-
-    const centerNode = page.locator('text=中心主题').first();
+    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
     await centerNode.click();
 
     // Press Space to enter edit mode
     await page.keyboard.press('Space');
-    await page.waitForTimeout(300);
 
     // Verify edit input is visible
-    const editInput = page.locator('input[type="text"]');
+    const editInput = page.locator('#graph-container input[placeholder="New Topic"]').first();
     await expect(editInput).toBeVisible();
   });
 
   test('should save text on Enter key', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('#graph-container');
+    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
+    await centerNode.click();
 
-    const centerNode = page.locator('text=中心主题').first();
+    const originalTitle = (await centerNode.locator('span').first().textContent())?.trim() || '';
+
     await centerNode.dblclick();
-    await page.waitForTimeout(300);
 
     // Clear and type new text
-    await page.keyboard.press('Control+A');
-    await page.keyboard.type('修改后的标题');
+    const editInput = page.locator('#graph-container input[placeholder="New Topic"]').first();
+    await expect(editInput).toBeVisible();
+    await editInput.fill('修改后的标题');
 
     // Press Enter to save
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(300);
+    await editInput.press('Enter');
 
     // Verify text was saved
-    await expect(page.locator('text=修改后的标题')).toBeVisible();
+    await expect(page.locator('.x6-node', { hasText: '修改后的标题' }).first()).toBeVisible();
+
+    // Restore original title to avoid cross-test pollution (center-node is persisted)
+    if (originalTitle) {
+      await centerNode.dblclick();
+      const restoreInput = page.locator('#graph-container input[placeholder="New Topic"]').first();
+      await expect(restoreInput).toBeVisible();
+      await restoreInput.fill(originalTitle);
+      await restoreInput.press('Enter');
+      await expect(centerNode.locator('span').first()).toHaveText(originalTitle);
+    }
   });
 
   test('should cancel edit on Escape key', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('#graph-container');
+    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
+    await centerNode.click();
+    const originalTitle = (await centerNode.locator('span').first().textContent())?.trim() || '';
 
-    const centerNode = page.locator('text=中心主题').first();
     await centerNode.dblclick();
-    await page.waitForTimeout(300);
 
     // Type new text
-    await page.keyboard.press('Control+A');
-    await page.keyboard.type('临时文本');
+    const editInput = page.locator('#graph-container input[placeholder="New Topic"]').first();
+    await expect(editInput).toBeVisible();
+    await editInput.fill('临时文本');
 
     // Press Escape to cancel
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
+    await editInput.press('Escape');
 
     // Verify original text is still there
-    await expect(page.locator('text=中心主题')).toBeVisible();
-    await expect(page.locator('text=临时文本')).not.toBeVisible();
+    await expect(centerNode.locator('span').first()).toHaveText(originalTitle);
   });
 });

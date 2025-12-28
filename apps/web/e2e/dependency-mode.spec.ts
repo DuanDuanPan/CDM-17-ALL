@@ -4,6 +4,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { gotoTestGraph } from './testUtils';
 
 // Helper to wait for any node-related API response
 const waitForNodeReady = (page: Page) =>
@@ -12,20 +13,22 @@ const waitForNodeReady = (page: Page) =>
       (res) =>
         res.url().includes('/api/nodes/') &&
         res.request().method() === 'GET' &&
-        res.status() === 200
+        res.status() === 200,
+      { timeout: 5000 }
     ),
     page.waitForResponse(
       (res) =>
         res.url().includes('/api/nodes') &&
         res.request().method() === 'POST' &&
-        res.status() < 300
+        res.status() < 300,
+      { timeout: 5000 }
     ),
+    page.locator('aside:has-text("属性")').waitFor({ state: 'visible', timeout: 5000 }),
   ]).catch(() => {});
 
 test.describe('Task Dependency Network', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('#graph-container');
+  test.beforeEach(async ({ page }, testInfo) => {
+    await gotoTestGraph(page, testInfo);
     // Wait for initial graph to load
     await page.waitForTimeout(500);
   });
@@ -261,9 +264,8 @@ test.describe('Task Dependency Network', () => {
 test.describe('Dependency Mode Integration', () => {
   test('Full flow: Toggle mode, create dependency, change type, delete', async ({
     page,
-  }) => {
-    await page.goto('/');
-    await page.waitForSelector('#graph-container');
+  }, testInfo) => {
+    await gotoTestGraph(page, testInfo);
     await page.waitForTimeout(500);
 
     // Step 1: Verify graph loads

@@ -4,6 +4,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import { gotoTestGraph } from './testUtils';
 
 // Helper to wait for API responses
 const waitForApi = (page: Page, method: string, path: string) =>
@@ -16,9 +17,8 @@ const waitForApi = (page: Page, method: string, path: string) =>
     );
 
 test.describe('Knowledge Link & Recommendation (Story 2.8)', () => {
-    test.beforeEach(async ({ page }) => {
-        await page.goto('/');
-        await page.waitForSelector('#graph-container');
+    test.beforeEach(async ({ page }, testInfo) => {
+        await gotoTestGraph(page, testInfo);
         await page.waitForTimeout(500);
     });
 
@@ -26,72 +26,48 @@ test.describe('Knowledge Link & Recommendation (Story 2.8)', () => {
         test('TC-2.8-REC-1: Recommendation panel should be visible when any node is selected', async ({
             page,
         }) => {
-            // Given: A node exists
-            const nodes = page.locator('.x6-node');
-            const nodeCount = await nodes.count();
-
-            if (nodeCount < 1) {
-                test.skip();
-                return;
-            }
-
             // When: Select a node
-            const firstNode = nodes.first();
-            await firstNode.click();
-            await page.waitForTimeout(500);
+            const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
+            await expect(centerNode).toBeVisible();
+            await centerNode.click();
 
-            // Then: Property panel should show Knowledge Recommendation section
-            const propertyPanel = page.locator('aside:has-text("属性")');
-            const panelVisible = await propertyPanel.isVisible().catch(() => false);
+            // Then: Knowledge Recommendation section should be visible with at least one item
+            const propertyPanel = page.locator('aside:has-text("属性面板")');
+            await expect(propertyPanel).toBeVisible();
 
-            if (panelVisible) {
-                // AC1.1: Knowledge Recommendation section should be visible
-                const recommendationSection = page.locator('text=知识推荐');
-                const sectionVisible = await recommendationSection.isVisible().catch(() => false);
+            const recommendationSection = propertyPanel.locator('[data-testid="knowledge-recommendation"]');
+            await expect(recommendationSection).toBeVisible();
 
-                // AC1.2: Should display mock recommended resources
-                if (sectionVisible) {
-                    // Look for recommendation items
-                    const recommendationItems = propertyPanel.locator('button:has-text("React Best Practices"), button:has-text("System Design"), button:has-text("API Design")');
-                    const itemCount = await recommendationItems.count();
-
-                    // Should have at least one recommendation (mock data)
-                    expect(itemCount).toBeGreaterThan(0);
-                }
-            }
+            const itemCount = await recommendationSection.locator('button').count();
+            expect(itemCount).toBeGreaterThan(0);
         });
 
         test('TC-2.8-REC-2: Clicking recommendation should show mock toast', async ({
             page,
         }) => {
             // Given: A node is selected and recommendation panel is visible
-            const nodes = page.locator('.x6-node');
-            const firstNode = nodes.first();
-            await firstNode.click();
-            await page.waitForTimeout(500);
+            const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
+            await expect(centerNode).toBeVisible();
+            await centerNode.click();
+
+            const propertyPanel = page.locator('aside:has-text("属性面板")');
+            await expect(propertyPanel).toBeVisible();
+
+            const recommendationButton = propertyPanel
+                .locator('[data-testid="knowledge-recommendation"] button')
+                .first();
+            await expect(recommendationButton).toBeVisible();
+
+            // Prevent real popups during test
+            await page.evaluate(() => {
+                window.open = () => null;
+            });
 
             // When: Click on a recommendation
-            const propertyPanel = page.locator('aside:has-text("属性")');
-            const panelVisible = await propertyPanel.isVisible().catch(() => false);
+            await recommendationButton.click();
 
-            if (panelVisible) {
-                // Find any button in the recommendation area
-                const recommendationButtons = propertyPanel.locator('div:has-text("知识推荐") >> button').first();
-                const buttonExists = await recommendationButtons.count();
-
-                if (buttonExists > 0) {
-                    await recommendationButtons.click();
-                    await page.waitForTimeout(500);
-
-                    // AC1.3: Should show "Mock: Open Resource" toast or log
-                    // Check for toast notification
-                    const toast = page.locator('[data-sonner-toast], [role="alert"], .toast');
-                    const toastVisible = await toast.isVisible().catch(() => false);
-
-                    // Toast should be visible after clicking recommendation
-                    expect(toastVisible).toBe(true);
-                }
-            }
+            // Then: Toast should be shown (mock implementation uses @cdm/ui toast)
+            await expect(page.locator('text=正在打开:')).toBeVisible({ timeout: 3000 });
         });
     });
 
@@ -100,32 +76,23 @@ test.describe('Knowledge Link & Recommendation (Story 2.8)', () => {
             page,
         }) => {
             // Given: A Task node is selected
-            const nodes = page.locator('.x6-node');
-            const firstNode = nodes.first();
-            await firstNode.click();
-            await page.waitForTimeout(500);
+            const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
+            await expect(centerNode).toBeVisible();
+            await centerNode.click();
 
             // Change to Task type
-            const propertyPanel = page.locator('aside:has-text("属性")');
-            const panelVisible = await propertyPanel.isVisible().catch(() => false);
+            const propertyPanel = page.locator('aside:has-text("属性面板")');
+            await expect(propertyPanel).toBeVisible();
 
-            if (panelVisible) {
-                const typeSelect = propertyPanel.locator('select').first();
-                await typeSelect.selectOption('TASK');
-                await page.waitForTimeout(300);
+            const typeSelect = propertyPanel.locator('select').first();
+            await typeSelect.selectOption('TASK');
+            await expect(propertyPanel.locator('label:has-text("状态")')).toBeVisible();
 
-                // AC2.1: Then "Associate Knowledge" section should be available
-                const knowledgeSection = page.locator('text=关联知识');
-                const sectionVisible = await knowledgeSection.isVisible().catch(() => false);
+            // AC2.1: Then "Associate Knowledge" section should be available
+            await expect(propertyPanel.getByRole('heading', { name: /关联知识/ })).toBeVisible();
 
-                expect(sectionVisible).toBe(true);
-
-                // Should have "关联" button
-                const addButton = propertyPanel.locator('button:has-text("关联")');
-                const buttonVisible = await addButton.isVisible().catch(() => false);
-
-                expect(buttonVisible).toBe(true);
-            }
+            // Should have "关联" button
+            await expect(propertyPanel.getByRole('button', { name: '关联' }).first()).toBeVisible();
         });
 
         test('TC-2.8-ASSOC-2: Clicking "关联" should open KnowledgeSearchDialog', async ({
@@ -199,24 +166,15 @@ test.describe('Knowledge Link & Recommendation (Story 2.8)', () => {
             await page.waitForTimeout(500);
 
             // When: Select a knowledge item
-            const knowledgeItem = page.locator('[data-value*="kb_"], [cmdk-item]').first();
-            const itemExists = await knowledgeItem.count();
+            const knowledgeItem = page.locator('[cmdk-item]').first();
+            await expect(knowledgeItem).toBeVisible();
 
-            if (itemExists > 0) {
-                await knowledgeItem.click();
-                await page.waitForTimeout(500);
+            const selectedTitle = (await knowledgeItem.locator('span').first().textContent())?.trim() || '';
+            await knowledgeItem.click();
 
-                // AC2.3 & AC2.4: Then item should appear in the Task's knowledge list
-                // Look for the added knowledge item in the property panel
-                const addedItem = propertyPanel.locator('text=Design Guidelines, text=API Documentation');
-                const itemVisible = await addedItem.isVisible().catch(() => false);
-
-                // Verify the item is visible or toast appeared
-                const toast = page.locator('[data-sonner-toast]:has-text("关联成功")');
-                const toastVisible = await toast.isVisible().catch(() => false);
-
-                // At least one indicator should confirm the action succeeded
-                expect(itemVisible || toastVisible).toBe(true);
+            // Dialog should close and the selected title should appear in the associated list
+            if (selectedTitle) {
+                await expect(propertyPanel.locator(`text=${selectedTitle}`)).toBeVisible({ timeout: 5000 });
             }
         });
 
@@ -313,14 +271,10 @@ test.describe('Knowledge Link & Recommendation (Story 2.8)', () => {
             await page.waitForTimeout(300);
 
             // Step 3: Verify Knowledge Recommendation is visible
-            const recommendationSection = page.locator('text=知识推荐');
-            const recVisible = await recommendationSection.isVisible().catch(() => false);
-            expect(recVisible).toBe(true);
+            await expect(propertyPanel.locator('[data-testid="knowledge-recommendation"]')).toBeVisible();
 
             // Step 4: Verify "关联知识" section exists
-            const knowledgeSection = page.locator('text=关联知识');
-            const knowledgeVisible = await knowledgeSection.isVisible().catch(() => false);
-            expect(knowledgeVisible).toBe(true);
+            await expect(propertyPanel.getByRole('heading', { name: /关联知识/ })).toBeVisible();
 
             // Step 5: Open search dialog
             const addButton = propertyPanel.locator('button:has-text("关联")');

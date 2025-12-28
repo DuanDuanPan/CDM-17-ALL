@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
-import { ToastProvider } from '@cdm/ui';
+import { ConfirmDialogProvider, ToastProvider } from '@cdm/ui';
 import { GraphComponent } from '@/components/graph/GraphComponent';
 
 vi.mock('@/hooks/useGraph', () => ({
@@ -33,7 +33,9 @@ describe('GraphComponent', () => {
   it('renders a focusable graph container', () => {
     render(
       <ToastProvider>
-        <GraphComponent />
+        <ConfirmDialogProvider>
+          <GraphComponent />
+        </ConfirmDialogProvider>
       </ToastProvider>
     );
     const container = document.getElementById('graph-container');

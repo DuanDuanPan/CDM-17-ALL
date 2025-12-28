@@ -7,6 +7,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TaskForm } from '@/components/PropertyPanel/TaskForm';
+import { UserProvider } from '@/contexts';
 import type { TaskProps, KnowledgeReference } from '@cdm/types';
 
 // Mock useToast hook
@@ -49,6 +50,7 @@ vi.mock('@/components/Knowledge', () => ({
 describe('TaskForm - Knowledge Association (Story 2.8)', () => {
     const mockOnUpdate = vi.fn();
     const defaultNodeId = 'test-node-123';
+    const testUser = { id: 'user-1', name: '测试用户' };
 
     beforeEach(() => {
         mockOnUpdate.mockClear();
@@ -56,7 +58,11 @@ describe('TaskForm - Knowledge Association (Story 2.8)', () => {
 
     describe('AC2.1: Action Entry', () => {
         it('renders "Associate Knowledge" section with add button', () => {
-            render(<TaskForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />);
+            render(
+                <UserProvider initialUser={testUser}>
+                    <TaskForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />
+                </UserProvider>
+            );
 
             expect(screen.getByText('📚 关联知识')).toBeTruthy();
             expect(screen.getByText('关联')).toBeTruthy();
@@ -65,7 +71,11 @@ describe('TaskForm - Knowledge Association (Story 2.8)', () => {
 
     describe('AC2.2: Search Dialog', () => {
         it('opens KnowledgeSearchDialog when clicking add button', () => {
-            render(<TaskForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />);
+            render(
+                <UserProvider initialUser={testUser}>
+                    <TaskForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />
+                </UserProvider>
+            );
 
             const addButton = screen.getByText('关联');
             fireEvent.click(addButton);
@@ -76,7 +86,11 @@ describe('TaskForm - Knowledge Association (Story 2.8)', () => {
 
     describe('AC2.3: Selection', () => {
         it('adds selected knowledge to knowledgeRefs list', () => {
-            render(<TaskForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />);
+            render(
+                <UserProvider initialUser={testUser}>
+                    <TaskForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />
+                </UserProvider>
+            );
 
             // Open dialog
             const addButton = screen.getByText('关联');
@@ -105,7 +119,11 @@ describe('TaskForm - Knowledge Association (Story 2.8)', () => {
                 ],
             };
 
-            render(<TaskForm nodeId={defaultNodeId} initialData={initialData} onUpdate={mockOnUpdate} />);
+            render(
+                <UserProvider initialUser={testUser}>
+                    <TaskForm nodeId={defaultNodeId} initialData={initialData} onUpdate={mockOnUpdate} />
+                </UserProvider>
+            );
 
             expect(screen.getByText('Design Guidelines')).toBeTruthy();
             expect(screen.getByText('Design docs')).toBeTruthy();
@@ -121,7 +139,11 @@ describe('TaskForm - Knowledge Association (Story 2.8)', () => {
                 ],
             };
 
-            render(<TaskForm nodeId={defaultNodeId} initialData={initialData} onUpdate={mockOnUpdate} />);
+            render(
+                <UserProvider initialUser={testUser}>
+                    <TaskForm nodeId={defaultNodeId} initialData={initialData} onUpdate={mockOnUpdate} />
+                </UserProvider>
+            );
 
             // Find and click remove button (there should be 2 remove buttons)
             const removeButtons = screen.getAllByTitle('移除关联');
@@ -137,7 +159,11 @@ describe('TaskForm - Knowledge Association (Story 2.8)', () => {
         });
 
         it('shows empty state when no knowledge refs', () => {
-            render(<TaskForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />);
+            render(
+                <UserProvider initialUser={testUser}>
+                    <TaskForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />
+                </UserProvider>
+            );
 
             expect(screen.getByText(/暂无关联知识/)).toBeTruthy();
         });
@@ -154,7 +180,11 @@ describe('TaskForm - Knowledge Association (Story 2.8)', () => {
                 ],
             };
 
-            render(<TaskForm nodeId={defaultNodeId} initialData={initialData} onUpdate={mockOnUpdate} />);
+            render(
+                <UserProvider initialUser={testUser}>
+                    <TaskForm nodeId={defaultNodeId} initialData={initialData} onUpdate={mockOnUpdate} />
+                </UserProvider>
+            );
 
             // All three items should be rendered
             expect(screen.getByText('Document')).toBeTruthy();

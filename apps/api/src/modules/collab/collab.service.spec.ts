@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CollabService } from './collab.service';
 
 /**
@@ -7,6 +8,14 @@ import { CollabService } from './collab.service';
  *
  * Story 1.4: Real-time Collaboration Engine
  */
+
+jest.mock('@hocuspocus/server', () => ({
+    Server: jest.fn().mockImplementation(() => ({
+        listen: jest.fn().mockResolvedValue(undefined),
+        destroy: jest.fn().mockResolvedValue(undefined),
+    })),
+}));
+
 describe('CollabService', () => {
     let service: CollabService;
 
@@ -23,7 +32,13 @@ describe('CollabService', () => {
                     ],
                 }),
             ],
-            providers: [CollabService],
+            providers: [
+                CollabService,
+                {
+                    provide: EventEmitter2,
+                    useValue: { emit: jest.fn(), on: jest.fn() },
+                },
+            ],
         }).compile();
 
         service = module.get<CollabService>(CollabService);
@@ -31,7 +46,7 @@ describe('CollabService', () => {
 
     afterEach(async () => {
         // Ensure cleanup
-        await service.onModuleDestroy();
+        await service?.onModuleDestroy();
     });
 
     describe('initialization', () => {
@@ -78,7 +93,13 @@ describe('CollabService', () => {
                         ],
                     }),
                 ],
-                providers: [CollabService],
+                providers: [
+                    CollabService,
+                    {
+                        provide: EventEmitter2,
+                        useValue: { emit: jest.fn(), on: jest.fn() },
+                    },
+                ],
             }).compile();
 
             const customService = customModule.get<CollabService>(CollabService);

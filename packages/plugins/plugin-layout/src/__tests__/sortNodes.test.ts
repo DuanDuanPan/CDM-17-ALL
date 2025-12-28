@@ -10,9 +10,29 @@ import {
  */
 describe('sortNodesRightToLeftTopToBottom', () => {
     // Helper to create a mock X6 Node
-    const createMockNode = (id: string, x: number, y: number) => ({
+    const createMockNode = (id: string, x: number, y: number, data: Record<string, unknown> = {}) => ({
         id,
         getPosition: vi.fn(() => ({ x, y })),
+        getData: vi.fn(() => data),
+    });
+
+    describe('Explicit order (from node data)', () => {
+        it('should prioritize lower order value first when both nodes have order', () => {
+            const nodeA = createMockNode('a', 0, 0, { order: 2 });
+            const nodeB = createMockNode('b', 999, 999, { order: 1 });
+
+            // Order takes precedence over position
+            expect(sortNodesRightToLeftTopToBottom(nodeA as any, nodeB as any)).toBeGreaterThan(0);
+            expect(sortNodesRightToLeftTopToBottom(nodeB as any, nodeA as any)).toBeLessThan(0);
+        });
+
+        it('should prioritize nodes with order over nodes without order', () => {
+            const nodeWithOrder = createMockNode('ordered', 0, 0, { order: 1 });
+            const nodeWithoutOrder = createMockNode('unordered', 999, 999);
+
+            expect(sortNodesRightToLeftTopToBottom(nodeWithOrder as any, nodeWithoutOrder as any)).toBeLessThan(0);
+            expect(sortNodesRightToLeftTopToBottom(nodeWithoutOrder as any, nodeWithOrder as any)).toBeGreaterThan(0);
+        });
     });
 
     describe('Primary sort: X coordinate (descending)', () => {

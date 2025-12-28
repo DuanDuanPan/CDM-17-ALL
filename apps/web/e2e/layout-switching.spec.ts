@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { gotoTestGraph } from './testUtils';
 
 test.describe('Layout Switching', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('#graph-container');
+  test.beforeEach(async ({ page }, testInfo) => {
+    await gotoTestGraph(page, testInfo);
 
     // Wait for graph to be fully loaded
     await page.waitForSelector('[data-testid="layout-switcher"]');
@@ -26,7 +26,7 @@ test.describe('Layout Switching', () => {
 
   test('should switch from mindmap to logic layout', async ({ page }) => {
     // Create a child node first to see layout changes
-    const centerNode = page.locator('text=中心主题').first();
+    const centerNode = page.locator('.x6-node').first();
     await centerNode.click();
     await page.keyboard.press('Tab');
     await page.keyboard.type('测试节点');
@@ -133,7 +133,7 @@ test.describe('Layout Switching', () => {
     await page.waitForTimeout(300);
 
     // Try to drag center node
-    const centerNode = page.locator('text=中心主题').first();
+    const centerNode = page.locator('.x6-node').first();
     const initialBox = await centerNode.boundingBox();
 
     if (initialBox) {
@@ -161,7 +161,7 @@ test.describe('Layout Switching', () => {
     await page.waitForTimeout(300);
 
     // Get center node
-    const centerNode = page.locator('text=中心主题').first();
+    const centerNode = page.locator('.x6-node').first();
     const initialBox = await centerNode.boundingBox();
 
     if (initialBox) {
@@ -225,7 +225,7 @@ test.describe('Layout Switching', () => {
     await page.waitForTimeout(300);
 
     // Select center node
-    const centerNode = page.locator('text=中心主题').first();
+    const centerNode = page.locator('.x6-node').first();
     await centerNode.click();
 
     // Get node positions before adding

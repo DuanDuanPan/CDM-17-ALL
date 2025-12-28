@@ -1,4 +1,5 @@
-import { test, expect, BrowserContext, Page } from '@playwright/test';
+import { test, expect, BrowserContext, Page, type TestInfo } from '@playwright/test';
+import { createTestGraph, gotoTestGraph, makeTestGraphUrl } from './testUtils';
 
 /**
  * E2E Tests for Real-time Collaboration Engine
@@ -19,8 +20,13 @@ test.describe('Real-time Collaboration Engine', () => {
     let pageA: Page;
     let pageB: Page;
 
-    // Shared test URL
-    const TEST_URL = 'http://localhost:3000';
+    const getTestUrls = async (testInfo: TestInfo) => {
+        const graphId = await createTestGraph(pageA, testInfo, 'e2e-user-a');
+        return {
+            urlA: makeTestGraphUrl(graphId, 'e2e-user-a'),
+            urlB: makeTestGraphUrl(graphId, 'e2e-user-b'),
+        };
+    };
 
     test.beforeAll(async ({ browser }) => {
         // Create two separate browser contexts (simulating two users)
@@ -40,37 +46,39 @@ test.describe('Real-time Collaboration Engine', () => {
         await contextB.close();
     });
 
-    test('both users can connect to the same document', async () => {
+    test('both users can connect to the same document', async ({ }, testInfo) => {
         // Navigate both users to the same URL
+        const { urlA, urlB } = await getTestUrls(testInfo);
         await Promise.all([
-            pageA.goto(TEST_URL),
-            pageB.goto(TEST_URL),
+            pageA.goto(urlA),
+            pageB.goto(urlB),
         ]);
 
         // Wait for collaboration connection indicators
         await expect(pageA.locator('[data-testid="collab-status"]')).toBeVisible({ timeout: 10000 });
         await expect(pageB.locator('[data-testid="collab-status"]')).toBeVisible({ timeout: 10000 });
 
-        // Verify both show "协作已连接" (Connected) status
-        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 5000 });
-        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 5000 });
+        // Verify both show synced status
+        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
+        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
     });
 
-    test('node added by User A appears for User B', async () => {
+    test('node added by User A appears for User B', async ({ }, testInfo) => {
+        const { urlA, urlB } = await getTestUrls(testInfo);
         await Promise.all([
-            pageA.goto(TEST_URL),
-            pageB.goto(TEST_URL),
+            pageA.goto(urlA),
+            pageB.goto(urlB),
         ]);
 
         // Wait for collaboration connection
-        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 10000 });
-        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 10000 });
+        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
+        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
 
         // Wait for initial sync
         await pageA.waitForTimeout(2000);
 
         // First, click on the center node to select it (required for Tab to work)
-        const centerNode = pageA.locator('.x6-node').first();
+        const centerNode = pageA.locator('.x6-node[data-cell-id="center-node"]');
         await centerNode.click();
 
         // Wait for selection
@@ -79,31 +87,30 @@ test.describe('Real-time Collaboration Engine', () => {
         // User A adds a child node using Tab
         await pageA.keyboard.press('Tab');
 
-        // Wait for the new node to appear and be editable
-        await pageA.waitForTimeout(500);
-
-        // Type the node content
-        await pageA.keyboard.type('Test Node From User A');
-        await pageA.keyboard.press('Escape');
+        const editInput = pageA.locator('#graph-container input[placeholder="New Topic"]').first();
+        await expect(editInput).toBeVisible();
+        await editInput.fill('Test Node From User A');
+        await editInput.press('Enter');
 
         // Wait for sync
         await pageB.waitForTimeout(2000);
 
         // Check if the node with this text appears on User B's screen
         // Use .first() because MindNode has a hidden measurement div that may also contain the text
-        const nodeLocator = pageB.locator('text=Test Node From User A').first();
+        const nodeLocator = pageB.locator('.x6-node', { hasText: 'Test Node From User A' }).first();
         await expect(nodeLocator).toBeVisible({ timeout: 5000 });
     });
 
-    test('layout mode switch by User A syncs to User B', async () => {
+    test('layout mode switch by User A syncs to User B', async ({ }, testInfo) => {
+        const { urlA, urlB } = await getTestUrls(testInfo);
         await Promise.all([
-            pageA.goto(TEST_URL),
-            pageB.goto(TEST_URL),
+            pageA.goto(urlA),
+            pageB.goto(urlB),
         ]);
 
         // Wait for collaboration connection
-        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 10000 });
-        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 10000 });
+        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
+        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
 
         // Wait for initial sync
         await pageA.waitForTimeout(2000);
@@ -132,27 +139,28 @@ test.describe('Real-time Collaboration Engine', () => {
         await expect(freeButtonB).toBeVisible();
     });
 
-    test('concurrent edits from both users are preserved', async () => {
+    test('concurrent edits from both users are preserved', async ({ }, testInfo) => {
+        const { urlA, urlB } = await getTestUrls(testInfo);
         await Promise.all([
-            pageA.goto(TEST_URL),
-            pageB.goto(TEST_URL),
+            pageA.goto(urlA),
+            pageB.goto(urlB),
         ]);
 
         // Wait for collaboration connection
-        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 10000 });
-        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 10000 });
+        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
+        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
 
         // Wait for initial sync (reduced to stay within timeout)
         await pageA.waitForTimeout(1000);
 
         // Both users select nodes and add children
         // User A
-        const nodeA = pageA.locator('.x6-node').first();
+        const nodeA = pageA.locator('.x6-node[data-cell-id="center-node"]');
         await nodeA.click();
         await pageA.waitForTimeout(300);
 
         // User B (select same or different node)
-        const nodeB = pageB.locator('.x6-node').first();
+        const nodeB = pageB.locator('.x6-node[data-cell-id="center-node"]');
         await nodeB.click();
         await pageB.waitForTimeout(300);
 
@@ -160,15 +168,17 @@ test.describe('Real-time Collaboration Engine', () => {
         await Promise.all([
             (async () => {
                 await pageA.keyboard.press('Tab');
-                await pageA.waitForTimeout(300);
-                await pageA.keyboard.type('Concurrent A');
-                await pageA.keyboard.press('Escape');
+                const inputA = pageA.locator('#graph-container input[placeholder="New Topic"]').first();
+                await expect(inputA).toBeVisible();
+                await inputA.fill('Concurrent A');
+                await inputA.press('Enter');
             })(),
             (async () => {
                 await pageB.keyboard.press('Tab');
-                await pageB.waitForTimeout(300);
-                await pageB.keyboard.type('Concurrent B');
-                await pageB.keyboard.press('Escape');
+                const inputB = pageB.locator('#graph-container input[placeholder="New Topic"]').first();
+                await expect(inputB).toBeVisible();
+                await inputB.fill('Concurrent B');
+                await inputB.press('Enter');
             })(),
         ]);
 
@@ -178,21 +188,22 @@ test.describe('Real-time Collaboration Engine', () => {
 
         // Both nodes should exist on both pages (no data loss due to CRDT)
         // Use .first() for text locators that may match hidden measurement divs
-        await expect(pageA.locator('text=Concurrent A').first()).toBeVisible({ timeout: 5000 });
-        await expect(pageA.locator('text=Concurrent B').first()).toBeVisible({ timeout: 5000 });
-        await expect(pageB.locator('text=Concurrent A').first()).toBeVisible({ timeout: 5000 });
-        await expect(pageB.locator('text=Concurrent B').first()).toBeVisible({ timeout: 5000 });
+        await expect(pageA.locator('.x6-node', { hasText: 'Concurrent A' }).first()).toBeVisible({ timeout: 5000 });
+        await expect(pageA.locator('.x6-node', { hasText: 'Concurrent B' }).first()).toBeVisible({ timeout: 5000 });
+        await expect(pageB.locator('.x6-node', { hasText: 'Concurrent A' }).first()).toBeVisible({ timeout: 5000 });
+        await expect(pageB.locator('.x6-node', { hasText: 'Concurrent B' }).first()).toBeVisible({ timeout: 5000 });
     });
 
-    test('remote user cursors are visible when mouse moves', async () => {
+    test('remote user cursors are visible when mouse moves', async ({ }, testInfo) => {
+        const { urlA, urlB } = await getTestUrls(testInfo);
         await Promise.all([
-            pageA.goto(TEST_URL),
-            pageB.goto(TEST_URL),
+            pageA.goto(urlA),
+            pageB.goto(urlB),
         ]);
 
         // Wait for collaboration connection
-        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 10000 });
-        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 10000 });
+        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
+        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
 
         // Wait for connection
         await pageA.waitForTimeout(2000);
@@ -211,20 +222,21 @@ test.describe('Real-time Collaboration Engine', () => {
         await expect(remoteCursor).toBeVisible({ timeout: 3000 });
     });
 
-    test('active users count updates when users join', async () => {
+    test('active users count updates when users join', async ({ }, testInfo) => {
+        const { urlA, urlB } = await getTestUrls(testInfo);
         // User A goes to the page first
-        await pageA.goto(TEST_URL);
+        await pageA.goto(urlA);
 
         // Wait for connection
-        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 10000 });
+        await expect(pageA.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
 
         // Check that TopBar shows remote users (may be empty initially, but the component should exist)
         // The ActiveUsersAvatarStack only shows when there are remoteUsers
         await pageA.waitForTimeout(1000);
 
         // User B joins
-        await pageB.goto(TEST_URL);
-        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('协作已连接', { timeout: 10000 });
+        await pageB.goto(urlB);
+        await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
 
         // Wait for awareness update
         await pageA.waitForTimeout(2000);
@@ -245,8 +257,8 @@ test.describe('Real-time Collaboration Engine', () => {
  * Verifies the collaboration hooks and components can be imported
  */
 test.describe('Collaboration Components Smoke Test', () => {
-    test('page loads without collaboration errors', async ({ page }) => {
-        await page.goto('http://localhost:3000');
+    test('page loads without collaboration errors', async ({ page }, testInfo) => {
+        await gotoTestGraph(page, testInfo);
 
         // Page should load without JavaScript errors related to collaboration
         const errors: string[] = [];
@@ -263,8 +275,8 @@ test.describe('Collaboration Components Smoke Test', () => {
         expect(errors).toHaveLength(0);
     });
 
-    test('collaboration status indicator is visible', async ({ page }) => {
-        await page.goto('http://localhost:3000');
+    test('collaboration status indicator is visible', async ({ page }, testInfo) => {
+        await gotoTestGraph(page, testInfo);
 
         // The collab-status indicator should be visible
         const collabStatus = page.locator('[data-testid="collab-status"]');

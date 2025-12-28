@@ -49,18 +49,30 @@ export function useSubscription({
 
   // Track current nodeId to handle stale responses
   const currentNodeIdRef = useRef<string | null>(null);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   // Fetch subscription status
   const checkSubscription = useCallback(async () => {
     if (!nodeId) {
-      setIsSubscribed(false);
-      setSubscriptionId(undefined);
+      if (isMounted.current) {
+        setIsSubscribed(false);
+        setSubscriptionId(undefined);
+      }
       return;
     }
 
     currentNodeIdRef.current = nodeId;
-    setIsLoading(true);
-    setError(null);
+    if (isMounted.current) {
+      setIsLoading(true);
+      setError(null);
+    }
 
     try {
       const response = await fetch(
@@ -80,17 +92,17 @@ export function useSubscription({
       const data: CheckSubscriptionResponse = await response.json();
 
       // Only update if this is still the current nodeId
-      if (currentNodeIdRef.current === nodeId) {
+      if (isMounted.current && currentNodeIdRef.current === nodeId) {
         setIsSubscribed(data.isSubscribed);
         setSubscriptionId(data.subscriptionId);
       }
     } catch (err) {
-      if (currentNodeIdRef.current === nodeId) {
+      if (isMounted.current && currentNodeIdRef.current === nodeId) {
         setError(err as Error);
         console.error('[useSubscription] Check error:', err);
       }
     } finally {
-      if (currentNodeIdRef.current === nodeId) {
+      if (isMounted.current && currentNodeIdRef.current === nodeId) {
         setIsLoading(false);
       }
     }
@@ -100,8 +112,11 @@ export function useSubscription({
   const subscribe = useCallback(async (): Promise<boolean> => {
     if (!nodeId) return false;
 
-    setIsLoading(true);
-    setError(null);
+    currentNodeIdRef.current = nodeId;
+    if (isMounted.current) {
+      setIsLoading(true);
+      setError(null);
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/subscriptions`, {
@@ -120,19 +135,25 @@ export function useSubscription({
       const result = await response.json();
 
       // Update state
-      setIsSubscribed(true);
-      setSubscriptionId(result.subscription?.id);
+      if (isMounted.current && currentNodeIdRef.current === nodeId) {
+        setIsSubscribed(true);
+        setSubscriptionId(result.subscription?.id);
+      }
 
       // Sync to global store for immediate UI feedback across all nodes
       addSubscription(nodeId);
 
       return true;
     } catch (err) {
-      setError(err as Error);
+      if (isMounted.current && currentNodeIdRef.current === nodeId) {
+        setError(err as Error);
+      }
       console.error('[useSubscription] Subscribe error:', err);
       return false;
     } finally {
-      setIsLoading(false);
+      if (isMounted.current && currentNodeIdRef.current === nodeId) {
+        setIsLoading(false);
+      }
     }
   }, [nodeId, userId]);
 
@@ -140,8 +161,11 @@ export function useSubscription({
   const unsubscribe = useCallback(async (): Promise<boolean> => {
     if (!nodeId) return false;
 
-    setIsLoading(true);
-    setError(null);
+    currentNodeIdRef.current = nodeId;
+    if (isMounted.current) {
+      setIsLoading(true);
+      setError(null);
+    }
 
     try {
       const response = await fetch(
@@ -160,19 +184,25 @@ export function useSubscription({
       }
 
       // Update state
-      setIsSubscribed(false);
-      setSubscriptionId(undefined);
+      if (isMounted.current && currentNodeIdRef.current === nodeId) {
+        setIsSubscribed(false);
+        setSubscriptionId(undefined);
+      }
 
       // Sync to global store for immediate UI feedback across all nodes
       removeSubscription(nodeId);
 
       return true;
     } catch (err) {
-      setError(err as Error);
+      if (isMounted.current && currentNodeIdRef.current === nodeId) {
+        setError(err as Error);
+      }
       console.error('[useSubscription] Unsubscribe error:', err);
       return false;
     } finally {
-      setIsLoading(false);
+      if (isMounted.current && currentNodeIdRef.current === nodeId) {
+        setIsLoading(false);
+      }
     }
   }, [nodeId, userId]);
 
@@ -217,10 +247,20 @@ export function useSubscriptionList(userId: string): UseSubscriptionListReturn {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const fetchSubscriptions = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    if (isMounted.current) {
+      setIsLoading(true);
+      setError(null);
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/subscriptions`, {
@@ -235,12 +275,18 @@ export function useSubscriptionList(userId: string): UseSubscriptionListReturn {
       }
 
       const data: SubscriptionListResponse = await response.json();
-      setSubscriptions(data.subscriptions);
+      if (isMounted.current) {
+        setSubscriptions(data.subscriptions);
+      }
     } catch (err) {
-      setError(err as Error);
+      if (isMounted.current) {
+        setError(err as Error);
+      }
       console.error('[useSubscriptionList] Fetch error:', err);
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
   }, [userId]);
 

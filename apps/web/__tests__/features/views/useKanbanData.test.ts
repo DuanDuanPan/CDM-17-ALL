@@ -198,14 +198,15 @@ describe('useKanbanData', () => {
         (c) => c.id === '__unassigned__'
       );
       expect(unassignedColumn).toBeDefined();
-      expect(unassignedColumn?.cards).toHaveLength(1);
-      expect(unassignedColumn?.title).toBe('未分配');
+      expect(unassignedColumn?.cards).toHaveLength(2);
+      expect(unassignedColumn?.cards.map((c) => c.id).sort()).toEqual(['t2', 't3']);
+      expect(unassignedColumn?.title).toBe('未归类');
 
       const unknownStageColumn = result.current.columns.find(
         (c) => c.id === '未知阶段'
       );
       expect(unknownStageColumn).toBeDefined();
-      expect(unknownStageColumn?.cards).toHaveLength(1);
+      expect(unknownStageColumn?.cards).toHaveLength(0);
     });
   });
 
