@@ -3,8 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Server as HocuspocusServer } from '@hocuspocus/server';
 import * as Y from 'yjs';
-import { prisma } from '@cdm/database';
 import { NodeType } from '@cdm/types';
+import { GraphRepository } from '../graphs/graph.repository';
+import { NodeRepository, NodeUpsertBatchData } from '../nodes/repositories/node.repository';
 
 // Event constants for Collab module
 export const COLLAB_EVENTS = {
@@ -39,6 +40,8 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
     constructor(
         private readonly configService: ConfigService,
         private readonly eventEmitter: EventEmitter2,
+        private readonly graphRepository: GraphRepository,
+        private readonly nodeRepository: NodeRepository,
     ) { }
 
     async onModuleInit() {
@@ -96,7 +99,7 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
              * Called when a document is first opened by any client.
              * Retrieves the binary Yjs state from PostgreSQL Graph.yjsState field.
              */
-            async onLoadDocument({ documentName, document }) {
+            onLoadDocument: async ({ documentName, document }) => {
                 Logger.log(`Loading document: ${documentName}`, 'CollabService');
 
                 try {
@@ -104,20 +107,8 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                     const graphId = documentName.replace('graph:', '');
 
                     // 1. Try to load yjsState from graph table
-                    const graph = await prisma.graph.findUnique({
-                        where: { id: graphId },
-                        include: {
-                            nodes: {
-                                include: {
-                                    taskProps: true,
-                                    requirementProps: true,
-                                    pbsProps: true,
-                                    dataProps: true,
-                                }
-                            },
-                            edges: true,
-                        }
-                    });
+                    // Story 7.1: Refactored to use GraphRepository
+                    const graph = await this.graphRepository.findGraphWithRelations(graphId);
 
                     if (!graph) {
                         Logger.warn(`Graph ${graphId} not found in database`, 'CollabService');
@@ -307,7 +298,7 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
              * 
              * Story 4.4 FIX: Also sync nodes to Node table for subscription feature
              */
-            async onStoreDocument({ documentName, document }) {
+            onStoreDocument: async ({ documentName, document }) => {
                 Logger.log(`Storing document: ${documentName}`, 'CollabService');
 
                 try {
@@ -316,10 +307,8 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                     const state = Y.encodeStateAsUpdate(document);
 
                     // 1. Save Yjs binary state to Graph table
-                    await prisma.graph.update({
-                        where: { id: graphId },
-                        data: { yjsState: Buffer.from(state) },
-                    });
+                    // Story 7.1: Refactored to use GraphRepository
+                    await this.graphRepository.updateYjsState(graphId, Buffer.from(state));
 
                     Logger.log(
                         `Document ${documentName} stored (graphId: ${graphId}, size: ${state.byteLength} bytes)`,
@@ -329,21 +318,7 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                     // 2. Story 4.4 FIX: Sync nodes from Yjs to Node table
                     // This ensures nodes exist in relational DB for subscription feature
                     const yNodes = document.getMap<Record<string, unknown>>('nodes');
-                    const nodeUpdates: Array<{
-                        id: string;
-                        label: string;
-                        graphId: string;
-                        type: string;
-                        x: number;
-                        y: number;
-                        width: number;
-                        height: number;
-                        parentId: string | null;
-                        creatorName: string;
-                        description: string | null;
-                        tags: string[];
-                        isArchived: boolean;
-                    }> = [];
+                    const nodeUpdates: NodeUpsertBatchData[] = [];
 
                     yNodes.forEach((nodeData, nodeId) => {
                         if (nodeData && typeof nodeData === 'object') {
@@ -351,7 +326,7 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                                 id: nodeId,
                                 label: (nodeData as { label?: string }).label || 'Untitled',
                                 graphId,
-                                type: (nodeData as { nodeType?: string }).nodeType || 'ORDINARY',
+                                type: ((nodeData as { nodeType?: string }).nodeType || 'ORDINARY') as NodeType,
                                 x: (nodeData as { x?: number }).x || 0,
                                 y: (nodeData as { y?: number }).y || 0,
                                 width: (nodeData as { width?: number }).width || 120,
@@ -365,43 +340,9 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                         }
                     });
 
-                    // Upsert nodes to database (create if not exists, update if exists)
+                    // Story 7.1: Refactored to use NodeRepository.upsertBatch
                     if (nodeUpdates.length > 0) {
-                        const upsertPromises = nodeUpdates.map(node =>
-                            prisma.node.upsert({
-                                where: { id: node.id },
-                                create: {
-                                    id: node.id,
-                                    label: node.label,
-                                    graphId: node.graphId,
-                                    type: node.type as 'ORDINARY' | 'TASK' | 'REQUIREMENT' | 'PBS' | 'DATA' | 'APP',
-                                    x: node.x,
-                                    y: node.y,
-                                    width: node.width,
-                                    height: node.height,
-                                    parentId: node.parentId,
-                                    creatorName: node.creatorName,
-                                    description: node.description,
-                                    tags: node.tags,
-                                    isArchived: node.isArchived,
-                                },
-                                update: {
-                                    label: node.label,
-                                    type: node.type as 'ORDINARY' | 'TASK' | 'REQUIREMENT' | 'PBS' | 'DATA' | 'APP',
-                                    x: node.x,
-                                    y: node.y,
-                                    width: node.width,
-                                    height: node.height,
-                                    parentId: node.parentId,
-                                    creatorName: node.creatorName,
-                                    description: node.description,
-                                    tags: node.tags,
-                                    isArchived: node.isArchived,
-                                },
-                            })
-                        );
-
-                        await Promise.all(upsertPromises);
+                        await this.nodeRepository.upsertBatch(nodeUpdates);
                         Logger.log(
                             `Synced ${nodeUpdates.length} nodes to Node table for graph ${graphId}`,
                             'CollabService',

@@ -2,11 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CollabService } from './collab.service';
+import { GraphRepository } from '../graphs/graph.repository';
+import { NodeRepository } from '../nodes/repositories/node.repository';
 
 /**
  * Unit tests for CollabService
  *
  * Story 1.4: Real-time Collaboration Engine
+ * Story 7.1: Updated to mock GraphRepository and NodeRepository
  */
 
 jest.mock('@hocuspocus/server', () => ({
@@ -15,6 +18,19 @@ jest.mock('@hocuspocus/server', () => ({
         destroy: jest.fn().mockResolvedValue(undefined),
     })),
 }));
+
+// Story 7.1: Mock repositories for CollabService tests
+const mockGraphRepository = {
+    findGraphWithRelations: jest.fn(),
+    updateYjsState: jest.fn(),
+    findById: jest.fn(),
+    exists: jest.fn(),
+};
+
+const mockNodeRepository = {
+    upsertBatch: jest.fn(),
+    findById: jest.fn(),
+};
 
 describe('CollabService', () => {
     let service: CollabService;
@@ -37,6 +53,15 @@ describe('CollabService', () => {
                 {
                     provide: EventEmitter2,
                     useValue: { emit: jest.fn(), on: jest.fn() },
+                },
+                // Story 7.1: Provide mock repositories
+                {
+                    provide: GraphRepository,
+                    useValue: mockGraphRepository,
+                },
+                {
+                    provide: NodeRepository,
+                    useValue: mockNodeRepository,
                 },
             ],
         }).compile();
@@ -98,6 +123,15 @@ describe('CollabService', () => {
                     {
                         provide: EventEmitter2,
                         useValue: { emit: jest.fn(), on: jest.fn() },
+                    },
+                    // Story 7.1: Provide mock repositories
+                    {
+                        provide: GraphRepository,
+                        useValue: mockGraphRepository,
+                    },
+                    {
+                        provide: NodeRepository,
+                        useValue: mockNodeRepository,
                     },
                 ],
             }).compile();

@@ -265,3 +265,336 @@ _文档版本: v1.1 (已审修订)_
 _初版日期: 2025-12-28_  
 _修订日期: 2025-12-28_  
 _作者: CDM-17 架构组_
+
+---
+
+## 9. 影响分析报告 (Impact Analysis Report)
+
+> _分析日期: 2025-12-29_  
+> _分析范围: commit `0e3bff0` 代码库_
+
+### 9.1 第一阶段影响分析（止血与核心规范）
+
+#### 9.1.1 强制 Repository 模式 (Backend)
+
+##### **[P0] 修复 `attachments.controller.ts`**
+
+| 影响项 | 详情 |
+|--------|------|
+| **文件位置** | `apps/api/src/modules/comments/attachments.controller.ts` (222 行) |
+| **违规点** | Line 117, 151, 195, 215 直接调用 `prisma.commentAttachment.*` |
+| **影响范围** | 仅影响评论附件功能 (上传/下载/删除) |
+| **风险等级** | 🟡 中等 - 独立模块，改动范围小 |
+| **工作量** | ~0.5 人天 |
+| **步骤** | 1. 创建 `AttachmentsRepository` 类 <br> 2. 封装 4 处 Prisma 调用 <br> 3. 注入到 Controller |
+
+**代码示例影响**:
+```typescript
+// 当前违规代码 (Line 117)
+const attachment = await prisma.commentAttachment.create({...});
+
+// 重构后
+const attachment = await this.attachmentsRepository.create({...});
+```
+
+##### **[P1] 为 `CollabService` 引入 `GraphRepository`**
+
+| 影响项 | 详情 |
+|--------|------|
+| **文件位置** | `apps/api/src/modules/collab/collab.service.ts` (447 行) |
+| **违规点** | Line 107 (`prisma.graph.findUnique`), Line 319 (`prisma.graph.update`), Line 371 (`prisma.node.upsert`) |
+| **影响范围** | 实时协作核心服务 ⚠️ |
+| **风险等级** | 🔴 高 - 触及 Hocuspocus 持久化逻辑 |
+| **工作量** | ~1.5 人天 |
+| **回归测试需求** | 必须验证：文档加载、状态持久化、节点同步 |
+
+**依赖关系**:
+- 已有 `node.repository.ts` 可参考
+- 需新建 `graph.repository.ts`
+
+##### **[P2] ESLint 规则添加**
+
+| 影响项 | 详情 |
+|--------|------|
+| **目标** | 禁止在 `*.service.ts` 和 `*.controller.ts` 中 import `@prisma/client` |
+| **影响范围** | CI/CD 流程 |
+| **风险等级** | 🟢 低 |
+| **工作量** | ~0.5 人天 |
+
+---
+
+#### 9.1.2 强制 Hook-First 模式 (Frontend)
+
+##### **当前 `fetch()` 违规统计**
+
+根据代码搜索，发现 **23 处** 直接 `fetch()` 调用：
+
+| 组件 | fetch 次数 | 优先级 |
+|------|------------|--------|
+| `ApprovalStatusPanel.tsx` | 8 次 | 🔴 P0 |
+| `TaskDispatchSection.tsx` | 3 次 | 🔴 P1 |
+| `ArchiveDrawer.tsx` | 3 次 | 🟡 P2 |
+| `UserSelector.tsx` | 2 次 | 🟡 P2 |
+| `AppLibraryDialog.tsx` | 2 次 | 🟡 P2 |
+| `CommentPanel.tsx` | 1 次 | 🟢 P3 |
+| `CommentInput.tsx` | 1 次 | 🟢 P3 |
+| `MindNode.tsx` | 1 次 (execute) | 🟢 P3 |
+| `WorkflowConfigDialog.tsx` | 1 次 | 🟢 P3 |
+| `KnowledgeSearchDialog.tsx` | 1 次 | 🟢 P3 |
+| `AppForm.tsx` | 1 次 | 🟢 P3 |
+
+##### **[P0] 创建 `useApproval` Hook**
+
+| 影响项 | 详情 |
+|--------|------|
+| **源文件** | `apps/web/components/PropertyPanel/ApprovalStatusPanel.tsx` |
+| **提取 API** | `fetchApproval`, `uploadDeliverable`, `submitForApproval`, `approve`, `reject` 等 |
+| **影响范围** | 审批工作流 UI |
+| **风险等级** | 🟡 中等 - 需要仔细处理状态刷新逻辑 |
+| **工作量** | ~1 人天 |
+
+##### **[P1] 创建 `useTaskDispatch` Hook**
+
+| 影响项 | 详情 |
+|--------|------|
+| **源文件** | `apps/web/components/PropertyPanel/TaskDispatchSection.tsx` |
+| **提取 API** | `dispatch`, `feedback`, `acceptFeedback` |
+| **风险等级** | 🟡 中等 |
+| **工作量** | ~0.5 人天 |
+
+---
+
+#### 9.1.3 UI 库基建启动
+
+##### **当前 `packages/ui` 状态**
+
+```
+packages/ui/src/
+├── confirm-dialog.tsx  (6KB)
+├── toast.tsx           (5KB)
+├── globals.css         (1KB)
+├── utils.ts            (169B)
+└── index.ts            (332B)
+```
+
+**缺失组件** (提案要求):
+- ❌ `Button` (变体: primary, secondary, ghost, danger)
+- ❌ `Input` (变体: text, textarea, number)
+- ❌ `Card`
+- ❌ `Badge` (变体: success, warning, error, info)
+
+| 影响项 | 详情 |
+|--------|------|
+| **工作量** | ~2 人天 |
+| **风险等级** | 🟢 低 - 新增组件不影响现有代码 |
+| **后续依赖** | 业务组件需逐步迁移使用 |
+
+---
+
+### 9.2 第二阶段影响分析（解耦与拆分）
+
+#### 9.2.1 拆解 `GraphComponent.tsx`
+
+| 指标 | 当前 | 目标 |
+|------|------|------|
+| **行数** | 1,361 行 | <300 行/文件 |
+| **职责** | 事件、快捷键、布局、选择、协作、剪贴板、订阅... | 拆分为 5 个模块 |
+
+##### **拆分计划 vs. 现有代码结构**
+
+| 新文件 | 对应代码段 | 预估行数 | 关键依赖 |
+|--------|------------|----------|----------|
+| `GraphEvents.tsx` | Line 669-799 (node/edge 事件) | ~200 | `graph.on(...)` |
+| `GraphHotkeys.tsx` | Line 468-584 (handleKeyDown) | ~150 | `graph`, `selectedNodes` |
+| `GraphLayout.tsx` | Line 153-157 (useLayoutPlugin) | ~100 | `currentLayout`, `graph` |
+| `SelectionManager.tsx` | Line 163-170 (useSelection) | ~150 | `selectedNodes` state |
+| `GraphComponent.tsx` | 容器组合 | ~200 | 组合上述模块 |
+
+##### **关键风险**:
+- 🔴 **事件处理链断裂**：Line 673-799 的事件处理器依赖共享 state (如 `selectedEdge`, `connectionStartNode`)
+- 🔴 **协作状态同步**：`yDoc`, `isConnected`, `remoteUsers` 需要在多个子模块间共享
+- 🟡 **回归测试**：需覆盖所有快捷键和事件交互
+
+**建议**：在拆分前，编写覆盖率 >80% 的集成测试（特别是 Tab/Enter/Delete 键和边的创建/删除）。
+
+---
+
+#### 9.2.2 重构 `MindNode.tsx`
+
+| 指标 | 当前 | 目标 |
+|------|------|------|
+| **行数** | 957 行 | <300 行/文件 |
+| **职责** | 所有节点类型的渲染 + 编辑 + 执行 | 策略模式拆分 |
+
+##### **双写问题确认** ⚠️
+
+提案中指出的 `updateNode` 双写问题已**验证存在**：
+
+```typescript
+// MindNode.tsx:22
+import { updateNode, updateNodeProps } from '@/lib/api/nodes';
+
+// MindNode.tsx:393 - 确实存在双写
+updateNode(node.id, payload).catch((err) => { ... });
+```
+
+**违反 `architecture.md:546-549`**:
+> UI Components (React/X6) **NEVER** modify local state directly.
+> User Action -> Call Yjs `Map.set()` -> Hocuspocus Sync -> Backend Hooks -> All Clients Update
+
+##### **策略模式拆分计划**
+
+| 新组件 | 渲染节点类型 | 预估行数 |
+|--------|--------------|----------|
+| `TaskNodeRenderer.tsx` | TASK 节点 | ~200 |
+| `PbsNodeRenderer.tsx` | PBS 节点 | ~150 |
+| `RequirementNodeRenderer.tsx` | REQUIREMENT 节点 | ~150 |
+| `AppNodeRenderer.tsx` | APP 节点 (含执行逻辑) | ~250 |
+| `MindNode.tsx` | 分发器/容器 | ~150 |
+
+**现有代码结构**:
+- 已有 `apps/web/components/nodes/rich/` 目录包含：`TitleRow.tsx`, `MetricsRow.tsx`, `HangingPill.tsx`, `Footer.tsx`
+- 可以作为进一步拆分的基础
+
+---
+
+#### 9.2.3 拆解 `useClipboard.ts`
+
+| 指标 | 当前 | 目标 |
+|------|------|------|
+| **行数** | 963 行 | <300 行/文件 |
+
+##### **职责分离计划**
+
+| 新 Hook | 职责 | 当前函数 |
+|---------|------|----------|
+| `useClipboardCore.ts` | 系统剪贴板读写 | `copy`, `cut`, `paste` |
+| `usePasteHandlers.ts` | 节点数据转换 | `findAllDescendants`, ID 重映射 |
+| `useClipboardShortcuts.ts` | 快捷键绑定 | **已存在！** ✅ |
+
+**发现**：`useClipboardShortcuts.ts` **已经存在**，提案中的拆分部分已完成。
+
+---
+
+### 9.3 第三阶段影响分析（架构回归）
+
+#### 9.3.1 插件架构迁移
+
+##### **当前模块 vs. 插件状态**
+
+| 位置 | 内容 | 状态 |
+|------|------|------|
+| `apps/api/src/modules/` | 13 个业务模块 | ❌ 未插件化 |
+| `packages/plugins/` | 2 个插件 (`plugin-layout`, `plugin-mindmap-core`) | ✅ 已迁移 |
+
+**需迁移的模块**（按依赖顺序）:
+
+| 顺序 | 源模块 | 目标插件 | 依赖项 | 复杂度 | 文件数 |
+|------|--------|----------|--------|--------|--------|
+| 1 | `modules/nodes` | `plugin-nodes` | 无 | 🔴 高 | 18 |
+| 2 | `modules/edges` | `plugin-edges` | plugin-nodes | 🟡 中 | 7 |
+| 3 | `modules/graphs` | `plugin-graphs` | plugin-nodes, plugin-edges | 🟡 中 | 3 |
+| 4 | `modules/approval` | `plugin-workflow-approval` | plugin-nodes | 🔴 高 | 7 |
+| 5 | `modules/comments` | `plugin-comments` | plugin-nodes | 🟡 中 | 10 |
+| 6 | `modules/subscriptions` | `plugin-subscriptions` | plugin-nodes | 🟢 低 | 7 |
+
+**总预估工时**：15-20 人天
+
+---
+
+#### 9.3.2 统一数据流 (移除双写)
+
+**当前双写位置**:
+- `MindNode.tsx:393` - `updateNode()`
+- `MindNode.tsx:493` - `updateNodeProps()` (APP 执行成功)
+- `MindNode.tsx:511` - `updateNodeProps()` (APP 执行失败)
+
+**推荐方案 A**：优化 Hocuspocus `onStoreDocument`
+
+| 步骤 | 描述 |
+|------|------|
+| 1 | 在 Yjs 协议中添加 `immediateSync` 标志位 |
+| 2 | 前端调用 `yDoc.getMap('nodes').set(...)` 时附带该标志 |
+| 3 | Hocuspocus 收到后立即触发 `onStoreDocument` (绕过防抖) |
+| 4 | 移除 `MindNode.tsx` 中的 `updateNode` 直接调用 |
+
+**风险**：需修改 Hocuspocus 同步协议，可能影响现有协作功能。
+
+---
+
+### 9.4 综合影响矩阵
+
+| 阶段 | 任务 | 工作量 | 风险 | 回归测试需求 |
+|------|------|--------|------|--------------|
+| 1.1 P0 | AttachmentsRepository | 0.5 天 | 🟢 | 附件上传/下载 |
+| 1.1 P1 | GraphRepository | 1.5 天 | 🔴 | 协作持久化 |
+| 1.1 P2 | ESLint 规则 | 0.5 天 | 🟢 | CI 流程 |
+| 1.2 P0 | useApproval hook | 1 天 | 🟡 | 审批流程 |
+| 1.2 P1 | useTaskDispatch hook | 0.5 天 | 🟡 | 任务派发 |
+| 1.2 P2 | ESLint fetch 规则 | 0.5 天 | 🟢 | CI 流程 |
+| 1.3 | UI 原子组件 | 2 天 | 🟢 | Storybook |
+| 2.1 | GraphComponent 拆分 | 4 天 | 🔴 | 全面集成测试 |
+| 2.2 | MindNode 策略模式 | 3 天 | 🔴 | 节点渲染/编辑 |
+| 2.3 | useClipboard 拆分 | 2 天 | 🟡 | 剪贴板操作 |
+| 3.1 | 插件迁移 (3个模块) | 12 天 | 🔴 | 端到端测试 |
+| 3.2 | 移除双写机制 | 3 天 | 🔴 | 协作一致性 |
+
+**总预估工时**：30-37 人天
+
+---
+
+### 9.5 关键风险与缓解措施
+
+| 风险 | 概率 | 影响 | 缓解措施 |
+|------|------|------|----------|
+| GraphComponent 拆分导致事件处理链断裂 | 🟡 中 | 🔴 高 | 拆分前编写 Playwright E2E 测试覆盖所有键盘快捷键 |
+| 移除双写机制导致数据竞态 | 🟡 中 | 🔴 高 | 使用 Feature Flag 灰度发布 |
+| 插件迁移破坏现有 API 契约 | 🟡 中 | 🔴 高 | 保持 API 路由不变，仅迁移内部实现 |
+| UI 组件迁移影响视觉一致性 | 🟢 低 | 🟢 低 | 使用 Storybook 进行视觉回归测试 |
+
+---
+
+### 9.6 建议执行顺序
+
+#### **立即执行 (本周)**
+- [ ] P0: 修复 `attachments.controller.ts`
+- [ ] 添加 ESLint 规则 (无破坏性)
+- [ ] 开始 `packages/ui` 原子组件开发
+
+#### **短期 (下周)**
+- [ ] 创建 `useApproval` 和 `useTaskDispatch` hooks
+- [ ] 开始编写 GraphComponent 集成测试
+
+#### **中期 (2-3 周)**
+- [ ] 完成 GraphComponent 拆分
+- [ ] 完成 MindNode 策略模式重构
+
+#### **长期 (1-2 月)**
+- [ ] 逐步迁移业务模块到插件架构
+- [ ] 解决双写机制问题
+
+---
+
+### 9.7 已有 Repository 清单
+
+以下 Repository 已存在，可作为新增 Repository 的参考：
+
+| Repository 文件 | 位置 |
+|-----------------|------|
+| `approval.repository.ts` | `modules/approval/` |
+| `comments.repository.ts` | `modules/comments/` |
+| `edge.repository.ts` | `modules/edges/repositories/` |
+| `node.repository.ts` | `modules/nodes/repositories/` |
+| `node-app.repository.ts` | `modules/nodes/repositories/` |
+| `node-data.repository.ts` | `modules/nodes/repositories/` |
+| `node-pbs.repository.ts` | `modules/nodes/repositories/` |
+| `node-requirement.repository.ts` | `modules/nodes/repositories/` |
+| `node-task.repository.ts` | `modules/nodes/repositories/` |
+| `notification.repository.ts` | `modules/notification/` |
+| `subscriptions.repository.ts` | `modules/subscriptions/` |
+
+---
+
+_影响分析版本: v1.0_  
+_分析日期: 2025-12-29_  
+_分析人员: CDM-17 架构组_

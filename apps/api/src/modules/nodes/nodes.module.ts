@@ -39,6 +39,6 @@ import { AppLibraryModule } from '../app-library';
     DataService,
     AppService, // Story 2.9: APP node service
   ],
-  exports: [NodesService],
+  exports: [NodesService, NodeRepository], // Story 7.1: Export NodeRepository for CollabModule
 })
 export class NodesModule { }

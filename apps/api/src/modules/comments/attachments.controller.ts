@@ -1,6 +1,7 @@
 /**
  * Story 4.3+: Comment Attachments
  * Attachments Controller - File upload, download, delete endpoints
+ * Story 7.1: Refactored to use AttachmentsRepository
  */
 
 import {
@@ -24,8 +25,8 @@ import { Response } from 'express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { existsSync, mkdirSync, unlinkSync, createReadStream } from 'fs';
-import { prisma } from '@cdm/database';
 import { randomBytes } from 'crypto';
+import { AttachmentsRepository } from './attachments.repository';
 
 // Configuration
 const UPLOAD_DIR = join(process.cwd(), 'uploads', 'comments');
@@ -77,6 +78,8 @@ const fileFilter = (
 
 @Controller('comments/attachments')
 export class AttachmentsController {
+    constructor(private readonly attachmentsRepository: AttachmentsRepository) {}
+
     /**
      * Upload a file attachment
      * POST /comments/attachments/upload
@@ -114,15 +117,14 @@ export class AttachmentsController {
         }
 
         // Create attachment record (pending association with comment)
-        const attachment = await prisma.commentAttachment.create({
-            data: {
-                fileName: decodedFileName,
-                fileSize: file.size,
-                mimeType: file.mimetype,
-                storagePath: file.filename, // Just the filename, not full path
-                uploaderId: userId,
-                // commentId is null by default - will be set when comment is created
-            },
+        // Story 7.1: Refactored to use AttachmentsRepository
+        const attachment = await this.attachmentsRepository.create({
+            fileName: decodedFileName,
+            fileSize: file.size,
+            mimeType: file.mimetype,
+            storagePath: file.filename, // Just the filename, not full path
+            uploaderId: userId,
+            // commentId is undefined by default - will be set when comment is created
         });
 
         return {
@@ -148,9 +150,8 @@ export class AttachmentsController {
             throw new UnauthorizedException('User ID required');
         }
 
-        const attachment = await prisma.commentAttachment.findUnique({
-            where: { id },
-        });
+        // Story 7.1: Refactored to use AttachmentsRepository
+        const attachment = await this.attachmentsRepository.findById(id);
 
         if (!attachment) {
             throw new NotFoundException('Attachment not found');
@@ -192,9 +193,8 @@ export class AttachmentsController {
             throw new UnauthorizedException('User ID required');
         }
 
-        const attachment = await prisma.commentAttachment.findUnique({
-            where: { id },
-        });
+        // Story 7.1: Refactored to use AttachmentsRepository
+        const attachment = await this.attachmentsRepository.findById(id);
 
         if (!attachment) {
             throw new NotFoundException('Attachment not found');
@@ -212,9 +212,8 @@ export class AttachmentsController {
         }
 
         // Delete database record
-        await prisma.commentAttachment.delete({
-            where: { id },
-        });
+        // Story 7.1: Refactored to use AttachmentsRepository
+        await this.attachmentsRepository.delete(id);
 
         return { success: true };
     }

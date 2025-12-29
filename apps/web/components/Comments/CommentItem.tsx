@@ -136,23 +136,56 @@ export function CommentItem({
                         <div className="mt-2 flex flex-wrap gap-2">
                             {comment.attachments.map((attachment) => {
                                 const isImage = attachment.mimeType.startsWith('image/');
+
+                                // Download handler with authentication header
+                                const handleDownload = async (e: React.MouseEvent) => {
+                                    e.preventDefault();
+                                    try {
+                                        const response = await fetch(attachment.url, {
+                                            headers: {
+                                                'x-user-id': currentUserId,
+                                            },
+                                        });
+
+                                        if (!response.ok) {
+                                            console.error('Download failed:', response.status);
+                                            return;
+                                        }
+
+                                        const blob = await response.blob();
+                                        const url = window.URL.createObjectURL(blob);
+
+                                        if (isImage) {
+                                            // Open image in new tab
+                                            window.open(url, '_blank');
+                                        } else {
+                                            // Trigger file download
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = attachment.fileName;
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            document.body.removeChild(a);
+                                        }
+
+                                        // Clean up blob URL after a delay
+                                        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+                                    } catch (error) {
+                                        console.error('Download error:', error);
+                                    }
+                                };
+
                                 return (
-                                    <a
+                                    <button
                                         key={attachment.id}
-                                        href={attachment.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                        onClick={handleDownload}
                                         className={`group/att flex items-center gap-2 px-2 py-1.5 rounded-lg border border-gray-200 
-                                            hover:border-blue-300 hover:bg-blue-50 transition-colors max-w-[200px]
+                                            hover:border-blue-300 hover:bg-blue-50 transition-colors max-w-[200px] text-left
                                             ${isImage ? 'flex-col p-1' : ''}`}
                                         title={attachment.fileName}
                                     >
                                         {isImage ? (
-                                            <img
-                                                src={attachment.url}
-                                                alt={attachment.fileName}
-                                                className="w-24 h-24 object-cover rounded"
-                                            />
+                                            <ImageIcon className="w-12 h-12 text-gray-400" />
                                         ) : (
                                             <>
                                                 <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -162,7 +195,7 @@ export function CommentItem({
                                                 <Download className="h-3 w-3 text-gray-400 group-hover/att:text-blue-500 flex-shrink-0" />
                                             </>
                                         )}
-                                    </a>
+                                    </button>
                                 );
                             })}
                         </div>

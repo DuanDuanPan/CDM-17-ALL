@@ -29,6 +29,25 @@ export interface NodeUpdateData {
 }
 
 /**
+ * Story 7.1: Batch upsert data structure for CollabService node sync
+ */
+export interface NodeUpsertBatchData {
+  id: string;
+  label: string;
+  graphId: string;
+  type: NodeType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  parentId: string | null;
+  creatorName: string;
+  description: string | null;
+  tags: string[];
+  isArchived: boolean;
+}
+
+/**
  * Story 2.2: Added explicit return types to fix TypeScript portability issues
  * with Prisma client type inference.
  * Story 2.5: Extended to include tags, isArchived, archivedAt, description
@@ -208,5 +227,53 @@ export class NodeRepository {
         `;
 
     return result.map((r) => ({ tag: r.tag, count: Number(r.count) }));
+  }
+
+  /**
+   * Story 7.1: Batch upsert nodes from Yjs sync
+   * Used by CollabService.onStoreDocument to sync nodes to relational DB
+   * @param nodes Array of node data to upsert
+   * @returns Array of upserted nodes
+   */
+  async upsertBatch(nodes: NodeUpsertBatchData[]): Promise<Node[]> {
+    if (nodes.length === 0) {
+      return [];
+    }
+
+    const upsertPromises = nodes.map((node) =>
+      prisma.node.upsert({
+        where: { id: node.id },
+        create: {
+          id: node.id,
+          label: node.label,
+          graphId: node.graphId,
+          type: node.type,
+          x: node.x,
+          y: node.y,
+          width: node.width,
+          height: node.height,
+          parentId: node.parentId,
+          creatorName: node.creatorName,
+          description: node.description,
+          tags: node.tags,
+          isArchived: node.isArchived,
+        },
+        update: {
+          label: node.label,
+          type: node.type,
+          x: node.x,
+          y: node.y,
+          width: node.width,
+          height: node.height,
+          parentId: node.parentId,
+          creatorName: node.creatorName,
+          description: node.description,
+          tags: node.tags,
+          isArchived: node.isArchived,
+        },
+      }),
+    );
+
+    return Promise.all(upsertPromises);
   }
 }

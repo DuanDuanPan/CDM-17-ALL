@@ -1,6 +1,7 @@
 /**
  * Story 4.3: Contextual Comments & Mentions
  * Comments Module - NestJS module definition
+ * Story 7.1: Added AttachmentsRepository for Repository pattern
  */
 
 import { Module, forwardRef } from '@nestjs/common';
@@ -8,6 +9,7 @@ import { CommentsController } from './comments.controller';
 import { AttachmentsController } from './attachments.controller';
 import { CommentsService } from './comments.service';
 import { CommentsRepository } from './comments.repository';
+import { AttachmentsRepository } from './attachments.repository';
 import { CommentsGateway } from './comments.gateway';
 import { NotificationModule } from '../notification/notification.module';
 import { UsersModule } from '../users/users.module';
@@ -21,6 +23,7 @@ import { UsersModule } from '../users/users.module';
     providers: [
         CommentsService,
         CommentsRepository,
+        AttachmentsRepository,
         CommentsGateway,
     ],
     exports: [CommentsService],

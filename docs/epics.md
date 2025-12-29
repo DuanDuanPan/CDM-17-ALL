@@ -620,3 +620,65 @@ So that **工具在处理复杂、大规模项目时依然可用。**
 **Then** 渲染帧率应保持在 60fps 以上
 **And** 视口外的节点应被虚拟化（不渲染在 DOM 中）以节省资源
 **And** 1000 节点图的初始加载时间应低于 2 秒
+
+## Epic 7: 架构重构与技术债偿还 (Architecture Refactoring & Tech Debt)
+
+**目标**: 对齐架构设计文档，修复核心架构偏离（Repository模式缺失、双写问题、组件库缺失），降低维护成本并提升系统稳定性。
+
+### Story 7.1: 后端 Repository 模式重构 (Backend Repository Pattern)
+
+As a **后端开发者**,
+I want **将所有直接的 Prisma 调用封装进 Repository 层**,
+So that **业务逻辑与数据访问解耦，实现可测试性和架构一致性。**
+
+**Acceptance Criteria:**
+
+**Given** `AttachmentsController` 和 `CollabService` 中存在直接的 `prisma.*` 调用
+**When** 执行重构后
+**Then** 所有数据库操作应通过 `AttachmentsRepository` 和 `GraphRepository` 进行
+**And** `prisma.*` 调用在 Controller 和 Service 层应被移除
+**And** 添加 ESLint 规则禁止在业务层直接导入 `@prisma/client`
+**And** 现有功能（附件上传、协作同步）通过回归测试
+
+### Story 7.2: 前端 Hook-First 模式提取 (Frontend Hook-First Extraction)
+
+As a **前端开发者**,
+I want **将散落在 UI 组件中的 `fetch` 调用提取为自定义 Hooks**,
+So that **UI 组件保持纯净，API 逻辑可复用且易于测试。**
+
+**Acceptance Criteria:**
+
+**Given** `ApprovalStatusPanel` 和 `TaskDispatchSection` 中存在直接的 `fetch` 调用
+**When** 执行重构后
+**Then** 逻辑应迁移至 `useApproval` 和 `useTaskDispatch` Hooks
+**And** 组件中不再包含直接的 `fetch` 或 API 状态管理逻辑
+**And** 添加 ESLint 规则禁止在 `components` 目录下直接使用 `fetch`
+
+### Story 7.3: UI 原子组件库搭建 (UI Atomic Components)
+
+As a **UI 开发者**,
+I want **在 `packages/ui` 中建立标准化的原子组件库**,
+So that **消除 ad-hoc 样式代码，保证全站视觉一致性。**
+
+**Acceptance Criteria:**
+
+**Given** `packages/ui` 目前缺失基础组件
+**When** 开发完成后
+**Then** 应包含功能完整的 `Button`, `Input`, `Card`, `Badge` 组件
+**And** 组件均支持设计规范定义的变体（Primary, Ghost, Danger 等）
+**And** 提供 Storybook 文档或示例页面验证组件样式
+
+### Story 7.4: 核心巨型文件拆分 (Phase 2 - God Class Splitting)
+
+As a **开发者**,
+I want **将 `GraphComponent.tsx` 和 `MindNode.tsx` 拆分为职责单一的小型模块**,
+So that **代码可读性提升，Git 冲突减少，单元测试更易编写。**
+
+**Acceptance Criteria:**
+
+**Given** `GraphComponent.tsx` (>1300行) 和 `MindNode.tsx` (>900行)
+**When** 执行拆分后
+**Then** 主文件行数应降低至 300 行以内
+**And** 功能被拆分至 `GraphEvents`, `GraphHotkeys`, `NodeRenderer` 等独立模块
+**And** 所有原有交互功能（绘图、捷径、编辑）通过 E2E 回归测试
+
