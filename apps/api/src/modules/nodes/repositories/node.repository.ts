@@ -232,6 +232,7 @@ export class NodeRepository {
   /**
    * Story 7.1: Batch upsert nodes from Yjs sync
    * Used by CollabService.onStoreDocument to sync nodes to relational DB
+   * Story 7.1 Fix: Changed from Promise.all to $transaction for atomicity
    * @param nodes Array of node data to upsert
    * @returns Array of upserted nodes
    */
@@ -240,7 +241,9 @@ export class NodeRepository {
       return [];
     }
 
-    const upsertPromises = nodes.map((node) =>
+    // Story 7.1 Fix: Use $transaction to ensure atomic batch upsert
+    // This prevents partial writes if any upsert fails
+    const upsertOperations = nodes.map((node) =>
       prisma.node.upsert({
         where: { id: node.id },
         create: {
@@ -274,6 +277,6 @@ export class NodeRepository {
       }),
     );
 
-    return Promise.all(upsertPromises);
+    return prisma.$transaction(upsertOperations);
   }
 }

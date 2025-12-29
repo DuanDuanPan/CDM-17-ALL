@@ -1,6 +1,7 @@
 /**
  * Story 4.3: Contextual Comments & Mentions
  * Comments Service - Business logic for comments
+ * Story 7.1 Fix: Refactored to use AttachmentsRepository
  */
 
 import {
@@ -12,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { prisma } from '@cdm/database';
 import { CommentsRepository, CommentWithAuthor } from './comments.repository';
+import { AttachmentsRepository } from './attachments.repository';
 import { CommentsGateway } from './comments.gateway';
 import { NotificationService } from '../notification/notification.service';
 import { UsersService } from '../users/users.service';
@@ -24,6 +26,7 @@ export class CommentsService {
 
     constructor(
         private readonly repo: CommentsRepository,
+        private readonly attachmentsRepository: AttachmentsRepository,
         private readonly gateway: CommentsGateway,
         private readonly notificationService: NotificationService,
         private readonly usersService: UsersService
@@ -71,17 +74,13 @@ export class CommentsService {
         });
 
         // 3.1 Associate uploaded attachments with this comment
+        // Story 7.1 Fix: Use AttachmentsRepository instead of direct prisma call
         if (dto.attachmentIds && dto.attachmentIds.length > 0) {
-            await prisma.commentAttachment.updateMany({
-                where: {
-                    id: { in: dto.attachmentIds },
-                    uploaderId: userId,
-                    commentId: null, // Only associate pending (unassigned) attachments
-                },
-                data: {
-                    commentId: comment.id,
-                },
-            });
+            await this.attachmentsRepository.associateBatchWithComment(
+                dto.attachmentIds,
+                comment.id,
+                userId
+            );
         }
 
         // 3.2 Reload comment with attachments

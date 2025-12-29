@@ -2,7 +2,6 @@
  * Story 7.1: Backend Repository Pattern Refactor
  * Unit tests for GraphRepository
  */
-/* eslint-disable @typescript-eslint/no-explicit-any -- Jest mocks */
 
 import { GraphRepository } from '../graph.repository';
 
@@ -129,12 +128,16 @@ describe('GraphRepository', () => {
   });
 
   describe('updateYjsState', () => {
-    it('should update graph yjs state with buffer', async () => {
-      const yjsState = Buffer.from([1, 2, 3, 4, 5]);
+    // Story 7.1 Fix: Updated tests to use Uint8Array input (matches Y.encodeStateAsUpdate return type)
+    it('should update graph yjs state with Uint8Array', async () => {
+      // Input is Uint8Array (from Y.encodeStateAsUpdate)
+      const yjsState = new Uint8Array([1, 2, 3, 4, 5]);
+      // Expected buffer after internal conversion
+      const expectedBuffer = Buffer.from(yjsState);
       const updatedGraph = {
         id: 'graph-1',
         title: 'Test Graph',
-        yjsState: yjsState,
+        yjsState: expectedBuffer,
         updatedAt: new Date(),
       };
 
@@ -144,29 +147,30 @@ describe('GraphRepository', () => {
 
       expect(mockPrisma.graph.update).toHaveBeenCalledWith({
         where: { id: 'graph-1' },
-        data: { yjsState: yjsState },
+        data: { yjsState: expectedBuffer },
       });
       expect(result).toEqual(updatedGraph);
-      expect(result.yjsState).toEqual(yjsState);
+      expect(result.yjsState).toEqual(expectedBuffer);
     });
 
-    it('should handle large yjs state buffer', async () => {
-      // Simulate a large Yjs document (100KB)
-      const largeBuffer = Buffer.alloc(100 * 1024, 'x');
+    it('should handle large yjs state Uint8Array', async () => {
+      // Simulate a large Yjs document (100KB) as Uint8Array
+      const largeArray = new Uint8Array(100 * 1024).fill(120); // 'x' = 120
+      const expectedBuffer = Buffer.from(largeArray);
       const updatedGraph = {
         id: 'graph-large',
         title: 'Large Graph',
-        yjsState: largeBuffer,
+        yjsState: expectedBuffer,
         updatedAt: new Date(),
       };
 
       (mockPrisma.graph.update as jest.Mock).mockResolvedValue(updatedGraph);
 
-      const result = await repository.updateYjsState('graph-large', largeBuffer);
+      const result = await repository.updateYjsState('graph-large', largeArray);
 
       expect(mockPrisma.graph.update).toHaveBeenCalledWith({
         where: { id: 'graph-large' },
-        data: { yjsState: largeBuffer },
+        data: { yjsState: expectedBuffer },
       });
       expect(result.yjsState?.length).toBe(100 * 1024);
     });

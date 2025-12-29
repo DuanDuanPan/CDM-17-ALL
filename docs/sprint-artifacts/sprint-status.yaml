@@ -89,3 +89,7 @@ development_status:
   3-5-performance-optimization: ready-for-dev
   3-6-infrastructure-lint-fix: done  # ESLint 9 Flat Config migrated; All 5 packages pass
   epic-3-retrospective: optional
+
+  epic-7: in-progress
+  7-1-backend-repo-refactor: done
+  7-2-frontend-hook-first-extraction: ready-for-dev

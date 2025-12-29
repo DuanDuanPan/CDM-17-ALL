@@ -133,7 +133,8 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                             // Sync Nodes
                             if (graph.nodes) {
                                 for (const node of graph.nodes) {
-                                    const props = node.taskProps || node.requirementProps || node.pbsProps || node.dataProps || {};
+                                    // Story 7.1 Fix: Added appProps to prevent APP node data loss
+                                    const props = node.taskProps || node.requirementProps || node.pbsProps || node.dataProps || node.appProps || {};
                                     const yNode = {
                                         id: node.id,
                                         x: node.x,
@@ -308,7 +309,8 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
 
                     // 1. Save Yjs binary state to Graph table
                     // Story 7.1: Refactored to use GraphRepository
-                    await this.graphRepository.updateYjsState(graphId, Buffer.from(state));
+                    // Story 7.1 Fix: Pass Uint8Array directly (from Y.encodeStateAsUpdate)
+                    await this.graphRepository.updateYjsState(graphId, state);
 
                     Logger.log(
                         `Document ${documentName} stored (graphId: ${graphId}, size: ${state.byteLength} bytes)`,

@@ -77,6 +77,31 @@ export class AttachmentsRepository {
   }
 
   /**
+   * Story 7.1 Fix: Batch associate attachments with a comment
+   * Used by CommentsService.create to link uploaded attachments
+   * Only associates attachments that are:
+   * 1. In the provided ID list
+   * 2. Owned by the specified user
+   * 3. Not already associated with another comment (orphaned)
+   */
+  async associateBatchWithComment(
+    attachmentIds: string[],
+    commentId: string,
+    uploaderId: string,
+  ): Promise<{ count: number }> {
+    return prisma.commentAttachment.updateMany({
+      where: {
+        id: { in: attachmentIds },
+        uploaderId: uploaderId,
+        commentId: null, // Only associate pending (unassigned) attachments
+      },
+      data: {
+        commentId: commentId,
+      },
+    });
+  }
+
+  /**
    * Find orphaned attachments (not associated with any comment)
    * Useful for cleanup jobs
    */

@@ -4,23 +4,23 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { prisma, type Graph, type Node, type Edge } from '@cdm/database';
+import { prisma, type Graph } from '@cdm/database';
+import type { Prisma } from '@cdm/database';
 
-/**
- * Graph with all relations needed for Yjs document loading
- */
-export interface GraphWithRelations extends Graph {
-  nodes: Array<
-    Node & {
-      taskProps: unknown | null;
-      requirementProps: unknown | null;
-      pbsProps: unknown | null;
-      dataProps: unknown | null;
-      appProps: unknown | null;
-    }
-  >;
-  edges: Edge[];
-}
+export type GraphWithRelations = Prisma.GraphGetPayload<{
+  include: {
+    nodes: {
+      include: {
+        taskProps: true;
+        requirementProps: true;
+        pbsProps: true;
+        dataProps: true;
+        appProps: true;
+      };
+    };
+    edges: true;
+  };
+}>;
 
 @Injectable()
 export class GraphRepository {
@@ -45,19 +45,19 @@ export class GraphRepository {
         },
         edges: true,
       },
-    }) as Promise<GraphWithRelations | null>;
+    });
   }
 
   /**
    * Update Yjs binary state for a graph
    * Used by CollabService.onStoreDocument (replaces line 319)
-   * Note: Prisma Bytes type accepts Buffer (Node.js Uint8Array subclass)
+   * Story 7.1 Fix: Changed Buffer to Uint8Array for Prisma Bytes compatibility
+   * (TypeScript 5.6+ has stricter Buffer/Uint8Array type checking)
    */
-  async updateYjsState(graphId: string, yjsState: Buffer): Promise<Graph> {
+  async updateYjsState(graphId: string, yjsState: Uint8Array): Promise<Graph> {
     return prisma.graph.update({
       where: { id: graphId },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: { yjsState: yjsState as any },
+      data: { yjsState: Buffer.from(yjsState) },
     });
   }
 

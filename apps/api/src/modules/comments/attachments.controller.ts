@@ -2,6 +2,7 @@
  * Story 4.3+: Comment Attachments
  * Attachments Controller - File upload, download, delete endpoints
  * Story 7.1: Refactored to use AttachmentsRepository
+ * NOTE: Fine-grained permission control deferred to future story
  */
 
 import {
@@ -78,7 +79,9 @@ const fileFilter = (
 
 @Controller('comments/attachments')
 export class AttachmentsController {
-    constructor(private readonly attachmentsRepository: AttachmentsRepository) {}
+    constructor(
+        private readonly attachmentsRepository: AttachmentsRepository,
+    ) {}
 
     /**
      * Upload a file attachment
@@ -139,6 +142,7 @@ export class AttachmentsController {
     /**
      * Download or preview an attachment
      * GET /comments/attachments/:id
+     * NOTE: Fine-grained permission control deferred to future story
      */
     @Get(':id')
     async download(
@@ -156,6 +160,9 @@ export class AttachmentsController {
         if (!attachment) {
             throw new NotFoundException('Attachment not found');
         }
+
+        // TODO: Add fine-grained permission control in future story
+        // Current behavior: any authenticated user can download any attachment
 
         const filePath = join(UPLOAD_DIR, attachment.storagePath);
         if (!existsSync(filePath)) {

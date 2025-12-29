@@ -2,7 +2,6 @@
  * Story 7.1: Backend Repository Pattern Refactor
  * Unit tests for AttachmentsRepository
  */
-/* eslint-disable @typescript-eslint/no-explicit-any -- Jest mocks */
 
 import { AttachmentsRepository, AttachmentCreateData } from '../attachments.repository';
 
@@ -14,6 +13,7 @@ jest.mock('@cdm/database', () => ({
       findUnique: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       delete: jest.fn(),
     },
   },
@@ -192,6 +192,44 @@ describe('AttachmentsRepository', () => {
         data: { commentId: 'comment-1' },
       });
       expect(result.commentId).toBe('comment-1');
+    });
+  });
+
+  describe('associateBatchWithComment', () => {
+    it('should batch associate orphaned attachments owned by the uploader', async () => {
+      const attachmentIds = ['attachment-1', 'attachment-2'];
+      const uploaderId = 'user-1';
+      const commentId = 'comment-1';
+
+      (mockPrisma.commentAttachment.updateMany as jest.Mock).mockResolvedValue({ count: 2 });
+
+      const result = await repository.associateBatchWithComment(
+        attachmentIds,
+        commentId,
+        uploaderId,
+      );
+
+      expect(mockPrisma.commentAttachment.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: attachmentIds },
+          uploaderId,
+          commentId: null,
+        },
+        data: { commentId },
+      });
+      expect(result).toEqual({ count: 2 });
+    });
+
+    it('should return count 0 when nothing matches', async () => {
+      (mockPrisma.commentAttachment.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+      const result = await repository.associateBatchWithComment(
+        ['missing-1'],
+        'comment-1',
+        'user-1',
+      );
+
+      expect(result).toEqual({ count: 0 });
     });
   });
 

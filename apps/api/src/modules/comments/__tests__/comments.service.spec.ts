@@ -1,6 +1,7 @@
 /**
  * Story 4.3: Contextual Comments & Mentions
  * Unit tests for CommentsService (access control + threading validation)
+ * Story 7.1 Fix: Updated to include AttachmentsRepository mock
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- Jest mocks */
 
@@ -34,6 +35,17 @@ describe('CommentsService', () => {
         getCommentCount: jest.fn(),
     };
 
+    // Story 7.1 Fix: Added mock for AttachmentsRepository
+    const mockAttachmentsRepository = {
+        create: jest.fn(),
+        findById: jest.fn(),
+        delete: jest.fn(),
+        findByCommentId: jest.fn(),
+        associateWithComment: jest.fn(),
+        associateBatchWithComment: jest.fn(),
+        findOrphaned: jest.fn(),
+    };
+
     const mockGateway = {
         emitCommentCreated: jest.fn(),
         emitCommentUpdated: jest.fn(),
@@ -51,8 +63,10 @@ describe('CommentsService', () => {
     const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 
     beforeEach(() => {
+        // Story 7.1 Fix: Added mockAttachmentsRepository to constructor
         service = new CommentsService(
             mockRepo as any,
+            mockAttachmentsRepository as any,
             mockGateway as any,
             mockNotificationService as any,
             mockUsersService as any
@@ -172,6 +186,81 @@ describe('CommentsService', () => {
             ).rejects.toThrow(BadRequestException);
 
             expect(mockRepo.create).not.toHaveBeenCalled();
+        });
+
+        it('associates attachments when attachmentIds are provided', async () => {
+            mockRepo.create.mockResolvedValue({ id: 'comment-1' });
+
+            const fullComment = {
+                id: 'comment-1',
+                content: 'Hello',
+                nodeId: 'node-1',
+                mindmapId: 'graph-1',
+                authorId: 'user-1',
+                author: { id: 'user-1', name: 'User 1' },
+                replyToId: null,
+                replies: [],
+                attachments: [
+                    {
+                        id: 'attachment-1',
+                        fileName: 'a.pdf',
+                        fileSize: 123,
+                        mimeType: 'application/pdf',
+                        createdAt: new Date('2025-01-01'),
+                    },
+                ],
+                createdAt: new Date('2025-01-01'),
+                updatedAt: new Date('2025-01-01'),
+            };
+
+            mockRepo.findById.mockResolvedValue(fullComment);
+            mockAttachmentsRepository.associateBatchWithComment.mockResolvedValue({ count: 2 });
+            mockUsersService.list.mockResolvedValue({ users: [] });
+
+            const result = await service.create(
+                {
+                    content: 'Hello',
+                    nodeId: 'node-1',
+                    attachmentIds: ['attachment-1', 'attachment-2'],
+                },
+                'user-1'
+            );
+
+            expect(mockAttachmentsRepository.associateBatchWithComment).toHaveBeenCalledWith(
+                ['attachment-1', 'attachment-2'],
+                'comment-1',
+                'user-1'
+            );
+            expect(mockGateway.emitCommentCreated).toHaveBeenCalledWith(
+                'graph-1',
+                expect.objectContaining({ id: 'comment-1' })
+            );
+            expect(result.id).toBe('comment-1');
+        });
+
+        it('does not associate attachments when attachmentIds are missing', async () => {
+            mockRepo.create.mockResolvedValue({ id: 'comment-1' });
+            mockRepo.findById.mockResolvedValue({
+                id: 'comment-1',
+                content: 'Hello',
+                nodeId: 'node-1',
+                mindmapId: 'graph-1',
+                authorId: 'user-1',
+                author: { id: 'user-1', name: 'User 1' },
+                replyToId: null,
+                replies: [],
+                attachments: [],
+                createdAt: new Date('2025-01-01'),
+                updatedAt: new Date('2025-01-01'),
+            });
+            mockUsersService.list.mockResolvedValue({ users: [] });
+
+            await service.create(
+                { content: 'Hello', nodeId: 'node-1' },
+                'user-1'
+            );
+
+            expect(mockAttachmentsRepository.associateBatchWithComment).not.toHaveBeenCalled();
         });
     });
 });

@@ -41,6 +41,7 @@ next-env.d.ts
 *.tsbuildinfo
 
 # BMAD temporary files
+.bmad
 .bmad/**/checkpoint.txt
 
 # Playwright artifacts

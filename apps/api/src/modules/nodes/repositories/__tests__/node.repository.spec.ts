@@ -1,13 +1,14 @@
 /**
  * Story 7.1: Backend Repository Pattern Refactor
  * Unit tests for NodeRepository (focus on upsertBatch and core methods)
+ * Story 7.1 Fix: Updated to use $transaction mock for atomic upsertBatch
  */
-/* eslint-disable @typescript-eslint/no-explicit-any -- Jest mocks */
 
 import { NodeRepository, NodeUpsertBatchData } from '../node.repository';
 import { NodeType } from '@cdm/types';
 
 // Mock Prisma
+// Story 7.1 Fix: Added $transaction mock for atomic upsertBatch
 jest.mock('@cdm/database', () => ({
   prisma: {
     node: {
@@ -20,6 +21,7 @@ jest.mock('@cdm/database', () => ({
       upsert: jest.fn(),
     },
     $queryRaw: jest.fn(),
+    $transaction: jest.fn(),
   },
 }));
 
@@ -208,10 +210,11 @@ describe('NodeRepository', () => {
       const result = await repository.upsertBatch([]);
 
       expect(result).toEqual([]);
-      expect(mockPrisma.node.upsert).not.toHaveBeenCalled();
+      // Story 7.1 Fix: $transaction should not be called for empty input
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
 
-    it('should upsert single node', async () => {
+    it('should upsert single node using $transaction with correct params', async () => {
       const nodeData: NodeUpsertBatchData = {
         id: 'node-1',
         label: 'Test Node',
@@ -229,10 +232,15 @@ describe('NodeRepository', () => {
       };
 
       const expectedNode = { ...nodeData, createdAt: new Date(), updatedAt: new Date() };
-      (mockPrisma.node.upsert as jest.Mock).mockResolvedValue(expectedNode);
+      // Mock upsert to return a promise-like object
+      const mockUpsertPromise = Promise.resolve(expectedNode);
+      (mockPrisma.node.upsert as jest.Mock).mockReturnValue(mockUpsertPromise);
+      // Story 7.1 Fix: Mock $transaction to return array of results
+      (mockPrisma.$transaction as jest.Mock).mockResolvedValue([expectedNode]);
 
       const result = await repository.upsertBatch([nodeData]);
 
+      // Verify upsert was called with correct parameters
       expect(mockPrisma.node.upsert).toHaveBeenCalledTimes(1);
       expect(mockPrisma.node.upsert).toHaveBeenCalledWith({
         where: { id: 'node-1' },
@@ -265,10 +273,15 @@ describe('NodeRepository', () => {
           isArchived: nodeData.isArchived,
         },
       });
+
+      // Verify $transaction receives array with correct length
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith([mockUpsertPromise]);
       expect(result).toHaveLength(1);
+      expect(result[0]).toEqual(expectedNode);
     });
 
-    it('should upsert multiple nodes in parallel', async () => {
+    it('should upsert multiple nodes atomically using $transaction', async () => {
       const nodes: NodeUpsertBatchData[] = [
         {
           id: 'node-1',
@@ -317,14 +330,33 @@ describe('NodeRepository', () => {
         },
       ];
 
+      // Story 7.1 Fix: Mock $transaction to return all nodes atomically
+      const expectedResults = nodes.map((n) => ({ ...n, createdAt: new Date() }));
+      // Mock upsert to return promise-like objects
+      const mockUpsertPromises = expectedResults.map((r) => Promise.resolve(r));
       (mockPrisma.node.upsert as jest.Mock)
-        .mockResolvedValueOnce({ ...nodes[0], createdAt: new Date() })
-        .mockResolvedValueOnce({ ...nodes[1], createdAt: new Date() })
-        .mockResolvedValueOnce({ ...nodes[2], createdAt: new Date() });
+        .mockReturnValueOnce(mockUpsertPromises[0])
+        .mockReturnValueOnce(mockUpsertPromises[1])
+        .mockReturnValueOnce(mockUpsertPromises[2]);
+      (mockPrisma.$transaction as jest.Mock).mockResolvedValue(expectedResults);
 
       const result = await repository.upsertBatch(nodes);
 
+      // Verify upsert was called 3 times with correct node IDs
       expect(mockPrisma.node.upsert).toHaveBeenCalledTimes(3);
+      expect(mockPrisma.node.upsert).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        where: { id: 'node-1' },
+      }));
+      expect(mockPrisma.node.upsert).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        where: { id: 'node-2' },
+      }));
+      expect(mockPrisma.node.upsert).toHaveBeenNthCalledWith(3, expect.objectContaining({
+        where: { id: 'node-3' },
+      }));
+
+      // Story 7.1 Fix: Single $transaction call for atomicity with 3 operations
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.$transaction).toHaveBeenCalledWith(mockUpsertPromises);
       expect(result).toHaveLength(3);
       expect(result[0].id).toBe('node-1');
       expect(result[1].id).toBe('node-2');
@@ -349,16 +381,12 @@ describe('NodeRepository', () => {
       };
 
       const expectedNode = { ...archivedNode };
-      (mockPrisma.node.upsert as jest.Mock).mockResolvedValue(expectedNode);
+      // Story 7.1 Fix: Mock $transaction
+      (mockPrisma.$transaction as jest.Mock).mockResolvedValue([expectedNode]);
 
       const result = await repository.upsertBatch([archivedNode]);
 
-      expect(mockPrisma.node.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          create: expect.objectContaining({ isArchived: true }),
-          update: expect.objectContaining({ isArchived: true }),
-        }),
-      );
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       expect(result[0].isArchived).toBe(true);
     });
 
@@ -387,13 +415,13 @@ describe('NodeRepository', () => {
         isArchived: false,
       }));
 
-      nodes.forEach((node, index) => {
-        (mockPrisma.node.upsert as jest.Mock).mockResolvedValueOnce(node);
-      });
+      // Story 7.1 Fix: Mock $transaction to return all nodes
+      (mockPrisma.$transaction as jest.Mock).mockResolvedValue(nodes);
 
       const result = await repository.upsertBatch(nodes);
 
-      expect(mockPrisma.node.upsert).toHaveBeenCalledTimes(5);
+      // Story 7.1 Fix: Verify atomic transaction
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       expect(result).toHaveLength(5);
       result.forEach((node, index) => {
         expect(node.type).toBe(nodeTypes[index]);
