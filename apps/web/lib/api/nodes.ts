@@ -21,6 +21,21 @@ function sanitizeProps(props: NodeProps, nodeType?: NodeType): NodeProps {
     }
   }
 
+  // Drop null for non-nullable array fields to satisfy API validation
+  const type = nodeType ?? NodeType.ORDINARY;
+  const nonNullableArrayKeysByType: Partial<Record<NodeType, readonly string[]>> = {
+    [NodeType.APP]: ['inputs', 'outputs'],
+    [NodeType.TASK]: ['knowledgeRefs'],
+  };
+  const arrayKeys = nonNullableArrayKeysByType[type];
+  if (arrayKeys) {
+    for (const key of arrayKeys) {
+      if (sanitized[key] === null) {
+        delete sanitized[key];
+      }
+    }
+  }
+
   return sanitized as NodeProps;
 }
 

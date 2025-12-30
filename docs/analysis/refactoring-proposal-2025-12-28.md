@@ -55,9 +55,14 @@
         | `ApprovalStatusPanel.tsx` | 8 次 |
         | `TaskDispatchSection.tsx` | 3 次 |
         | `ArchiveDrawer.tsx` | 3 次 |
-        | `CommentInput.tsx` | 1 次 |
+        | `UserSelector.tsx` | 2 次 |
+        | `AppLibraryDialog.tsx` | 2 次 |
         | `CommentPanel.tsx` | 1 次 |
-        | 其他 | 7 次 |
+        | `CommentInput.tsx` | 1 次 |
+        | `MindNode.tsx` | 1 次 (execute) |
+        | `WorkflowConfigDialog.tsx` | 1 次 |
+        | `KnowledgeSearchDialog.tsx` | 1 次 |
+        | `AppForm.tsx` | 1 次 |
     *   **影响**: UI 与数据获取耦合，逻辑无法复用，组件难以测试。
 
 ### 2.3 UI 系统缺失 (Missing Design System)
@@ -327,7 +332,7 @@ const attachment = await this.attachmentsRepository.create({...});
 
 ##### **当前 `fetch()` 违规统计**
 
-根据代码搜索，发现 **23 处** 直接 `fetch()` 调用：
+根据代码搜索，发现 **24 处** 直接 `fetch()` 调用：
 
 | 组件 | fetch 次数 | 优先级 |
 |------|------------|--------|
