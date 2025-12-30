@@ -4,17 +4,19 @@
  * Story 4.1: Approval Driven Workflow
  * UserSelector Component - Async search dropdown for selecting users
  * Features: Async search, avatar display, keyboard navigation
+ *
+ * Story 7.5: Refactored to use Hook-First pattern
+ * - Removed 2 direct fetch() calls
+ * - Now uses useUserSearch hook following Story 7.2 pattern
  */
 
 import { useState, useEffect, useCallback, useRef, KeyboardEvent } from 'react';
 import { User, ChevronDown, Search, X, Loader2 } from 'lucide-react';
+import { useUserSearch } from '@/hooks/useUserSearch';
+import type { UserOption } from '@/lib/api/users';
 
-// Types
-export interface UserOption {
-    id: string;
-    name: string | null;
-    email: string;
-}
+// Re-export UserOption for consumers
+export type { UserOption };
 
 interface UserSelectorProps {
     value?: string;                    // Selected user ID
@@ -23,28 +25,6 @@ interface UserSelectorProps {
     disabled?: boolean;
     className?: string;
     onUserSelect?: (user: UserOption) => void;
-}
-
-// API base URL (in real app would come from env)
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-/**
- * Fetch users from API with search query
- */
-async function searchUsers(query: string): Promise<UserOption[]> {
-    try {
-        const response = await fetch(
-            `${API_BASE}/api/users/search?q=${encodeURIComponent(query)}&limit=20`
-        );
-        if (!response.ok) {
-            throw new Error('Failed to fetch users');
-        }
-        const data = await response.json();
-        return data.users || [];
-    } catch (error) {
-        console.error('Error searching users:', error);
-        return [];
-    }
 }
 
 /**
@@ -74,14 +54,19 @@ export function UserSelector({
 }: UserSelectorProps) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
-    const [users, setUsers] = useState<UserOption[]>([]);
-    const [loading, setLoading] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserOption | null>(null);
     const [highlightedIndex, setHighlightedIndex] = useState(0);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Story 7.5: Use Hook-First pattern
+    const {
+        users,
+        isLoading,
+        search: searchUsers,
+        fetchUser,
+    } = useUserSearch({ debounceMs: 300, limit: 20 });
 
     // Fetch selected user info when value changes (for displaying selected user)
     useEffect(() => {
@@ -95,57 +80,26 @@ export function UserSelector({
             return;
         }
 
-        // Fetch user info by searching with the ID
-        const fetchSelectedUser = async () => {
-            try {
-                const response = await fetch(
-                    `${API_BASE}/api/users/${value}`
-                );
-                if (response.ok) {
-                    const user = await response.json();
-                    if (user) {
-                        setSelectedUser({
-                            id: user.id,
-                            name: user.name,
-                            email: user.email,
-                        });
-                    }
-                }
-            } catch {
+        // Fetch user info by ID using hook
+        fetchUser(value).then((user) => {
+            if (user) {
+                setSelectedUser(user);
+            } else {
                 // If fetching fails, try to find from users list
                 const found = users.find(u => u.id === value);
                 if (found) {
                     setSelectedUser(found);
                 }
             }
-        };
+        });
+    }, [value, selectedUser?.id, users, fetchUser]);
 
-        fetchSelectedUser();
-    }, [value, selectedUser?.id, users]);
-
-    // Fetch users when search changes (debounced) or when dropdown opens
+    // Fetch users when search changes or when dropdown opens
     useEffect(() => {
-        if (!open) return;
-
-        if (debounceRef.current) {
-            clearTimeout(debounceRef.current);
+        if (open) {
+            searchUsers(search.trim());
         }
-
-        debounceRef.current = setTimeout(async () => {
-            setLoading(true);
-            // Always fetch users - use empty string to get default list
-            const results = await searchUsers(search.trim());
-            setUsers(results);
-            setLoading(false);
-            setHighlightedIndex(0);
-        }, search.trim().length > 0 ? 300 : 0); // No delay for initial load
-
-        return () => {
-            if (debounceRef.current) {
-                clearTimeout(debounceRef.current);
-            }
-        };
-    }, [search, open]);
+    }, [search, open, searchUsers]);
 
     // Reset search when popover opens
     useEffect(() => {
@@ -279,12 +233,12 @@ export function UserSelector({
                             onKeyDown={handleKeyDown}
                             className="flex-1 px-2 py-2 text-sm outline-none"
                         />
-                        {loading && <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />}
+                        {isLoading && <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />}
                     </div>
 
                     {/* Results */}
                     <div className="max-h-[200px] overflow-y-auto">
-                        {users.length === 0 && search.length > 0 && !loading && (
+                        {users.length === 0 && search.length > 0 && !isLoading && (
                             <div className="py-6 text-center text-sm text-gray-400">
                                 未找到匹配的用户
                             </div>

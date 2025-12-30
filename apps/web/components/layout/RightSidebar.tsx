@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PropertyPanel } from '@/components/PropertyPanel';
-import { NodeType, type EnhancedNodeData, type NodeProps, sanitizeNodeProps } from '@cdm/types';
+import { NodeType, type EnhancedNodeData, type NodeProps, sanitizeNodeProps, type Deliverable, type ApprovalPipeline } from '@cdm/types';
 import type { Graph, Node } from '@antv/x6';
 import type * as Y from 'yjs';
 import { syncLogger as logger } from '@/lib/logger';
@@ -367,6 +367,8 @@ export function RightSidebar({
         type: graphData.nodeType || NodeType.ORDINARY,
         props: graphData.props || {},
         tags: Array.isArray(graphData.tags) ? graphData.tags : [],
+        approval: graphData.approval ?? null,
+        deliverables: Array.isArray(graphData.deliverables) ? graphData.deliverables : undefined,
         isArchived: typeof graphData.isArchived === 'boolean' ? graphData.isArchived : false,
         archivedAt:
           typeof graphData.archivedAt === 'string' || graphData.archivedAt === null
@@ -390,9 +392,11 @@ export function RightSidebar({
         description: undefined,
         type: (yjsNode.nodeType as NodeType) || NodeType.ORDINARY,
         props: (yjsNode.props as NodeProps) || {},
-        tags: [],
-        isArchived: false,
-        archivedAt: null,
+        tags: Array.isArray(yjsNode.tags) ? yjsNode.tags : [],
+        approval: yjsNode.approval ?? null,
+        deliverables: Array.isArray(yjsNode.deliverables) ? yjsNode.deliverables : undefined,
+        isArchived: typeof yjsNode.isArchived === 'boolean' ? yjsNode.isArchived : false,
+        archivedAt: yjsNode.archivedAt ?? null,
         createdAt: yjsNode.createdAt,
         updatedAt: yjsNode.updatedAt,
         creator: yjsNode.creator || resolvedCreatorName,
@@ -462,6 +466,10 @@ export function RightSidebar({
             type: (data.nodeType as NodeType) || prev?.type || NodeType.ORDINARY,
             props: nextProps,
             tags: Array.isArray(data.tags) ? data.tags : prev?.tags ?? [],
+            approval: data.approval !== undefined ? data.approval : prev?.approval,
+            deliverables: data.deliverables !== undefined
+              ? (Array.isArray(data.deliverables) ? data.deliverables as Deliverable[] : [])
+              : prev?.deliverables,
             isArchived: typeof data.isArchived === 'boolean' ? data.isArchived : prev?.isArchived,
             archivedAt:
               typeof data.archivedAt === 'string' || data.archivedAt === null
@@ -492,6 +500,8 @@ export function RightSidebar({
           type: (yjsNode.nodeType as NodeType) || NodeType.ORDINARY,
           // Fix: Use props directly, fallback to empty object only when undefined
           props: yjsNode.props !== undefined ? (yjsNode.props as NodeProps) : {},
+          approval: yjsNode.approval ?? null,
+          deliverables: Array.isArray(yjsNode.deliverables) ? yjsNode.deliverables : undefined,
           createdAt: yjsNode.createdAt,
           updatedAt: yjsNode.updatedAt,
           creator: yjsNode.creator || resolvedCreatorName,
@@ -620,34 +630,31 @@ export function RightSidebar({
     [getX6Node, graph, onClose]
   );
 
-  // Story 4.1: Handle approval-related updates (refresh node data from API)
-  const handleApprovalUpdate = useCallback(async (nodeId: string) => {
+  // Story 4.1 + Story 7.2: Handle approval-related updates (sync deliverables to X6/Yjs)
+  const handleApprovalUpdate = useCallback(async (nodeId: string, payload: { approval: ApprovalPipeline | null; deliverables: Deliverable[] }) => {
     try {
-      const data = await fetchNode(nodeId);
-      // Type assertion for extended properties
-      const extendedData = data as (typeof data) & {
-        approval?: unknown;
-        deliverables?: unknown;
-      };
-      if (data) {
-        setNodeData(data);
-        // Also sync to X6 node for consistency
-        const x6Node = getX6Node(nodeId);
-        if (x6Node) {
-          const existingData = x6Node.getData() || {};
-          // IMPORTANT: use overwrite mode so empty arrays in props (e.g. deliverables: [])
-          // can correctly clear existing arrays in X6's deep-merge semantics.
-          x6Node.setData({
-            ...existingData,
-            props: data.props,
-            approval: extendedData.approval,
-            deliverables: extendedData.deliverables,
-            updatedAt: data.updatedAt,
-          }, { overwrite: true });
-        }
+      // Sync deliverables directly to X6 node for Yjs propagation
+      const x6Node = getX6Node(nodeId);
+      if (x6Node) {
+        const existingData = x6Node.getData() || {};
+        const now = new Date().toISOString();
+        const existingProps = existingData.props;
+        const { approval, deliverables } = payload;
+        const nextProps = (existingProps && typeof existingProps === 'object' && !Array.isArray(existingProps))
+          ? { ...(existingProps as Record<string, unknown>), deliverables }
+          : { deliverables };
+        // IMPORTANT: use overwrite mode so deliverables array syncs correctly to Yjs
+        x6Node.setData({
+          ...existingData,
+          deliverables,
+          approval,
+          props: nextProps as NodeProps,
+          updatedAt: now,
+        }, { overwrite: true });
+        logger.debug('Synced deliverables to X6 for Yjs propagation', { nodeId, deliverablesCount: deliverables.length });
       }
     } catch (error) {
-      logger.error('Failed to refresh node data after approval update', { nodeId, error });
+      logger.error('Failed to sync deliverables after update', { nodeId, error });
     }
   }, [getX6Node]);
 

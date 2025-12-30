@@ -20,6 +20,7 @@ import {
 import { NodeType, type TaskProps, type RequirementProps, type PBSProps, type DataProps, type AppProps, type AppOutput, type AppExecutionStatus, type ApprovalStatus, type ApprovalPipeline } from '@cdm/types';
 import type { MindNodeData } from '@cdm/types';
 import { updateNode, updateNodeProps } from '@/lib/api/nodes';
+import { executeApp } from '@/lib/api/app-library';
 import { getUnreadCount as getGlobalUnreadCount, subscribe as subscribeToUnreadCounts } from '@/lib/commentCountStore';
 import { isSubscribed as isNodeSubscribed, subscribe as subscribeToSubscriptionStore } from '@/lib/subscriptionStore';
 // Rich Node UI components
@@ -452,25 +453,17 @@ export function MindNode({ node }: MindNodeProps) {
       }
 
       try {
-        const response = await fetch(`/api/nodes/${node.id}/execute`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            appSourceType: appProps.appSourceType ?? 'library',
-            appPath: appProps.appPath,
-            appUrl: appProps.appUrl,
-            libraryAppId: appProps.libraryAppId,
-            libraryAppName: appProps.libraryAppName,
-            inputs: appProps.inputs || [],
-            outputs: appProps.outputs || [],
-          }),
+        // Use centralized API service
+        const result = await executeApp(node.id, {
+          appSourceType: appProps.appSourceType ?? 'library',
+          appPath: appProps.appPath ?? null,
+          appUrl: appProps.appUrl ?? null,
+          libraryAppId: appProps.libraryAppId ?? null,
+          libraryAppName: appProps.libraryAppName ?? null,
+          inputs: appProps.inputs || [],
+          outputs: appProps.outputs || [],
         });
 
-        if (!response.ok) {
-          throw new Error(`执行失败：${response.status}`);
-        }
-
-        const result: { outputs: AppOutput[]; error?: string; executedAt: string } = await response.json();
         if (result?.error) {
           throw new Error(result.error);
         }

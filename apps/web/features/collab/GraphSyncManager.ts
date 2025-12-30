@@ -1,6 +1,6 @@
 import { Graph, Node, Edge, Cell } from '@antv/x6';
 import * as Y from 'yjs';
-import { LayoutMode, NodeType, TaskProps, RequirementProps, PBSProps, DataProps, EdgeMetadata, type ApprovalPipeline } from '@cdm/types';
+import { LayoutMode, NodeType, TaskProps, RequirementProps, PBSProps, DataProps, EdgeMetadata, type ApprovalPipeline, type Deliverable } from '@cdm/types';
 import { syncLogger as logger } from '@/lib/logger';
 
 /**
@@ -36,6 +36,9 @@ export interface YjsNodeData {
 
     // Story 4.1: Approval data sync
     approval?: ApprovalPipeline;
+
+    // Story 7.2: Deliverables sync for multi-browser collaboration
+    deliverables?: Deliverable[];
 }
 
 /**
@@ -395,6 +398,8 @@ export class GraphSyncManager {
             archivedAt: data.archivedAt !== undefined ? data.archivedAt : undefined,
             // Story 4.1: Sync approval data
             approval: data.approval as ApprovalPipeline | undefined,
+            // Story 7.2: Sync deliverables for multi-browser collaboration
+            deliverables: Array.isArray(data.deliverables) ? data.deliverables as Deliverable[] : undefined,
         };
 
         this.yDoc.transact(() => {
@@ -518,6 +523,8 @@ export class GraphSyncManager {
                 archivedAt: data.archivedAt,
                 // Story 4.1: Apply approval data
                 approval: data.approval,
+                // Story 7.2: Apply deliverables for multi-browser collaboration
+                deliverables: data.deliverables,
             }, { overwrite: true });
 
             // Story 2.7: Handle visibility based on isArchived state (multi-client sync)
@@ -573,6 +580,8 @@ export class GraphSyncManager {
                     archivedAt: data.archivedAt,
                     // Story 4.1: Apply approval data
                     approval: data.approval,
+                    // Story 7.2: Apply deliverables for multi-browser collaboration
+                    deliverables: data.deliverables,
                 },
             });
 

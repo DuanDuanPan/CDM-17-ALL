@@ -3,11 +3,16 @@
 /**
  * Story 4.3: Contextual Comments & Mentions
  * CommentItem Component - Single comment display with author and actions
+ *
+ * Story 7.5: Refactored to use Hook-First pattern
+ * - Removed 1 direct fetch() call for attachment download
+ * - Now uses useCommentActions hook following Story 7.2 pattern
  */
 
 import { useState, useMemo } from 'react';
 import { Trash2, CornerDownRight, FileText, Download, Image as ImageIcon } from 'lucide-react';
 import type { Comment } from '@cdm/types';
+import { useCommentActions } from '@/hooks/useCommentActions';
 
 // Helper: Format relative time
 function formatRelativeTime(dateString: string): string {
@@ -99,6 +104,9 @@ export function CommentItem({
     const authorName = comment.author?.name || 'Unknown';
     const initials = useMemo(() => getInitials(authorName), [authorName]);
 
+    // Story 7.5: Use Hook-First pattern for attachment actions
+    const { downloadFile, viewImage } = useCommentActions();
+
     return (
         <div
             className={`group ${depth > 0 ? 'ml-8 border-l-2 border-gray-100 pl-4' : ''}`}
@@ -137,39 +145,21 @@ export function CommentItem({
                             {comment.attachments.map((attachment) => {
                                 const isImage = attachment.mimeType.startsWith('image/');
 
-                                // Download handler with authentication header
+                                // Download handler using hook
                                 const handleDownload = async (e: React.MouseEvent) => {
                                     e.preventDefault();
                                     try {
-                                        const response = await fetch(attachment.url, {
-                                            headers: {
-                                                'x-user-id': currentUserId,
-                                            },
-                                        });
-
-                                        if (!response.ok) {
-                                            console.error('Download failed:', response.status);
-                                            return;
-                                        }
-
-                                        const blob = await response.blob();
-                                        const url = window.URL.createObjectURL(blob);
-
                                         if (isImage) {
                                             // Open image in new tab
-                                            window.open(url, '_blank');
+                                            await viewImage(attachment.url, currentUserId);
                                         } else {
                                             // Trigger file download
-                                            const a = document.createElement('a');
-                                            a.href = url;
-                                            a.download = attachment.fileName;
-                                            document.body.appendChild(a);
-                                            a.click();
-                                            document.body.removeChild(a);
+                                            await downloadFile(
+                                                attachment.url,
+                                                currentUserId,
+                                                attachment.fileName
+                                            );
                                         }
-
-                                        // Clean up blob URL after a delay
-                                        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
                                     } catch (error) {
                                         console.error('Download error:', error);
                                     }

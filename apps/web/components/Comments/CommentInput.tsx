@@ -3,19 +3,18 @@
 /**
  * Story 4.3: Contextual Comments & Mentions
  * CommentInput Component - Textarea with @mention suggestions and attachments
+ *
+ * Story 7.5: Refactored to use Hook-First pattern
+ * - Removed 1 direct fetch() call for @mention search
+ * - Now uses useUserSearch hook following Story 7.2 pattern
  */
 
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
-import { Send, AtSign, Loader2, X, Paperclip } from 'lucide-react';
+import { Send, Loader2, X, Paperclip } from 'lucide-react';
 import { useAttachmentUpload } from '@/hooks/useAttachmentUpload';
+import { useUserSearch } from '@/hooks/useUserSearch';
 import { AttachmentPreview } from './AttachmentPreview';
-
-// Types
-interface UserSuggestion {
-    id: string;
-    name: string | null;
-    email: string;
-}
+import type { UserOption } from '@/lib/api/users';
 
 interface CommentInputProps {
     onSubmit: (content: string, attachmentIds?: string[]) => Promise<void>;
@@ -37,15 +36,19 @@ export function CommentInput({
     const [content, setContent] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [mentionQuery, setMentionQuery] = useState('');
     const [mentionStartPos, setMentionStartPos] = useState(0);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
-    const debounceRef = useRef<NodeJS.Timeout | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Story 7.5: Use Hook-First pattern for user search
+    const {
+        users: suggestions,
+        search: searchUsers,
+    } = useUserSearch({ debounceMs: 200, limit: 10 });
 
     // Attachment upload hook
     const {
@@ -56,22 +59,6 @@ export function CommentInput({
         getAttachmentIds,
         isUploading,
     } = useAttachmentUpload({ userId, maxFiles: 5, maxSize: 10 * 1024 * 1024 });
-
-    // Fetch user suggestions
-    const fetchSuggestions = useCallback(async (query: string) => {
-        try {
-            const response = await fetch(
-                `/api/users/search?q=${encodeURIComponent(query)}&limit=10`
-            );
-            if (response.ok) {
-                const data = await response.json();
-                setSuggestions(data.users || []);
-            }
-        } catch (err) {
-            console.error('[CommentInput] Failed to fetch suggestions:', err);
-            setSuggestions([]);
-        }
-    }, []);
 
     // Handle content change and detect @mentions
     const handleChange = useCallback(
@@ -92,24 +79,18 @@ export function CommentInput({
                 setShowSuggestions(true);
                 setSelectedIndex(0);
 
-                // Debounced fetch
-                if (debounceRef.current) {
-                    clearTimeout(debounceRef.current);
-                }
-                debounceRef.current = setTimeout(() => {
-                    fetchSuggestions(query);
-                }, 200);
+                // Use hook's search function with debouncing built-in
+                searchUsers(query);
             } else {
                 setShowSuggestions(false);
-                setSuggestions([]);
             }
         },
-        [fetchSuggestions]
+        [searchUsers]
     );
 
     // Handle suggestion selection
     const handleSelectSuggestion = useCallback(
-        (user: UserSuggestion) => {
+        (user: UserOption) => {
             const displayName = user.name || user.email;
             const mentionToken =
                 displayName.includes('"')
@@ -123,7 +104,6 @@ export function CommentInput({
 
             setContent(newContent);
             setShowSuggestions(false);
-            setSuggestions([]);
 
             // Focus back and set cursor position
             setTimeout(() => {
@@ -217,15 +197,6 @@ export function CommentInput({
             textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 150)}px`;
         }
     }, [content]);
-
-    // Cleanup debounce on unmount
-    useEffect(() => {
-        return () => {
-            if (debounceRef.current) {
-                clearTimeout(debounceRef.current);
-            }
-        };
-    }, []);
 
     return (
         <div className="relative">
@@ -349,5 +320,3 @@ export function CommentInput({
 }
 
 export default CommentInput;
-
-

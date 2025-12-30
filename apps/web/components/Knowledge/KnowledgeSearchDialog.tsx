@@ -5,6 +5,10 @@
  * Modal dialog for searching and selecting knowledge resources from mock knowledge library
  * Uses cmdk (Command) component pattern from ProductSearchDialog
  * Uses React Portal to escape PropertyPanel container constraints
+ *
+ * Story 7.5: Refactored to use Hook-First pattern
+ * - Removed 1 direct fetch() call
+ * - Now uses useKnowledge hook following Story 7.2 pattern
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -21,9 +25,7 @@ import {
 } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 import type { KnowledgeReference } from '@cdm/types';
-
-// API base URL - prefer env override, otherwise same-origin /api to avoid invalid URL during preview/dev
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+import { useKnowledge } from '@/hooks/useKnowledge';
 
 export interface KnowledgeSearchDialogProps {
     open: boolean;
@@ -73,57 +75,29 @@ export function KnowledgeSearchDialog({
 }: KnowledgeSearchDialogProps) {
     const [query, setQuery] = useState('');
     const [debouncedQuery] = useDebounce(query, 300);
-    const [results, setResults] = useState<KnowledgeReference[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Fetch knowledge data from API
-    const fetchKnowledge = useCallback(async (searchQuery: string) => {
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            // Build absolute URL safely; preserve path when base already contains /api
-            const base = API_BASE_URL.startsWith('http')
-                ? API_BASE_URL
-                : (typeof window !== 'undefined' ? `${window.location.origin}${API_BASE_URL}` : API_BASE_URL);
-            const normalizedBase = base.endsWith('/') ? base : `${base}/`;
-            const url = new URL('knowledge-library', normalizedBase);
-            if (searchQuery.trim()) {
-                url.searchParams.set('q', searchQuery.trim());
-            }
-
-            const response = await fetch(url.toString());
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch knowledge resources');
-            }
-
-            const data: KnowledgeReference[] = await response.json();
-            setResults(data);
-        } catch (err) {
-            console.error('Knowledge search error:', err);
-            setError('无法加载知识资源');
-            setResults([]);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+    // Story 7.5: Use Hook-First pattern
+    const {
+        results,
+        isLoading,
+        error,
+        search,
+    } = useKnowledge({ debounceMs: 0 }); // We handle debounce ourselves
 
     // Fetch initial results when dialog opens
     useEffect(() => {
         if (open) {
-            fetchKnowledge('');
+            search('');
         }
-    }, [open, fetchKnowledge]);
+    }, [open, search]);
 
     // Re-fetch on debounced query change
     useEffect(() => {
         if (open) {
-            fetchKnowledge(debouncedQuery);
+            search(debouncedQuery);
         }
-    }, [debouncedQuery, open, fetchKnowledge]);
+    }, [debouncedQuery, open, search]);
 
     // Focus input when dialog opens
     useEffect(() => {
@@ -139,8 +113,6 @@ export function KnowledgeSearchDialog({
     useEffect(() => {
         if (!open) {
             setQuery('');
-            setResults([]);
-            setError(null);
         }
     }, [open]);
 

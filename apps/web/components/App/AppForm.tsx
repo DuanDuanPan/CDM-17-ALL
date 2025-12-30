@@ -4,16 +4,21 @@
  * Story 2.9: APP Node Form
  * Form for APP (Application) node properties
  * Supports local, remote, and library application sources
+ *
+ * Story 7.5: Refactored to use Hook-First pattern
+ * - Removed 1 direct fetch() call for app execution
+ * - Now uses useAppLibrary hook following Story 7.2 pattern
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { Box, Play, Loader2 } from 'lucide-react';
 import type { AppProps, AppInput, AppOutput, AppSourceType, AppExecutionStatus, AppLibraryEntry } from '@cdm/types';
-import { useAppLibrary } from '../../contexts';
+import { useAppLibrary as useAppLibraryContext } from '@/contexts';
 import { AppIOConfig } from './AppIOConfig';
 import { AppExecutionState } from './AppExecutionState';
 import { AppSourceSelector } from './AppSourceSelector';
 import { buildLibraryDefaults } from './app-utils';
+import { useAppLibrary as useAppLibraryApi } from '@/hooks/useAppLibrary';
 
 export interface AppFormProps {
   nodeId: string;
@@ -22,7 +27,8 @@ export interface AppFormProps {
 }
 
 export function AppForm({ nodeId, initialData, onUpdate }: AppFormProps) {
-  const { openAppLibrary } = useAppLibrary();
+  const { openAppLibrary } = useAppLibraryContext();
+  const { execute, isExecuting } = useAppLibraryApi();
 
   const [formData, setFormData] = useState<AppProps>({
     appSourceType: initialData?.appSourceType || 'library',
@@ -36,8 +42,6 @@ export function AppForm({ nodeId, initialData, onUpdate }: AppFormProps) {
     lastExecutedAt: initialData?.lastExecutedAt || null,
     errorMessage: initialData?.errorMessage || null,
   });
-
-  const [isExecuting, setIsExecuting] = useState(false);
 
   useEffect(() => {
     setFormData({
@@ -120,8 +124,6 @@ export function AppForm({ nodeId, initialData, onUpdate }: AppFormProps) {
   const handleExecute = useCallback(async () => {
     if (isExecuting) return;
 
-    setIsExecuting(true);
-
     // Set running state locally only (transient - not persisted)
     setFormData((prev) => ({
       ...prev,
@@ -137,25 +139,16 @@ export function AppForm({ nodeId, initialData, onUpdate }: AppFormProps) {
     }
 
     try {
-      const response = await fetch(`/api/nodes/${nodeId}/execute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          appSourceType: formData.appSourceType,
-          appPath: formData.appPath,
-          appUrl: formData.appUrl,
-          libraryAppId: formData.libraryAppId,
-          libraryAppName: formData.libraryAppName,
-          inputs: formData.inputs || [],
-          outputs: formData.outputs || [],
-        }),
+      const result = await execute(nodeId, {
+        appSourceType: formData.appSourceType || 'library',
+        appPath: formData.appPath ?? null,
+        appUrl: formData.appUrl ?? null,
+        libraryAppId: formData.libraryAppId ?? null,
+        libraryAppName: formData.libraryAppName ?? null,
+        inputs: formData.inputs || [],
+        outputs: formData.outputs || [],
       });
 
-      if (!response.ok) {
-        throw new Error(`执行失败：${response.status}`);
-      }
-
-      const result: { outputs: AppOutput[]; error?: string; executedAt: string } = await response.json();
       if (result?.error) {
         throw new Error(result.error);
       }
@@ -179,10 +172,8 @@ export function AppForm({ nodeId, initialData, onUpdate }: AppFormProps) {
       };
       setFormData(errorData);
       onUpdate?.(errorData);
-    } finally {
-      setIsExecuting(false);
     }
-  }, [formData, onUpdate, isExecuting, nodeId]);
+  }, [formData, onUpdate, isExecuting, nodeId, execute]);
 
   // Clear library selection
   const handleClearLibrary = useCallback(() => {
@@ -276,4 +267,3 @@ export function AppForm({ nodeId, initialData, onUpdate }: AppFormProps) {
     </div>
   );
 }
-

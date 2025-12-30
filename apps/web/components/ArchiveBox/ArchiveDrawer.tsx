@@ -4,9 +4,13 @@
  * Story 2.5: Archive Drawer Component
  * Refined UI Implementation based on mockup
  * Story 2.7: Fixed multi-client sync for archive/restore operations
+ *
+ * Story 7.5: Refactored to use Hook-First pattern
+ * - Removed 3 direct fetch() calls
+ * - Now uses useArchive hook following Story 7.2 pattern
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
     X,
@@ -19,14 +23,12 @@ import {
     Loader2,
     Package,
 } from 'lucide-react';
-import { NodeType, SearchResultItem } from '@cdm/types';
+import { NodeType } from '@cdm/types';
 import { format } from 'date-fns';
 import { useConfirmDialog } from '@cdm/ui';
 import { toast } from 'sonner';
 import { useGraphContextOptional } from '@/contexts';
-import type { YjsNodeData } from '@/features/collab/GraphSyncManager';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { useArchive } from '@/hooks/useArchive';
 
 interface ArchiveDrawerProps {
     isOpen: boolean;
@@ -85,46 +87,39 @@ export function ArchiveDrawer({
     // Use project's styled confirm dialog instead of native confirm()
     const { showConfirm } = useConfirmDialog();
 
-    const [archivedNodes, setArchivedNodes] = useState<SearchResultItem[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+    // Story 7.5: Use Hook-First pattern
+    const {
+        archivedNodes,
+        isLoading,
+        processingIds,
+        error,
+        refresh,
+        restoreNodes,
+        deleteNodes,
+    } = useArchive({ graphId, yDoc, graph });
+
     const [searchQuery, setSearchQuery] = useState('');
-    const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
     const [mounted, setMounted] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-    // Fetch archived nodes
-    const fetchArchivedNodes = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const params = new URLSearchParams();
-            if (graphId) params.set('graphId', graphId);
-
-            const response = await fetch(
-                `${API_BASE_URL}/api/nodes/archived?${params.toString()}`
-            );
-            if (response.ok) {
-                const data = await response.json();
-                const nodes = data.results || [];
-                setArchivedNodes(nodes);
-            }
-        } catch (error) {
-            console.error('Failed to fetch archived nodes:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [graphId]);
 
     // Load on open
     useEffect(() => {
         if (isOpen) {
-            fetchArchivedNodes();
+            refresh();
             setSelectedIds(new Set());
         }
-    }, [isOpen, fetchArchivedNodes]);
+    }, [isOpen, refresh]);
 
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Show error toast
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+        }
+    }, [error]);
 
     // Filter by search
     const filteredNodes = useMemo(() => archivedNodes.filter(
@@ -142,86 +137,27 @@ export function ArchiveDrawer({
         setSelectedIds(next);
     };
 
-    // Restore Logic
-    // Story 2.7: Fixed to update Yjs for multi-client sync
+    // Restore Logic using hook
     const handleRestore = async (nodeIds: string[]) => {
         if (nodeIds.length === 0) return;
 
-        // Add to processing
-        setProcessingIds(prev => {
-            const next = new Set(prev);
-            nodeIds.forEach(id => next.add(id));
-            return next;
-        });
-
         try {
-            // 1. Call backend API
-            await Promise.all(nodeIds.map(id =>
-                fetch(`${API_BASE_URL}/api/nodes/${id}:unarchive`, { method: 'POST' })
-            ));
-
-            // 2. Story 2.7: Update Yjs to sync to other clients
-            if (yDoc) {
-                const yNodes = yDoc.getMap<YjsNodeData>('nodes');
-                const now = new Date().toISOString();
-                yDoc.transact(() => {
-                    nodeIds.forEach(id => {
-                        const existing = yNodes.get(id);
-                        if (existing) {
-                            yNodes.set(id, {
-                                ...existing,
-                                isArchived: false,
-                                archivedAt: null,
-                                updatedAt: now,
-                            });
-                        }
-                    });
-                });
-            }
-
-            // 3. Update local X6 graph visibility (for current client)
-            if (graph) {
-                nodeIds.forEach(id => {
-                    const cell = graph.getCellById(id);
-                    if (cell && cell.isNode()) {
-                        cell.show();
-                        // Also show connected edges if both endpoints are visible
-                        const edges = graph.getConnectedEdges(cell);
-                        edges?.forEach(edge => {
-                            const source = edge.getSourceCell();
-                            const target = edge.getTargetCell();
-                            if (source?.isVisible() && target?.isVisible()) {
-                                edge.show();
-                            }
-                        });
-                    }
-                });
-            }
-
-            // 4. Update local state
-            setArchivedNodes(prev => prev.filter(n => !nodeIds.includes(n.id)));
+            await restoreNodes(nodeIds);
+            // Clear selection
             setSelectedIds(prev => {
                 const next = new Set(prev);
                 nodeIds.forEach(id => next.delete(id));
                 return next;
             });
-
-            // 5. Notify parent
+            // Notify parent
             nodeIds.forEach(id => onRestore?.(id));
-        } catch (error) {
-            console.error('Failed to restore nodes:', error);
-        } finally {
-            setProcessingIds(prev => {
-                const next = new Set(prev);
-                nodeIds.forEach(id => next.delete(id));
-                return next;
-            });
+        } catch {
+            // Error already handled by hook
         }
     };
 
-    // Delete Logic - Using project's styled confirm dialog
-    // Story 2.7: Added Yjs sync for multi-client permanent delete
-    const handleDelete = useCallback((nodeIds: string[]) => {
+    // Delete Logic using hook
+    const handleDelete = (nodeIds: string[]) => {
         if (nodeIds.length === 0) return;
 
         const count = nodeIds.length;
@@ -232,86 +168,21 @@ export function ArchiveDrawer({
             cancelText: '取消',
             variant: 'danger',
             onConfirm: async () => {
-                setProcessingIds(prev => {
-                    const next = new Set(prev);
-                    nodeIds.forEach(id => next.add(id));
-                    return next;
-                });
-
                 try {
-                    // 1. Call backend API to delete nodes
-                    await Promise.all(nodeIds.map(id =>
-                        fetch(`${API_BASE_URL}/api/nodes/${id}`, { method: 'DELETE' })
-                    ));
-
-                    // 2. Delete from Yjs to sync to other clients
-                    // Also collect edgeIds for X6 removal
-                    const edgeIdsToDelete: string[] = [];
-                    if (yDoc) {
-                        const yNodes = yDoc.getMap<YjsNodeData>('nodes');
-                        const yEdges = yDoc.getMap('edges');
-
-                        yDoc.transact(() => {
-                            // First, delete related edges and collect their IDs
-                            yEdges.forEach((edgeData, edgeId) => {
-                                const edge = edgeData as { source: string; target: string };
-                                if (nodeIds.includes(edge.source) || nodeIds.includes(edge.target)) {
-                                    edgeIdsToDelete.push(edgeId);
-                                    yEdges.delete(edgeId);
-                                }
-                            });
-                            // Then, delete nodes
-                            nodeIds.forEach(id => {
-                                yNodes.delete(id);
-                            });
-                        });
-                    }
-
-                    // 3. Manually remove cells from X6 Graph
-                    // IMPORTANT: GraphSyncManager's observe callback skips transactions with
-                    // LOCAL_ORIGIN marker (from GraphSyncManager itself), but propagates changes
-                    // from other sources (like this ArchiveDrawer). However, we still manually
-                    // remove cells here for immediate UI feedback before Yjs sync completes.
-                    if (graph) {
-                        // Remove edges first to avoid dangling references
-                        edgeIdsToDelete.forEach(edgeId => {
-                            const cell = graph.getCellById(edgeId);
-                            if (cell) {
-                                graph.removeCell(cell);
-                            }
-                        });
-                        // Then remove nodes
-                        nodeIds.forEach(nodeId => {
-                            const cell = graph.getCellById(nodeId);
-                            if (cell) {
-                                graph.removeCell(cell);
-                            }
-                        });
-                    }
-
-                    // 4. Update local component state
-                    setArchivedNodes(prev => prev.filter(n => !nodeIds.includes(n.id)));
+                    await deleteNodes(nodeIds);
+                    // Clear selection
                     setSelectedIds(prev => {
                         const next = new Set(prev);
                         nodeIds.forEach(id => next.delete(id));
                         return next;
                     });
-
                     toast.success(`已永久删除 ${count} 个节点`);
-                } catch (error) {
-                    console.error('Failed to delete nodes:', error);
-                    // Show error using toast notification
-                    toast.error('删除失败，请稍后重试');
-                } finally {
-                    setProcessingIds(prev => {
-                        const next = new Set(prev);
-                        nodeIds.forEach(id => next.delete(id));
-                        return next;
-                    });
+                } catch {
+                    // Error already handled by hook
                 }
             },
         });
-    }, [yDoc, showConfirm]);
+    };
 
     if (!isOpen || !mounted) return null;
 

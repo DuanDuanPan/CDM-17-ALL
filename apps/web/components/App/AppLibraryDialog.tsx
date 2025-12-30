@@ -3,11 +3,16 @@
 /**
  * Story 2.9: APP Library Selection Dialog
  * Allows users to search and select from satellite application library
+ *
+ * Story 7.5: Refactored to use Hook-First pattern
+ * - Removed 2 direct fetch() calls
+ * - Now uses useAppLibrary hook following Story 7.2 pattern
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Grid3X3, X, Check, Loader2 } from 'lucide-react';
 import type { AppLibraryEntry } from '@cdm/types';
+import { useAppLibrary } from '@/hooks/useAppLibrary';
 
 export interface AppLibraryDialogProps {
   open: boolean;
@@ -17,66 +22,39 @@ export interface AppLibraryDialogProps {
 
 export function AppLibraryDialog({ open, onOpenChange, onSelect }: AppLibraryDialogProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [entries, setEntries] = useState<AppLibraryEntry[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<AppLibraryEntry | null>(null);
 
-  // Fetch entries from API
-  const fetchEntries = useCallback(async (query?: string) => {
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (query) {
-        params.set('q', query);
-      }
-      const response = await fetch(`/api/app-library?${params.toString()}`);
-      if (response.ok) {
-        const data = await response.json();
-        setEntries(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch app library:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Fetch categories
-  const fetchCategories = useCallback(async () => {
-    try {
-      const response = await fetch('/api/app-library/categories');
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch categories:', error);
-    }
-  }, []);
+  // Story 7.5: Use Hook-First pattern
+  const {
+    entries,
+    categories,
+    isLoading,
+    searchEntries,
+    loadCategories,
+  } = useAppLibrary();
 
   // Load data when dialog opens
   useEffect(() => {
     if (open) {
-      fetchEntries();
-      fetchCategories();
+      searchEntries();
+      loadCategories();
       setSearchQuery('');
       setSelectedCategory(null);
       setSelectedEntry(null);
     }
-  }, [open, fetchEntries, fetchCategories]);
+  }, [open, searchEntries, loadCategories]);
 
   // Search with debounce
   useEffect(() => {
     if (!open) return;
 
     const timer = setTimeout(() => {
-      fetchEntries(searchQuery);
+      searchEntries(searchQuery);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, open, fetchEntries]);
+  }, [searchQuery, open, searchEntries]);
 
   // Filter by category
   const filteredEntries = selectedCategory
@@ -135,8 +113,8 @@ export function AppLibraryDialog({ open, onOpenChange, onSelect }: AppLibraryDia
               <button
                 onClick={() => setSelectedCategory(null)}
                 className={`px-2.5 py-1 text-xs rounded-full transition-colors ${selectedCategory === null
-                    ? 'bg-cyan-100 text-cyan-700 font-medium'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-cyan-100 text-cyan-700 font-medium'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
               >
                 全部
@@ -146,8 +124,8 @@ export function AppLibraryDialog({ open, onOpenChange, onSelect }: AppLibraryDia
                   key={category}
                   onClick={() => setSelectedCategory(category)}
                   className={`px-2.5 py-1 text-xs rounded-full transition-colors ${selectedCategory === category
-                      ? 'bg-cyan-100 text-cyan-700 font-medium'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-cyan-100 text-cyan-700 font-medium'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                 >
                   {category}
@@ -176,8 +154,8 @@ export function AppLibraryDialog({ open, onOpenChange, onSelect }: AppLibraryDia
                   key={entry.id}
                   onClick={() => setSelectedEntry(entry)}
                   className={`p-4 text-left rounded-lg border-2 transition-all ${selectedEntry?.id === entry.id
-                      ? 'border-cyan-500 bg-cyan-50'
-                      : 'border-gray-200 hover:border-cyan-300 hover:bg-gray-50'
+                    ? 'border-cyan-500 bg-cyan-50'
+                    : 'border-gray-200 hover:border-cyan-300 hover:bg-gray-50'
                     }`}
                 >
                   <div className="flex items-start gap-3">
@@ -235,8 +213,8 @@ export function AppLibraryDialog({ open, onOpenChange, onSelect }: AppLibraryDia
               onClick={handleSelect}
               disabled={!selectedEntry}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${selectedEntry
-                  ? 'bg-cyan-500 text-white hover:bg-cyan-600'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                ? 'bg-cyan-500 text-white hover:bg-cyan-600'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
             >
               选择应用

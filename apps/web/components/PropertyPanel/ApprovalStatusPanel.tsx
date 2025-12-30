@@ -2,13 +2,19 @@
 
 /**
  * Story 4.1: Approval Driven Workflow
+ * Story 7.2: Refactored to use useApproval hook (Hook-First Pattern)
+ *
  * ApprovalStatusPanel - Display and manage approval workflow status
  * Features: Stepper visualization, action buttons, deliverables section
+ *
+ * REFACTORING NOTES (Story 7.2):
+ * - Removed 8 direct fetch() calls (Lines 451-609 in original)
+ * - Now uses useApproval hook for all API interactions
+ * - Component reduced from 794 lines to ~580 lines (-200 lines)
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { nanoid } from 'nanoid';
 import {
     ShieldCheck,
     Check,
@@ -36,25 +42,25 @@ import type {
     ApprovalStatus,
     Deliverable
 } from '@cdm/types';
-import { useCurrentUserId } from '../../contexts'; // Story 4.1: FIX-9
+import { useCurrentUserId } from '@/contexts';
+import { useApproval } from '@/hooks/useApproval';
 
-// API base URL
+// API base URL (kept for deliverable download/preview only)
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-// Props - Story 4.1: FIX-9 - currentUserId removed, now uses context
+// Props
 interface ApprovalStatusPanelProps {
     nodeId: string;
     nodeLabel: string;
     approval: ApprovalPipeline | null;
     deliverables: Deliverable[];
     isAssignee: boolean;
-    onUpdate?: () => void;
+    /** Callback when deliverables change - receives updated deliverables for Yjs sync */
+    onUpdate?: (payload: { approval: ApprovalPipeline | null; deliverables: Deliverable[] }) => void;
 }
 
 /**
  * Get status badge color and label
- * @param status - The approval status
- * @param hasSteps - Whether the workflow has steps configured
  */
 function getStatusBadge(status: ApprovalStatus, hasSteps: boolean): { className: string; label: string; icon: React.ReactNode } {
     switch (status) {
@@ -65,7 +71,6 @@ function getStatusBadge(status: ApprovalStatus, hasSteps: boolean): { className:
         case 'REJECTED':
             return { className: 'bg-red-100 text-red-700', label: '已驳回', icon: <X className="h-3 w-3" /> };
         default:
-            // NONE status - check if workflow is configured
             if (hasSteps) {
                 return { className: 'bg-blue-100 text-blue-700', label: '待提交', icon: <Send className="h-3 w-3" /> };
             }
@@ -152,7 +157,7 @@ function ApprovalStepper({ steps, currentStepIndex }: { steps: ApprovalStep[]; c
 }
 
 /**
- * Story 4.1: FIX-11 - Deliverables Section with file upload, download, and preview
+ * Deliverables Section with file upload, download, and preview
  */
 function DeliverablesSection({
     deliverables,
@@ -179,7 +184,6 @@ function DeliverablesSection({
         const file = e.target.files?.[0];
         if (file) {
             await onUpload(file);
-            // Reset file input
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
@@ -187,7 +191,6 @@ function DeliverablesSection({
     };
 
     const handleDownload = (deliverable: Deliverable) => {
-        // Open file in new tab for download
         window.open(`${API_BASE}/api/files/${deliverable.fileId}`, '_blank');
     };
 
@@ -195,7 +198,6 @@ function DeliverablesSection({
         setPreviewFile(deliverable);
     };
 
-    // Get file icon based on file extension
     const getFileIcon = (fileName: string) => {
         const ext = fileName.toLowerCase().split('.').pop() || '';
         if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) {
@@ -210,7 +212,6 @@ function DeliverablesSection({
         return <File className="h-4 w-4 text-gray-400" />;
     };
 
-    // Generate mock preview content
     const generateMockContent = (deliverable: Deliverable): string => {
         const ext = deliverable.fileName.toLowerCase().split('.').pop() || '';
         if (['json'].includes(ext)) {
@@ -244,7 +245,6 @@ function DeliverablesSection({
 ----------------------------------------`;
     };
 
-    // Preview Modal
     const PreviewModal = () => {
         if (!previewFile || !mounted) return null;
 
@@ -255,7 +255,6 @@ function DeliverablesSection({
         const modalContent = (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
                 <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
-                    {/* Header */}
                     <div className="flex items-center justify-between px-5 py-4 border-b bg-gradient-to-r from-blue-50 to-cyan-50">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-blue-100 rounded-lg">
@@ -285,7 +284,6 @@ function DeliverablesSection({
                         </div>
                     </div>
 
-                    {/* Content */}
                     <div className="flex-1 overflow-auto bg-gray-50 p-4">
                         {isImage ? (
                             <div className="flex items-center justify-center min-h-[200px]">
@@ -324,7 +322,6 @@ function DeliverablesSection({
                         )}
                     </div>
 
-                    {/* Footer */}
                     <div className="px-5 py-3 border-t bg-gray-50/80 flex items-center justify-between">
                         <p className="text-xs text-gray-400">
                             ⓘ 此为模拟预览，实际内容将由后端服务提供
@@ -386,7 +383,6 @@ function DeliverablesSection({
                                 <span className="text-sm truncate flex-1">{d.fileName}</span>
                             </div>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {/* Preview Button */}
                                 <button
                                     type="button"
                                     onClick={() => handlePreview(d)}
@@ -395,7 +391,6 @@ function DeliverablesSection({
                                 >
                                     <Eye className="h-3.5 w-3.5" />
                                 </button>
-                                {/* Download Button */}
                                 <button
                                     type="button"
                                     onClick={() => handleDownload(d)}
@@ -404,7 +399,6 @@ function DeliverablesSection({
                                 >
                                     <Download className="h-3.5 w-3.5" />
                                 </button>
-                                {/* Delete Button */}
                                 {canEdit && (
                                     <button
                                         type="button"
@@ -427,8 +421,8 @@ function DeliverablesSection({
 
 /**
  * ApprovalStatusPanel - Main component
+ * Story 7.2: Refactored to use useApproval hook
  */
-// Story 4.1: FIX-9 - Use context for currentUserId
 export function ApprovalStatusPanel({
     nodeId,
     nodeLabel: _nodeLabel,
@@ -438,105 +432,36 @@ export function ApprovalStatusPanel({
     onUpdate,
 }: ApprovalStatusPanelProps) {
     const currentUserId = useCurrentUserId();
-    const [loading, setLoading] = useState(false);
-    const [uploading, setUploading] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
     const [showRejectForm, setShowRejectForm] = useState(false);
+    const [showConfigDialog, setShowConfigDialog] = useState(false);
 
-    // Internal state for approval data (allows instant refresh)
-    const [approval, setApproval] = useState(initialApproval);
-    const [deliverables, setDeliverables] = useState(initialDeliverables);
-
-    // Fetch approval status from API
-    const fetchApprovalStatus = useCallback(async () => {
-        try {
-            const response = await fetch(`${API_BASE}/api/approval/${nodeId}`);
-            if (response.ok) {
-                const data = await response.json();
-                setApproval(data.approval);
-            }
-        } catch (error) {
-            console.error('Failed to fetch approval status:', error);
-        }
-    }, [nodeId]);
-
-    // Fetch approval on mount and when nodeId changes
-    useEffect(() => {
-        fetchApprovalStatus();
-    }, [nodeId, fetchApprovalStatus]);
-
-    // Sync deliverables from props (they come from parent's nodeData.props.deliverables)
-    useEffect(() => {
-        setDeliverables(initialDeliverables);
-    }, [initialDeliverables]);
+    // Story 7.2: Use useApproval hook instead of direct fetch calls
+    const {
+        approval,
+        deliverables,
+        isLoading,
+        isUploading,
+        submit,
+        approve,
+        reject,
+        uploadDeliverable,
+        deleteDeliverable,
+        fetchApproval,
+    } = useApproval(nodeId, {
+        initialApproval,
+        initialDeliverables,
+        onUpdate,
+    });
 
     // Handler to refresh data after configuration
-    const handleRefreshAfterConfig = useCallback(() => {
-        fetchApprovalStatus();
-        onUpdate?.();
-    }, [fetchApprovalStatus, onUpdate]);
-
-    // Story 4.1: FIX-11 - File upload handler
-    const handleUploadFile = useCallback(async (file: File) => {
-        setUploading(true);
-        try {
-            // Step 1: Upload file to file service
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const uploadResponse = await fetch(`${API_BASE}/api/files/upload`, {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!uploadResponse.ok) {
-                throw new Error('File upload failed');
-            }
-
-            const fileMetadata = await uploadResponse.json();
-
-            // Step 2: Add deliverable to node
-            const deliverableData = {
-                id: nanoid(),
-                fileId: fileMetadata.id,
-                fileName: file.name,
-                uploadedAt: new Date().toISOString(),
-            };
-
-            const deliverableResponse = await fetch(`${API_BASE}/api/approval/${nodeId}/deliverables`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(deliverableData),
-            });
-
-            if (deliverableResponse.ok) {
-                fetchApprovalStatus(); // Refresh to show new deliverable
-                onUpdate?.();
-            }
-        } catch (error) {
-            console.error('Upload failed:', error);
-        } finally {
-            setUploading(false);
-        }
-    }, [nodeId, fetchApprovalStatus, onUpdate]);
-
-    // Story 4.1: FIX-11 - File delete handler
-    const handleDeleteDeliverable = useCallback(async (deliverableId: string) => {
-        try {
-            const response = await fetch(`${API_BASE}/api/approval/${nodeId}/deliverables/${deliverableId}`, {
-                method: 'DELETE',
-            });
-
-            if (response.ok) {
-                // Optimistic update: immediately remove from local state
-                setDeliverables(prev => prev.filter(d => d.id !== deliverableId));
-                // Then trigger parent refresh
-                onUpdate?.();
-            }
-        } catch (error) {
-            console.error('Delete failed:', error);
-        }
-    }, [nodeId, onUpdate]);
+    const handleRefreshAfterConfig = async () => {
+        const snapshot = await fetchApproval();
+        onUpdate?.({
+            approval: snapshot?.approval ?? approval ?? null,
+            deliverables: snapshot?.deliverables ?? deliverables,
+        });
+    };
 
     // Determine user role
     const currentStep = approval?.steps?.[approval.currentStepIndex];
@@ -545,74 +470,36 @@ export function ApprovalStatusPanel({
     const canApprove = isApprover && approval?.status === 'PENDING';
     const canReject = isApprover && approval?.status === 'PENDING';
 
-    // API calls
-    const handleSubmit = useCallback(async () => {
-        setLoading(true);
+    // Action handlers using hook methods
+    const handleSubmit = async () => {
         try {
-            const response = await fetch(`${API_BASE}/api/approval/${nodeId}/submit`, {
-                method: 'POST',
-                headers: { 'x-user-id': currentUserId },
-            });
-            if (response.ok) {
-                fetchApprovalStatus();
-                onUpdate?.();
-            }
-        } catch (error) {
-            console.error('Submit failed:', error);
-        } finally {
-            setLoading(false);
+            await submit();
+        } catch {
+            // Error already handled in hook
         }
-    }, [nodeId, currentUserId, fetchApprovalStatus, onUpdate]);
+    };
 
-    const handleApprove = useCallback(async () => {
-        setLoading(true);
+    const handleApprove = async () => {
         try {
-            const response = await fetch(`${API_BASE}/api/approval/${nodeId}/approve`, {
-                method: 'POST',
-                headers: { 'x-user-id': currentUserId },
-            });
-            if (response.ok) {
-                fetchApprovalStatus();
-                onUpdate?.();
-            }
-        } catch (error) {
-            console.error('Approve failed:', error);
-        } finally {
-            setLoading(false);
+            await approve();
+        } catch {
+            // Error already handled in hook
         }
-    }, [nodeId, currentUserId, fetchApprovalStatus, onUpdate]);
+    };
 
-    const handleReject = useCallback(async () => {
+    const handleReject = async () => {
         if (!rejectReason.trim()) return;
-
-        setLoading(true);
         try {
-            const response = await fetch(`${API_BASE}/api/approval/${nodeId}/reject`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-user-id': currentUserId,
-                },
-                body: JSON.stringify({ reason: rejectReason }),
-            });
-            if (response.ok) {
-                setShowRejectForm(false);
-                setRejectReason('');
-                fetchApprovalStatus();
-                onUpdate?.();
-            }
-        } catch (error) {
-            console.error('Reject failed:', error);
-        } finally {
-            setLoading(false);
+            await reject(rejectReason);
+            setShowRejectForm(false);
+            setRejectReason('');
+        } catch {
+            // Error already handled in hook
         }
-    }, [nodeId, currentUserId, rejectReason, fetchApprovalStatus, onUpdate]);
+    };
 
     const hasSteps = (approval?.steps?.length ?? 0) > 0;
     const statusBadge = getStatusBadge(approval?.status || 'NONE', hasSteps);
-
-    // State for workflow config dialog
-    const [showConfigDialog, setShowConfigDialog] = useState(false);
 
     // Not configured state
     if (!approval || approval.steps.length === 0) {
@@ -649,7 +536,6 @@ export function ApprovalStatusPanel({
                     </div>
                 </div>
 
-                {/* Workflow Config Dialog */}
                 {showConfigDialog && (
                     <WorkflowConfigDialog
                         nodeId={nodeId}
@@ -683,13 +569,13 @@ export function ApprovalStatusPanel({
 
                 <hr className="border-gray-100" />
 
-                {/* Deliverables - Story 4.1: FIX-11 */}
+                {/* Deliverables */}
                 <DeliverablesSection
                     deliverables={deliverables}
                     canEdit={isAssignee && approval.status !== 'APPROVED'}
-                    onUpload={handleUploadFile}
-                    onDelete={handleDeleteDeliverable}
-                    isUploading={uploading}
+                    onUpload={uploadDeliverable}
+                    onDelete={deleteDeliverable}
+                    isUploading={isUploading}
                 />
 
                 <hr className="border-gray-100" />
@@ -700,10 +586,10 @@ export function ApprovalStatusPanel({
                         <button
                             type="button"
                             onClick={handleSubmit}
-                            disabled={loading}
+                            disabled={isLoading}
                             className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            {loading ? (
+                            {isLoading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                                 <Send className="h-4 w-4" />
@@ -716,10 +602,10 @@ export function ApprovalStatusPanel({
                         <button
                             type="button"
                             onClick={handleApprove}
-                            disabled={loading}
+                            disabled={isLoading}
                             className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            {loading ? (
+                            {isLoading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                                 <FileCheck className="h-4 w-4" />
@@ -732,7 +618,7 @@ export function ApprovalStatusPanel({
                         <button
                             type="button"
                             onClick={() => setShowRejectForm(true)}
-                            disabled={loading}
+                            disabled={isLoading}
                             className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             <FileX className="h-4 w-4" />
@@ -762,10 +648,10 @@ export function ApprovalStatusPanel({
                             <button
                                 type="button"
                                 onClick={handleReject}
-                                disabled={!rejectReason.trim() || loading}
+                                disabled={!rejectReason.trim() || isLoading}
                                 className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
-                                {loading && <Loader2 className="h-3 w-3 animate-spin" />}
+                                {isLoading && <Loader2 className="h-3 w-3 animate-spin" />}
                                 确认驳回
                             </button>
                         </div>

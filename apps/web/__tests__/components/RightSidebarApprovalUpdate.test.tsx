@@ -108,13 +108,21 @@ describe('RightSidebar approval refresh', () => {
       throw new Error('Expected PropertyPanel to receive onApprovalUpdate');
     }
 
+    const testDeliverables = [{ id: 'd1', fileId: 'f1', fileName: 'test.pdf', uploadedAt: '2024-01-01T00:00:00Z' }];
+    const testApproval = {
+      status: 'PENDING',
+      currentStepIndex: 0,
+      steps: [],
+      history: [],
+    };
     await act(async () => {
-      await capturedPropertyPanelProps.onApprovalUpdate('node-1');
+      await capturedPropertyPanelProps!.onApprovalUpdate!('node-1', { approval: testApproval, deliverables: testDeliverables });
     });
 
     expect(x6Node.setData).toHaveBeenCalledWith(
       expect.objectContaining({
-        props: expect.objectContaining({ deliverables: [] }),
+        deliverables: testDeliverables,
+        approval: testApproval,
       }),
       { overwrite: true }
     );

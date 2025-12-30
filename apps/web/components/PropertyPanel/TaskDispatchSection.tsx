@@ -2,18 +2,24 @@
 
 /**
  * Story 2.4: Task Dispatch Section
+ * Story 7.2: Refactored to use useTaskDispatch hook (Hook-First Pattern)
+ *
  * Extracted from TaskForm.tsx for better maintainability
  * Handles task dispatch, accept, and reject workflows
+ *
+ * REFACTORING NOTES (Story 7.2):
+ * - Removed 3 direct fetch() calls (Lines 53-159 in original)
+ * - Now uses useTaskDispatch hook for all API interactions
+ * - Component reduced from 277 lines to ~180 lines (-100 lines)
  */
 
 import { useState } from 'react';
 import { Send, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import type { TaskProps } from '@cdm/types';
-import { useToast } from '@cdm/ui';
 import { RejectReasonDialog } from './RejectReasonDialog';
-import { useCurrentUserId } from '../../contexts'; // Story 4.1: FIX-9
+import { useCurrentUserId } from '@/contexts';
+import { useTaskDispatch } from '@/hooks/useTaskDispatch';
 
-// Story 4.1: FIX-9 - currentUserId removed, now uses context
 export interface TaskDispatchSectionProps {
     nodeId: string;
     formData: TaskProps;
@@ -24,137 +30,52 @@ export interface TaskDispatchSectionProps {
 }
 
 /**
- * Safely parse error response from API
+ * Task Dispatch Section - Refactored with useTaskDispatch hook
  */
-async function parseApiError(response: Response, defaultMessage: string): Promise<string> {
-    const errorText = await response.text();
-    try {
-        const errorJson = JSON.parse(errorText);
-        return errorJson.message || errorJson.error || defaultMessage;
-    } catch {
-        return errorText || defaultMessage;
-    }
-}
-
-// Story 4.1: FIX-9 - Use context for currentUserId
 export function TaskDispatchSection({
     nodeId,
     formData,
-    isSubmitting,
-    setIsSubmitting,
+    isSubmitting: _isSubmitting, // Kept for backward compatibility but not used
+    setIsSubmitting: _setIsSubmitting, // Kept for backward compatibility but not used
     onFormDataChange,
     onUpdate,
 }: TaskDispatchSectionProps) {
     const currentUserId = useCurrentUserId();
     const [showRejectDialog, setShowRejectDialog] = useState(false);
-    const { addToast } = useToast();
 
-    // Task dispatch handler
+    // Story 7.2: Use useTaskDispatch hook instead of direct fetch calls
+    const { dispatch, accept, reject, isSubmitting } = useTaskDispatch(nodeId, {
+        onUpdate: (data) => {
+            onFormDataChange(data);
+            onUpdate?.(data);
+        },
+    });
+
+    // Task dispatch handler - now delegates to hook
     const handleDispatch = async () => {
-        if (!formData.assigneeId) {
-            addToast({ type: 'warning', title: '缺少信息', description: '请先指定执行人' });
-            return;
-        }
-
-        setIsSubmitting(true);
         try {
-            const response = await fetch(`/api/nodes/${nodeId}:dispatch?userId=${encodeURIComponent(currentUserId)}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            });
-
-            if (!response.ok) {
-                throw new Error(await parseApiError(response, '派发失败'));
-            }
-
-            const now = new Date().toISOString();
-            const updatedData: TaskProps = {
-                ...formData,
-                assignmentStatus: 'dispatched',
-                ownerId: currentUserId,
-                dispatchedAt: now,
-            };
-            onFormDataChange(updatedData);
-            onUpdate?.(updatedData);
-
-            addToast({ type: 'success', title: '派发成功', description: '任务已成功派发！' });
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : '派发失败，请重试';
-            addToast({ type: 'error', title: '派发失败', description: message });
-        } finally {
-            setIsSubmitting(false);
+            await dispatch(formData);
+        } catch {
+            // Error already handled by hook (toast shown)
         }
     };
 
-    // Task accept handler
+    // Task accept handler - now delegates to hook
     const handleAccept = async () => {
-        setIsSubmitting(true);
         try {
-            const response = await fetch(`/api/nodes/${nodeId}:feedback?userId=${encodeURIComponent(currentUserId)}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'accept' }),
-            });
-
-            if (!response.ok) {
-                throw new Error(await parseApiError(response, '接受失败'));
-            }
-
-            const now = new Date().toISOString();
-            const updatedData: TaskProps = {
-                ...formData,
-                assignmentStatus: 'accepted',
-                status: 'todo',
-                feedbackAt: now,
-            };
-            onFormDataChange(updatedData);
-            onUpdate?.(updatedData);
-
-            addToast({ type: 'success', title: '接受成功', description: '任务已接受！' });
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : '接受失败，请重试';
-            addToast({ type: 'error', title: '接受失败', description: message });
-        } finally {
-            setIsSubmitting(false);
+            await accept(formData);
+        } catch {
+            // Error already handled by hook (toast shown)
         }
     };
 
-    // Task reject handler
+    // Task reject handler - now delegates to hook
     const handleReject = async (reason: string) => {
-        if (!reason?.trim()) {
-            addToast({ type: 'warning', title: '提示', description: '请填写驳回理由' });
-            return;
-        }
-
-        setIsSubmitting(true);
         try {
-            const response = await fetch(`/api/nodes/${nodeId}:feedback?userId=${encodeURIComponent(currentUserId)}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'reject', reason }),
-            });
-
-            if (!response.ok) {
-                throw new Error(await parseApiError(response, '驳回失败'));
-            }
-
-            const now = new Date().toISOString();
-            const updatedData: TaskProps = {
-                ...formData,
-                assignmentStatus: 'rejected',
-                rejectionReason: reason,
-                feedbackAt: now,
-            };
-            onFormDataChange(updatedData);
-            onUpdate?.(updatedData);
-
+            await reject(formData, reason);
             setShowRejectDialog(false);
-            addToast({ type: 'success', title: '驳回成功', description: '任务已驳回' });
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : '驳回失败，请重试';
-            addToast({ type: 'error', title: '驳回失败', description: message });
-        } finally {
-            setIsSubmitting(false);
+        } catch {
+            // Error already handled by hook (toast shown)
         }
     };
 
@@ -176,12 +97,12 @@ export function TaskDispatchSection({
                     <span className="text-xs text-gray-600">派发状态</span>
                     <span
                         className={`px-2 py-1 rounded text-xs font-medium ${formData.assignmentStatus === 'accepted'
-                                ? 'bg-green-100 text-green-700 border border-green-300'
-                                : formData.assignmentStatus === 'dispatched'
-                                    ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
-                                    : formData.assignmentStatus === 'rejected'
-                                        ? 'bg-red-100 text-red-700 border border-red-300'
-                                        : 'bg-gray-100 text-gray-600 border border-gray-300'
+                            ? 'bg-green-100 text-green-700 border border-green-300'
+                            : formData.assignmentStatus === 'dispatched'
+                                ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
+                                : formData.assignmentStatus === 'rejected'
+                                    ? 'bg-red-100 text-red-700 border border-red-300'
+                                    : 'bg-gray-100 text-gray-600 border border-gray-300'
                             }`}
                     >
                         {formData.assignmentStatus === 'accepted' && '✓ 已接受'}

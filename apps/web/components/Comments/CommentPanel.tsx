@@ -3,11 +3,16 @@
 /**
  * Story 4.3: Contextual Comments & Mentions
  * CommentPanel Component - Side panel overlay for viewing and adding comments
+ *
+ * Story 7.5: Refactored to use Hook-First pattern
+ * - Removed 1 direct fetch() call for mark-as-read
+ * - Now uses useCommentActions hook following Story 7.2 pattern
  */
 
 import { useState, useCallback, useEffect } from 'react';
 import { X, MessageSquareDashed, Loader2 } from 'lucide-react';
 import { useComments } from '../../hooks/useComments';
+import { useCommentActions } from '../../hooks/useCommentActions';
 import { CommentItem } from './CommentItem';
 import { CommentInput } from './CommentInput';
 
@@ -41,29 +46,17 @@ export function CommentPanel({
         loadMore,
     } = useComments({ nodeId, userId, mindmapId });
 
-    // Mark as read when opening panel
+    // Story 7.5: Use Hook-First pattern for mark-as-read
+    const { markAsRead } = useCommentActions();
+
+    // Mark as read when opening panel using hook
     useEffect(() => {
         if (!nodeId) return;
 
-        let cancelled = false;
-
-        fetch(`/api/comments/${nodeId}/read`, {
-            method: 'POST',
-            headers: { 'x-user-id': userId },
-        })
-            .then(() => {
-                if (!cancelled) {
-                    onMarkAsRead?.();
-                }
-            })
-            .catch((err) => {
-                console.error('[CommentPanel] Failed to mark as read:', err);
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [nodeId, userId, onMarkAsRead]);
+        markAsRead(nodeId, userId).then(() => {
+            onMarkAsRead?.();
+        });
+    }, [nodeId, userId, markAsRead, onMarkAsRead]);
 
     // Handle close with Escape key
     useEffect(() => {

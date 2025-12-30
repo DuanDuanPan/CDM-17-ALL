@@ -676,9 +676,38 @@ So that **代码可读性提升，Git 冲突减少，单元测试更易编写。
 
 **Acceptance Criteria:**
 
-**Given** `GraphComponent.tsx` (>1300行) 和 `MindNode.tsx` (>900行)
+**Given** `GraphComponent.tsx` (>1300行), `MindNode.tsx` (>900行) 和 `useClipboard.ts` (>900行)
 **When** 执行拆分后
 **Then** 主文件行数应降低至 300 行以内
-**And** 功能被拆分至 `GraphEvents`, `GraphHotkeys`, `NodeRenderer` 等独立模块
+**And** 功能被拆分至 `GraphEvents`, `GraphHotkeys`, `NodeRenderer`, `usePasteHandlers` 等独立模块
 **And** 所有原有交互功能（绘图、捷径、编辑）通过 E2E 回归测试
+
+### Story 7.5: 业务模块插件化迁移 (Phase 3 - Plugin Migration)
+
+As a **架构师**,
+I want **将核心业务模块从 API 单体迁移至独立的插件包**,
+So that **系统架构符合 Microkernel 设计，提升可扩展性和解耦度。**
+
+**Acceptance Criteria:**
+
+**Given** 当前业务逻辑紧耦合在 `apps/api/src/modules`
+**When** 执行迁移后
+**Then** `nodes`, `edges`, `approval`, `comments` 等模块应移动至 `packages/plugins`
+**And** `apps/api` 仅保留 Kernel loader 和基础服务
+**And** 模块间依赖关系清晰，无循环依赖
+
+### Story 7.6: 数据流一致性修复 (Phase 3 - Data Flow Consistency)
+
+As a **开发者**,
+I want **移除前端组件中的双写逻辑，严格遵循 Yjs-First 单向数据流**,
+So that **消除数据竞态条件和潜在的脑裂风险。**
+
+**Acceptance Criteria:**
+
+**Given** 前端存在同时写入 Yjs 和调用 REST API 更新节点的情况 (如 `MindNode.tsx`)
+**When** 执行重构后
+**Then** 前端仅应修改 Yjs 本地状态
+**And** 后端应通过 Hocuspocus 钩子或同步协议自动处理数据持久化
+**And** 移除所有组件层面的直接 `updateNode` API 调用
+**And** 并在高并发场景下验证数据一致性
 

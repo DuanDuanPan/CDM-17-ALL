@@ -7,14 +7,14 @@
 
 import { useState, useEffect } from 'react';
 import { Archive, ChevronDown, RotateCcw, X } from 'lucide-react';
-import { NodeType, type EnhancedNodeData, type NodeProps, type TaskProps } from '@cdm/types';
+import { NodeType, type EnhancedNodeData, type NodeProps, type TaskProps, type Deliverable, type ApprovalPipeline } from '@cdm/types';
 import { CommonHeader } from './CommonHeader';
 import { getFormComponent } from './PropertyPanelRegistry';
 import { TagEditor } from './TagEditor';
 import { useConfirmDialog } from '@cdm/ui';
 import { KnowledgeRecommendation } from '@/components/Knowledge'; // Story 2.8
 import { ApprovalStatusPanel } from './ApprovalStatusPanel'; // Story 4.1
-import { useCurrentUserId } from '../../contexts'; // Story 4.1: FIX-9
+import { useCurrentUserId } from '@/contexts'; // Story 4.1: FIX-9
 
 export interface PropertyPanelProps {
   nodeId: string | null;
@@ -24,7 +24,8 @@ export interface PropertyPanelProps {
   onPropsUpdate?: (nodeId: string, nodeType: NodeType, props: NodeProps) => void;
   onTagsUpdate?: (nodeId: string, tags: string[]) => void;
   onArchiveToggle?: (nodeId: string, nextIsArchived: boolean) => void;
-  onApprovalUpdate?: (nodeId: string) => void; // Story 4.1: Refresh node data after approval action
+  /** Story 7.2: Callback when approval/deliverables change - receives nodeId and payload for Yjs sync */
+  onApprovalUpdate?: (nodeId: string, payload: { approval: ApprovalPipeline | null; deliverables: Deliverable[] }) => void;
 }
 
 // Story 4.1: FIX-9 - Use context instead of prop for currentUserId
@@ -200,7 +201,7 @@ export function PropertyPanel({
                   approval={nodeData.approval ?? null}
                   deliverables={deliverables}
                   isAssignee={taskProps.assigneeId === currentUserId}
-                  onUpdate={() => onApprovalUpdate?.(nodeId)}
+                  onUpdate={(payload) => onApprovalUpdate?.(nodeId, payload)}
                 />
               </>
             );

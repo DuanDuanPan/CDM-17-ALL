@@ -4,12 +4,18 @@
  * Story 4.1: Workflow Configuration Dialog
  * Allows users to select predefined workflow templates and configure approval steps
  * Uses React Portal to render at document.body level for proper centering
+ *
+ * Story 7.5: Refactored to use Hook-First pattern
+ * - Removed 1 direct fetch() call
+ * - Now uses useApprovalConfig hook following Story 7.2 pattern
  */
 
 import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, Trash2, Loader2, Settings, Users } from 'lucide-react';
 import { UserSelector } from '../UserSelector';
+import { useApprovalConfig } from '@/hooks/useApprovalConfig';
+import type { WorkflowStep } from '@/lib/api/approval';
 
 // Predefined workflow templates
 const WORKFLOW_TEMPLATES = [
@@ -46,18 +52,11 @@ const WORKFLOW_TEMPLATES = [
     },
 ];
 
-interface WorkflowStep {
-    name: string;
-    assigneeId: string;
-}
-
 interface WorkflowConfigDialogProps {
     nodeId: string;
     onClose: () => void;
     onConfigured: () => void;
 }
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export function WorkflowConfigDialog({
     nodeId,
@@ -66,9 +65,10 @@ export function WorkflowConfigDialog({
 }: WorkflowConfigDialogProps) {
     const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
     const [steps, setSteps] = useState<WorkflowStep[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [validationError, setValidationError] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
+
+    const { configure, isSubmitting, error: submitError, clearError } = useApprovalConfig();
 
     // Wait for client-side mount before using portal
     useEffect(() => {
@@ -82,9 +82,10 @@ export function WorkflowConfigDialog({
         if (template) {
             setSelectedTemplate(templateId);
             setSteps(template.steps.map((s) => ({ ...s })));
-            setError(null);
+            setValidationError(null);
+            clearError();
         }
-    }, []);
+    }, [clearError]);
 
     // Add a step (for custom template)
     const handleAddStep = useCallback(() => {
@@ -112,44 +113,35 @@ export function WorkflowConfigDialog({
 
     // Submit configuration
     const handleSubmit = useCallback(async () => {
+        setValidationError(null);
+        clearError();
+
         // Validation
         if (steps.length === 0) {
-            setError('请至少添加一个审批步骤');
+            setValidationError('请至少添加一个审批步骤');
             return;
         }
 
         const emptyAssignees = steps.filter((s) => !s.assigneeId);
         if (emptyAssignees.length > 0) {
-            setError('请为所有步骤指定审批人');
+            setValidationError('请为所有步骤指定审批人');
             return;
         }
 
-        setLoading(true);
-        setError(null);
-
         try {
-            const response = await fetch(`${API_BASE}/api/approval/${nodeId}/configure`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ steps }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || '配置失败');
-            }
-
+            await configure(nodeId, steps);
             onConfigured();
             onClose();
         } catch (err) {
-            setError(err instanceof Error ? err.message : '配置失败，请重试');
-        } finally {
-            setLoading(false);
+            // Error already captured in hook state
+            console.error('[WorkflowConfigDialog] Configure failed:', err);
         }
-    }, [nodeId, steps, onConfigured, onClose]);
+    }, [nodeId, steps, configure, onConfigured, onClose, clearError]);
 
     // Don't render until mounted (for SSR compatibility)
     if (!mounted) return null;
+
+    const error = validationError || submitError;
 
     const dialogContent = (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
@@ -209,6 +201,8 @@ export function WorkflowConfigDialog({
                                     onClick={() => {
                                         setSelectedTemplate(null);
                                         setSteps([]);
+                                        setValidationError(null);
+                                        clearError();
                                     }}
                                     className="text-sm text-blue-600 hover:text-blue-800"
                                 >
@@ -305,7 +299,7 @@ export function WorkflowConfigDialog({
                         <button
                             type="button"
                             onClick={onClose}
-                            disabled={loading}
+                            disabled={isSubmitting}
                             className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
                         >
                             取消
@@ -313,10 +307,10 @@ export function WorkflowConfigDialog({
                         <button
                             type="button"
                             onClick={handleSubmit}
-                            disabled={loading || steps.length === 0}
+                            disabled={isSubmitting || steps.length === 0}
                             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                             确认配置
                         </button>
                     </div>
