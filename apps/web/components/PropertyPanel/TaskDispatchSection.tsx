@@ -16,6 +16,7 @@
 import { useState } from 'react';
 import { Send, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import type { TaskProps } from '@cdm/types';
+import { Button, Badge } from '@cdm/ui';
 import { RejectReasonDialog } from './RejectReasonDialog';
 import { useCurrentUserId } from '@/contexts';
 import { useTaskDispatch } from '@/hooks/useTaskDispatch';
@@ -95,21 +96,22 @@ export function TaskDispatchSection({
             <div className="mb-3 p-3 rounded-md bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200">
                 <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-600">派发状态</span>
-                    <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${formData.assignmentStatus === 'accepted'
-                            ? 'bg-green-100 text-green-700 border border-green-300'
-                            : formData.assignmentStatus === 'dispatched'
-                                ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
-                                : formData.assignmentStatus === 'rejected'
-                                    ? 'bg-red-100 text-red-700 border border-red-300'
-                                    : 'bg-gray-100 text-gray-600 border border-gray-300'
-                            }`}
+                    <Badge
+                        variant={
+                            formData.assignmentStatus === 'accepted'
+                                ? 'success'
+                                : formData.assignmentStatus === 'dispatched'
+                                    ? 'warning'
+                                    : formData.assignmentStatus === 'rejected'
+                                        ? 'destructive'
+                                        : 'secondary'
+                        }
                     >
                         {formData.assignmentStatus === 'accepted' && '✓ 已接受'}
                         {formData.assignmentStatus === 'dispatched' && '⏳ 待确认'}
                         {formData.assignmentStatus === 'rejected' && '✗ 已驳回'}
                         {formData.assignmentStatus === 'idle' && '待派发'}
-                    </span>
+                    </Badge>
                 </div>
             </div>
 
@@ -130,15 +132,14 @@ export function TaskDispatchSection({
             {isOwnerOrCanDispatch && (
                 <div className="space-y-2">
                     {(formData.assignmentStatus === 'idle' || formData.assignmentStatus === 'rejected') && (
-                        <button
-                            type="button"
+                        <Button
+                            className="w-full"
                             onClick={handleDispatch}
                             disabled={isSubmitting || !formData.assigneeId}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                         >
                             <Send className="w-4 h-4" />
                             {isSubmitting ? '派发中...' : '派发任务'}
-                        </button>
+                        </Button>
                     )}
                     {formData.assignmentStatus === 'dispatched' && (
                         <div className="text-xs text-gray-500 text-center py-2">
@@ -151,24 +152,23 @@ export function TaskDispatchSection({
             {/* Action Buttons - Assignee View */}
             {isAssigneeAndDispatched && (
                 <div className="flex gap-2">
-                    <button
-                        type="button"
+                    <Button
+                        className="flex-1 bg-green-600 hover:bg-green-700"
                         onClick={handleAccept}
                         disabled={isSubmitting}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     >
                         <CheckCircle className="w-4 h-4" />
                         {isSubmitting ? '接受中...' : '接受'}
-                    </button>
-                    <button
-                        type="button"
+                    </Button>
+                    <Button
+                        variant="destructive"
+                        className="flex-1"
                         onClick={() => setShowRejectDialog(true)}
                         disabled={isSubmitting}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     >
                         <XCircle className="w-4 h-4" />
                         驳回
-                    </button>
+                    </Button>
                 </div>
             )}
 

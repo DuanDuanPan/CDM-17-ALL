@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Hash, Tag, User, Target, Plus, Trash2, Package, Link, ChevronDown, Sparkles } from 'lucide-react';
+import { Button, Badge } from '@cdm/ui';
 import { nanoid } from 'nanoid';
 import type { PBSProps, PBSIndicator, ProductReference } from '@cdm/types';
 import { ProductSearchDialog } from '@/components/ProductLibrary';
@@ -291,9 +292,9 @@ export function PBSForm({ nodeId: _nodeId, initialData, onUpdate }: PBSFormProps
                   {formData.productRef.productName}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs font-mono bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                  <Badge variant="info" className="font-mono">
                     {formData.productRef.productCode}
-                  </span>
+                  </Badge>
                   {formData.productRef.category && (
                     <span className="text-xs text-gray-500">
                       {formData.productRef.category}
@@ -302,22 +303,25 @@ export function PBSForm({ nodeId: _nodeId, initialData, onUpdate }: PBSFormProps
                 </div>
               </div>
             </div>
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={handleUnlinkProduct}
-              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+              className="h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-red-50"
               title="取消关联"
             >
               <Trash2 className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
+          <Button
+            variant="outline"
             onClick={() => setShowProductSearch(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-colors"
+            className="w-full border-dashed hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50"
           >
             <Link className="w-4 h-4" />
             关联产品库产品
-          </button>
+          </Button>
         )}
       </div>
 
@@ -349,13 +353,15 @@ export function PBSForm({ nodeId: _nodeId, initialData, onUpdate }: PBSFormProps
                       className="w-full text-sm font-medium text-gray-900 placeholder:text-gray-400 border-none p-0 focus:ring-0 bg-transparent"
                     />
                   </div>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => handleDeleteIndicator(indicator.id)}
-                    className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
+                    className="h-6 w-6 text-gray-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100"
                     title="删除指标"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Row 2: Values Grid */}
@@ -415,24 +421,28 @@ export function PBSForm({ nodeId: _nodeId, initialData, onUpdate }: PBSFormProps
 
         {/* Add Indicator Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => handleAddIndicator()}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors"
+            className="text-xs"
           >
             <Plus className="w-3.5 h-3.5" />
             添加指标
-          </button>
+          </Button>
 
           {/* Preset Dropdown */}
           <div className="relative" ref={presetDropdownRef}>
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setShowPresetDropdown(!showPresetDropdown)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-blue-600 border border-blue-200 rounded-md hover:bg-blue-50 transition-colors"
+              className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
             >
               <Target className="w-3.5 h-3.5" />
               常用指标
               <ChevronDown className="w-3 h-3" />
-            </button>
+            </Button>
 
             {showPresetDropdown && (
               <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto">
@@ -454,14 +464,16 @@ export function PBSForm({ nodeId: _nodeId, initialData, onUpdate }: PBSFormProps
 
           {/* Satellite Template Dropdown */}
           <div className="relative" ref={templateDropdownRef}>
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-emerald-600 border border-emerald-200 rounded-md hover:bg-emerald-50 transition-colors"
+              className="text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50"
             >
               <Sparkles className="w-3.5 h-3.5" />
               卫星模板
               <ChevronDown className="w-3 h-3" />
-            </button>
+            </Button>
 
             {showTemplateDropdown && (
               <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-10">

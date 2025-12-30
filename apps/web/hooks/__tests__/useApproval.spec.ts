@@ -45,7 +45,7 @@ describe('useApproval', () => {
         it('should submit approval with x-user-id header', async () => {
             (fetch as Mock)
                 .mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // initial fetch
-                .mockResolvedValueOnce({ ok: true }) // submit
+                .mockResolvedValueOnce({ ok: true, json: async () => ({ approval: null }) }) // submit
                 .mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // refetch
 
             const { result } = renderHook(() => useApproval('node-1'));
@@ -70,7 +70,7 @@ describe('useApproval', () => {
         it('should approve with x-user-id header', async () => {
             (fetch as Mock)
                 .mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // initial fetch
-                .mockResolvedValueOnce({ ok: true }) // approve
+                .mockResolvedValueOnce({ ok: true, json: async () => ({ approval: null }) }) // approve
                 .mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // refetch
 
             const { result } = renderHook(() => useApproval('node-1'));
@@ -95,7 +95,7 @@ describe('useApproval', () => {
         it('should reject with reason and x-user-id header', async () => {
             (fetch as Mock)
                 .mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // initial fetch
-                .mockResolvedValueOnce({ ok: true }) // reject
+                .mockResolvedValueOnce({ ok: true, json: async () => ({ approval: null }) }) // reject
                 .mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // refetch
 
             const { result } = renderHook(() => useApproval('node-1'));

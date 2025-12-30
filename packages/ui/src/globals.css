@@ -24,6 +24,14 @@
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
     --radius: 0.5rem;
+
+    /* Semantic status colors */
+    --success: 142 76% 36%;
+    --success-foreground: 142 76% 20%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 32 95% 20%;
+    --info: 221 83% 53%;
+    --info-foreground: 224 76% 25%;
   }
 
   .dark {
@@ -46,6 +54,14 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
+
+    /* Semantic status colors (dark mode) */
+    --success: 142 69% 58%;
+    --success-foreground: 142 70% 90%;
+    --warning: 45 93% 58%;
+    --warning-foreground: 45 93% 90%;
+    --info: 217 91% 60%;
+    --info-foreground: 217 91% 90%;
   }
 }
 

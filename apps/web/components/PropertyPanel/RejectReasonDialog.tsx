@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import { XCircle } from 'lucide-react';
+import { Button } from '@cdm/ui';
 
 export interface RejectReasonDialogProps {
     onConfirm: (reason: string) => void;
@@ -39,22 +40,22 @@ export function RejectReasonDialog({ onConfirm, onCancel, isSubmitting }: Reject
                     autoFocus
                 />
                 <div className="flex gap-3 mt-4">
-                    <button
-                        type="button"
+                    <Button
+                        variant="outline"
+                        className="flex-1"
                         onClick={onCancel}
                         disabled={isSubmitting}
-                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     >
                         取消
-                    </button>
-                    <button
-                        type="button"
+                    </Button>
+                    <Button
+                        variant="destructive"
+                        className="flex-1"
                         onClick={() => onConfirm(reason)}
                         disabled={isSubmitting || !reason.trim()}
-                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     >
                         {isSubmitting ? '提交中...' : '确认驳回'}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

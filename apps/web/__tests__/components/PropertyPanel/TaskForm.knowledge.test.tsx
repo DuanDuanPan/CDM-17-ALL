@@ -10,12 +10,16 @@ import { TaskForm } from '@/components/PropertyPanel/TaskForm';
 import { UserProvider } from '@/contexts';
 import type { TaskProps, KnowledgeReference } from '@cdm/types';
 
-// Mock useToast hook
-vi.mock('@cdm/ui', () => ({
-    useToast: () => ({
-        addToast: vi.fn(),
-    }),
-}));
+// Mock useToast hook - use importOriginal to preserve other exports like Badge, Button
+vi.mock('@cdm/ui', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@cdm/ui')>();
+    return {
+        ...actual,
+        useToast: () => ({
+            addToast: vi.fn(),
+        }),
+    };
+});
 
 // Mock KnowledgeSearchDialog
 vi.mock('@/components/Knowledge', () => ({

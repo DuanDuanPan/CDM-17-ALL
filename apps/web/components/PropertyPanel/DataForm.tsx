@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { Database, FileType, Shield, Folder, Tag, ExternalLink, FileText, Box, PenLine } from 'lucide-react';
+import { Button, Badge } from '@cdm/ui';
 import type { DataProps, DataType } from '@cdm/types';
 import { DataPreviewDialog } from './DataPreviewDialog';
 
@@ -140,14 +141,14 @@ export function DataForm({ nodeId: _nodeId, initialData, onUpdate }: DataFormPro
 
       {/* Open Button */}
       <div>
-        <button
+        <Button
           type="button"
           onClick={handleOpenPreview}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-md transition-colors"
+          className="w-full bg-orange-500 hover:bg-orange-600"
         >
           <ExternalLink className="w-4 h-4" />
           打开{DATA_TYPE_LABELS[formData.dataType || 'document']?.label}
-        </button>
+        </Button>
       </div>
 
       {/* Data Asset Badge */}
@@ -159,34 +160,34 @@ export function DataForm({ nodeId: _nodeId, initialData, onUpdate }: DataFormPro
         <div className="space-y-2 text-xs">
           <div className="flex items-center justify-between">
             <span className="text-gray-600">类型</span>
-            <span className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-100 font-medium">
+            <Badge variant="secondary" className="flex items-center gap-1.5">
               {getDataTypeIcon(formData.dataType || 'document')}
               {DATA_TYPE_LABELS[formData.dataType || 'document']?.label}
-            </span>
+            </Badge>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-gray-600">版本</span>
-            <span className="px-2 py-1 rounded bg-blue-100 text-blue-700 font-mono font-medium">
+            <Badge variant="info" className="font-mono">
               {formData.version || 'v1.0.0'}
-            </span>
+            </Badge>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-gray-600">安全级别</span>
-            <span
-              className={`px-2 py-1 rounded font-medium ${
+            <Badge
+              variant={
                 formData.secretLevel === 'secret'
-                  ? 'bg-red-100 text-red-700'
+                  ? 'destructive'
                   : formData.secretLevel === 'internal'
-                  ? 'bg-yellow-100 text-yellow-700'
-                  : 'bg-green-100 text-green-700'
-              }`}
+                  ? 'warning'
+                  : 'success'
+              }
             >
               {formData.secretLevel === 'secret'
                 ? '机密'
                 : formData.secretLevel === 'internal'
                 ? '内部'
                 : '公开'}
-            </span>
+            </Badge>
           </div>
         </div>
       </div>

@@ -10,6 +10,7 @@
 
 import { useEffect, useRef } from 'react';
 import { X, FileText, Box, PenLine, Tag, Folder, ExternalLink } from 'lucide-react';
+import { Button, Badge } from '@cdm/ui';
 import type { DataType } from '@cdm/types';
 
 export interface DataPreviewDialogProps {
@@ -147,13 +148,15 @@ export function DataPreviewDialog({
               <p className="text-sm text-gray-500">{config.subtitle}</p>
             </div>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-white/50 transition-colors"
+            className="hover:bg-white/50"
             aria-label="关闭"
           >
             <X className="w-5 h-5 text-gray-600" />
-          </button>
+          </Button>
         </div>
 
         {/* Content */}
@@ -161,16 +164,16 @@ export function DataPreviewDialog({
           {/* Metadata Bar */}
           <div className="flex items-center gap-4 mb-6 text-sm">
             {version && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full">
+              <Badge variant="info" className="flex items-center gap-1.5 px-3 py-1.5">
                 <Tag className="w-3.5 h-3.5" />
                 <span className="font-mono font-medium">{version}</span>
-              </div>
+              </Badge>
             )}
             {storagePath && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full max-w-xs truncate">
+              <Badge variant="secondary" className="flex items-center gap-1.5 px-3 py-1.5 max-w-xs">
                 <Folder className="w-3.5 h-3.5 flex-shrink-0" />
                 <span className="font-mono text-xs truncate">{storagePath}</span>
-              </div>
+              </Badge>
             )}
           </div>
 
@@ -234,18 +237,18 @@ export function DataPreviewDialog({
             点击外部区域或按 ESC 关闭
           </p>
           <div className="flex items-center gap-3">
-            <button
+            <Button
+              variant="outline"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               关闭
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-orange-500 rounded-lg hover:bg-orange-600 transition-colors"
+            </Button>
+            <Button
+              className="bg-orange-500 hover:bg-orange-600"
             >
               <ExternalLink className="w-4 h-4" />
               在新窗口打开
-            </button>
+            </Button>
           </div>
         </div>
       </div>

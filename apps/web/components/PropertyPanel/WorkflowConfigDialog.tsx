@@ -13,6 +13,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, Trash2, Loader2, Settings, Users } from 'lucide-react';
+import { Button } from '@cdm/ui';
 import { UserSelector } from '../UserSelector';
 import { useApprovalConfig } from '@/hooks/useApprovalConfig';
 import type { WorkflowStep } from '@/lib/api/approval';
@@ -154,13 +155,13 @@ export function WorkflowConfigDialog({
                         </div>
                         配置审批流程
                     </h2>
-                    <button
-                        type="button"
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={onClose}
-                        className="p-2 hover:bg-white/80 rounded-lg transition-colors"
                     >
                         <X className="h-5 w-5 text-gray-500" />
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Content */}
@@ -196,18 +197,19 @@ export function WorkflowConfigDialog({
                     {selectedTemplate && (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <button
-                                    type="button"
+                                <Button
+                                    variant="link"
+                                    size="sm"
                                     onClick={() => {
                                         setSelectedTemplate(null);
                                         setSteps([]);
                                         setValidationError(null);
                                         clearError();
                                     }}
-                                    className="text-sm text-blue-600 hover:text-blue-800"
+                                    className="p-0"
                                 >
                                     ← 返回选择模板
-                                </button>
+                                </Button>
                                 <span className="text-sm text-gray-500">
                                     {WORKFLOW_TEMPLATES.find((t) => t.id === selectedTemplate)?.name}
                                 </span>
@@ -219,14 +221,15 @@ export function WorkflowConfigDialog({
                                         <Users className="h-4 w-4" />
                                         审批步骤
                                     </p>
-                                    <button
-                                        type="button"
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={handleAddStep}
-                                        className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded"
+                                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                                     >
                                         <Plus className="h-3 w-3" />
                                         添加步骤
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 {steps.length === 0 && (
@@ -268,14 +271,15 @@ export function WorkflowConfigDialog({
                                         </div>
 
                                         {/* Delete Button */}
-                                        <button
-                                            type="button"
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
                                             onClick={() => handleRemoveStep(index)}
-                                            className="flex-shrink-0 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                             title="删除步骤"
+                                            className="flex-shrink-0 text-gray-400 hover:text-red-600 hover:bg-red-50"
                                         >
                                             <Trash2 className="h-5 w-5" />
-                                        </button>
+                                        </Button>
                                     </div>
                                 ))}
 
@@ -296,23 +300,20 @@ export function WorkflowConfigDialog({
                 {/* Footer */}
                 {selectedTemplate && (
                     <div className="flex justify-end gap-2 px-4 py-3 border-t bg-gray-50">
-                        <button
-                            type="button"
+                        <Button
+                            variant="ghost"
                             onClick={onClose}
                             disabled={isSubmitting}
-                            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
                         >
                             取消
-                        </button>
-                        <button
-                            type="button"
+                        </Button>
+                        <Button
                             onClick={handleSubmit}
                             disabled={isSubmitting || steps.length === 0}
-                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                             确认配置
-                        </button>
+                        </Button>
                     </div>
                 )}
             </div>

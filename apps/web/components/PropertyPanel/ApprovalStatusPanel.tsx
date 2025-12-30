@@ -35,13 +35,17 @@ import {
     FileImage,
     FileJson,
 } from 'lucide-react';
+import { Button, Badge } from '@cdm/ui';
 import { WorkflowConfigDialog } from './WorkflowConfigDialog';
 import type {
     ApprovalPipeline,
     ApprovalStep,
     ApprovalStatus,
-    Deliverable
+    Deliverable,
 } from '@cdm/types';
+
+// Badge variant type for status mapping
+type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'info';
 import { useCurrentUserId } from '@/contexts';
 import { useApproval } from '@/hooks/useApproval';
 
@@ -60,21 +64,21 @@ interface ApprovalStatusPanelProps {
 }
 
 /**
- * Get status badge color and label
+ * Get status badge variant and label
  */
-function getStatusBadge(status: ApprovalStatus, hasSteps: boolean): { className: string; label: string; icon: React.ReactNode } {
+function getStatusBadge(status: ApprovalStatus, hasSteps: boolean): { variant: BadgeVariant; label: string; icon: React.ReactNode } {
     switch (status) {
         case 'PENDING':
-            return { className: 'bg-yellow-100 text-yellow-700', label: '待审批', icon: <Clock className="h-3 w-3" /> };
+            return { variant: 'warning', label: '待审批', icon: <Clock className="h-3 w-3" /> };
         case 'APPROVED':
-            return { className: 'bg-green-100 text-green-700', label: '已通过', icon: <Check className="h-3 w-3" /> };
+            return { variant: 'success', label: '已通过', icon: <Check className="h-3 w-3" /> };
         case 'REJECTED':
-            return { className: 'bg-red-100 text-red-700', label: '已驳回', icon: <X className="h-3 w-3" /> };
+            return { variant: 'destructive', label: '已驳回', icon: <X className="h-3 w-3" /> };
         default:
             if (hasSteps) {
-                return { className: 'bg-blue-100 text-blue-700', label: '待提交', icon: <Send className="h-3 w-3" /> };
+                return { variant: 'info', label: '待提交', icon: <Send className="h-3 w-3" /> };
             }
-            return { className: 'bg-gray-100 text-gray-600', label: '未配置', icon: <ShieldCheck className="h-3 w-3" /> };
+            return { variant: 'secondary', label: '未配置', icon: <ShieldCheck className="h-3 w-3" /> };
     }
 }
 
@@ -268,19 +272,21 @@ function DeliverablesSection({
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleDownload(previewFile)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
                             >
                                 <Download className="w-4 h-4" />
                                 下载
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => setPreviewFile(null)}
-                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                             >
                                 <X className="w-5 h-5" />
-                            </button>
+                            </Button>
                         </div>
                     </div>
 
@@ -303,13 +309,13 @@ function DeliverablesSection({
                                     <FileText className="w-16 h-16 text-red-400 mx-auto mb-4" />
                                     <p className="text-lg font-medium text-gray-700 mb-2">{previewFile.fileName}</p>
                                     <p className="text-sm text-gray-500 mb-4">PDF 文件预览</p>
-                                    <button
+                                    <Button
                                         onClick={() => handleDownload(previewFile)}
-                                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors mx-auto"
+                                        className="mx-auto"
                                     >
                                         <Download className="w-4 h-4" />
                                         下载查看
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         ) : (
@@ -326,12 +332,13 @@ function DeliverablesSection({
                         <p className="text-xs text-gray-400">
                             ⓘ 此为模拟预览，实际内容将由后端服务提供
                         </p>
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setPreviewFile(null)}
-                            className="px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
                         >
                             关闭
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -356,11 +363,12 @@ function DeliverablesSection({
                             className="hidden"
                             accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.gif,.webp,.zip,.rar,.json"
                         />
-                        <button
-                            type="button"
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isUploading}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         >
                             {isUploading ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -368,7 +376,7 @@ function DeliverablesSection({
                                 <Upload className="h-3 w-3" />
                             )}
                             上传
-                        </button>
+                        </Button>
                     </>
                 )}
             </div>
@@ -383,31 +391,34 @@ function DeliverablesSection({
                                 <span className="text-sm truncate flex-1">{d.fileName}</span>
                             </div>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                    type="button"
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => handlePreview(d)}
-                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                                     title="预览"
+                                    className="h-7 w-7 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                                 >
                                     <Eye className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                    type="button"
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => handleDownload(d)}
-                                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
                                     title="下载"
+                                    className="h-7 w-7 text-gray-400 hover:text-green-600 hover:bg-green-50"
                                 >
                                     <Download className="h-3.5 w-3.5" />
-                                </button>
+                                </Button>
                                 {canEdit && (
-                                    <button
-                                        type="button"
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={() => onDelete(d.id)}
-                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                                         title="删除"
+                                        className="h-7 w-7 text-gray-400 hover:text-red-600 hover:bg-red-50"
                                     >
                                         <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                         </div>
@@ -511,28 +522,25 @@ export function ApprovalStatusPanel({
                             <ShieldCheck className="h-4 w-4" />
                             审批流程
                         </h3>
-                        <button
-                            type="button"
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setShowConfigDialog(true)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         >
                             <Plus className="h-3 w-3" />
                             配置流程
-                        </button>
+                        </Button>
                     </div>
                     <div className="p-4 text-center">
                         <Settings className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                         <p className="text-sm text-gray-400 mb-3">
                             此任务未配置审批流程
                         </p>
-                        <button
-                            type="button"
-                            onClick={() => setShowConfigDialog(true)}
-                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
-                        >
+                        <Button onClick={() => setShowConfigDialog(true)}>
                             <Plus className="h-4 w-4" />
                             配置审批流程
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -554,10 +562,10 @@ export function ApprovalStatusPanel({
                     <ShieldCheck className="h-4 w-4" />
                     审批流程
                 </h3>
-                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${statusBadge.className}`}>
+                <Badge variant={statusBadge.variant} className="gap-1">
                     {statusBadge.icon}
                     {statusBadge.label}
-                </span>
+                </Badge>
             </div>
 
             <div className="p-4 space-y-4">
@@ -583,11 +591,10 @@ export function ApprovalStatusPanel({
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-2">
                     {canSubmit && (
-                        <button
-                            type="button"
+                        <Button
+                            className="flex-1"
                             onClick={handleSubmit}
                             disabled={isLoading}
-                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             {isLoading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -595,15 +602,14 @@ export function ApprovalStatusPanel({
                                 <Send className="h-4 w-4" />
                             )}
                             提交审批
-                        </button>
+                        </Button>
                     )}
 
                     {canApprove && (
-                        <button
-                            type="button"
+                        <Button
+                            className="flex-1 bg-green-600 hover:bg-green-700"
                             onClick={handleApprove}
                             disabled={isLoading}
-                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             {isLoading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -611,19 +617,19 @@ export function ApprovalStatusPanel({
                                 <FileCheck className="h-4 w-4" />
                             )}
                             通过
-                        </button>
+                        </Button>
                     )}
 
                     {canReject && !showRejectForm && (
-                        <button
-                            type="button"
+                        <Button
+                            variant="outline"
+                            className="flex-1 text-red-600 border-red-300 hover:bg-red-50"
                             onClick={() => setShowRejectForm(true)}
                             disabled={isLoading}
-                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             <FileX className="h-4 w-4" />
                             驳回
-                        </button>
+                        </Button>
                     )}
                 </div>
 
@@ -638,22 +644,22 @@ export function ApprovalStatusPanel({
                             className="w-full min-h-[80px] text-sm border border-red-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
                         />
                         <div className="flex justify-end gap-2">
-                            <button
-                                type="button"
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => setShowRejectForm(false)}
-                                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
                             >
                                 取消
-                            </button>
-                            <button
-                                type="button"
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                size="sm"
                                 onClick={handleReject}
                                 disabled={!rejectReason.trim() || isLoading}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                                 {isLoading && <Loader2 className="h-3 w-3 animate-spin" />}
                                 确认驳回
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 )}

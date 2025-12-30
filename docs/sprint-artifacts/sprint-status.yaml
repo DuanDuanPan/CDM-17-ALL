@@ -93,3 +93,5 @@ development_status:
   epic-7: in-progress
   7-1-backend-repo-refactor: done
   7-2-frontend-hook-first-extraction: done
+  7-3-ui-atomic-components: review
+
