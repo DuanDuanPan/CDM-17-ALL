@@ -1,9 +1,8 @@
 import { Plugin } from '@cdm/plugins';
-import { Graph } from '@antv/x6';
+import { Graph, Node } from '@antv/x6';
 import {
   AddSiblingCommand,
   AddChildCommand,
-  RemoveNodeCommand,
 } from './commands';
 
 /**
@@ -21,7 +20,6 @@ export class MindmapCorePlugin extends Plugin {
   private graph: Graph | null = null;
   private addSiblingCommand = new AddSiblingCommand();
   private addChildCommand = new AddChildCommand();
-  private removeNodeCommand = new RemoveNodeCommand();
 
   constructor() {
     super({
@@ -55,7 +53,9 @@ export class MindmapCorePlugin extends Plugin {
       throw new Error('Graph instance is required');
     }
 
+    this.unbindCustomEvents();
     this.graph = graph;
+    this.bindCustomEvents();
     // NOTE: App-level keyboard handling lives in `apps/web/components/graph/GraphComponent.tsx`.
     // Keeping shortcut bindings here caused duplicated behavior and focus conflicts (especially for Tab/Space).
     // This plugin remains responsible for command logic (AddChild/AddSibling/Remove) that can be unit-tested.
@@ -80,18 +80,45 @@ export class MindmapCorePlugin extends Plugin {
   private handleNodeOperation = (e: CustomEvent) => {
     if (!this.graph) return;
 
-    const { action, nodeId } = e.detail;
-    const node = this.graph.getCellById(nodeId) as any;
+    const { action, nodeId } = (e.detail as { action?: string; nodeId?: string }) ?? {};
+    if (!action || !nodeId) return;
 
-    if (!node) return;
+    const cell = this.graph.getCellById(nodeId);
+    if (!cell || !cell.isNode()) return;
+    const node = cell as Node;
 
-    if (action === 'addChild') {
-      const newNode = this.addChildCommand.execute(this.graph, node);
-      if (newNode) {
-        this.graph.select(newNode);
-      }
+    const batchId = `create-node-${Date.now()}`;
+    this.graph.startBatch(batchId);
+
+    const newNode =
+      action === 'addChild'
+        ? this.addChildCommand.execute(this.graph, node)
+        : action === 'addSibling'
+          ? this.addSiblingCommand.execute(this.graph, node)
+          : null;
+
+    if (!newNode) {
+      this.graph.stopBatch(batchId);
+      return;
     }
+
+    this.ensureNodeTimestamps(newNode);
+    const data = newNode.getData() || {};
+    newNode.setData({ ...data, _batchId: batchId });
+
+    this.graph.unselect(this.graph.getSelectedCells());
+    this.graph.select(newNode);
   };
+
+  private ensureNodeTimestamps(node: Node): void {
+    const data = node.getData() || {};
+    if (data.createdAt && data.updatedAt) return;
+
+    const now = new Date().toISOString();
+    const createdAt = data.createdAt ?? now;
+    const updatedAt = data.updatedAt ?? createdAt;
+    node.setData({ ...data, createdAt, updatedAt });
+  }
 
   /**
    * Unbind custom events

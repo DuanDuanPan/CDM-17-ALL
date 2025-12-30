@@ -241,14 +241,19 @@ test.describe('Node Type Conversion', () => {
     ]);
     await page.waitForTimeout(200);
 
-    // Test "secret" level - use span selector to avoid matching option element
-    const secretLevelSelect = propertyPanel.locator('select').nth(2); // Third select is secret level
+    const secretLevelSelect = propertyPanel.locator('label:has-text("密级")').locator('..').locator('select');
+    const secretLevelBadge = propertyPanel.locator('[data-testid="data-secret-level-badge"]');
+
+    await expect(secretLevelSelect).toBeVisible();
+    await expect(secretLevelBadge).toBeVisible();
+
+    // Test "secret" level
     await Promise.all([
       waitForApi(page, 'PATCH', '/properties'),
       secretLevelSelect.selectOption('secret'),
     ]);
     await page.waitForTimeout(100);
-    await expect(propertyPanel.locator('span.bg-red-100:has-text("机密")')).toBeVisible();
+    await expect(secretLevelBadge).toHaveText('机密');
 
     // Test "internal" level
     await Promise.all([
@@ -256,7 +261,7 @@ test.describe('Node Type Conversion', () => {
       secretLevelSelect.selectOption('internal'),
     ]);
     await page.waitForTimeout(100);
-    await expect(propertyPanel.locator('span.bg-yellow-100:has-text("内部")')).toBeVisible();
+    await expect(secretLevelBadge).toHaveText('内部');
 
     // Test "public" level
     await Promise.all([
@@ -264,7 +269,7 @@ test.describe('Node Type Conversion', () => {
       secretLevelSelect.selectOption('public'),
     ]);
     await page.waitForTimeout(100);
-    await expect(propertyPanel.locator('span.bg-green-100:has-text("公开")')).toBeVisible();
+    await expect(secretLevelBadge).toHaveText('公开');
   });
 
   test('TC-2.1-7: Common header displays for all node types', async ({ page }) => {

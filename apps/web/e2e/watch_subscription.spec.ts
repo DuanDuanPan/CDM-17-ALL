@@ -279,7 +279,7 @@ test.describe('Watch & Subscription - Multi-User Scenarios', () => {
     // ============================================
     // TC-4.4.04: Both users can access subscription UI
     // ============================================
-  test('TC-4.4.04: Multiple users can access subscription feature', async (_, testInfo) => {
+  test('TC-4.4.04: Multiple users can access subscription feature', async ({ browser: _browser }, testInfo) => {
     const userA = 'test-e2e-user-a';
     const userB = 'test-e2e-user-b';
 

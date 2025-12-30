@@ -174,6 +174,7 @@ export function DataForm({ nodeId: _nodeId, initialData, onUpdate }: DataFormPro
           <div className="flex items-center justify-between">
             <span className="text-gray-600">安全级别</span>
             <Badge
+              data-testid="data-secret-level-badge"
               variant={
                 formData.secretLevel === 'secret'
                   ? 'destructive'

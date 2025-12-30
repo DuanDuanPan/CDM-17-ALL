@@ -15,7 +15,7 @@ export interface TitleRowProps {
     /** Callback when title changes (editing mode) */
     onTitleChange?: (value: string) => void;
     /** Input ref for edit mode focus */
-    inputRef?: React.RefObject<HTMLInputElement>;
+    inputRef?: React.RefObject<HTMLInputElement | null>;
     /** Key down handler for edit mode (Enter/Esc) */
     onKeyDown?: (e: React.KeyboardEvent) => void;
 }
@@ -35,7 +35,7 @@ export const TitleRow = memo(
         onKeyDown,
     }: TitleRowProps) => {
         return (
-            <div className="flex items-center gap-2 w-full h-8">
+            <div className="group flex items-center gap-2 w-full h-8">
                 {/* Icon */}
                 <div className="flex-shrink-0 scale-75 origin-center">{icon}</div>
 

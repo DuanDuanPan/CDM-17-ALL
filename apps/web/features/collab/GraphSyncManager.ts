@@ -502,9 +502,20 @@ export class GraphSyncManager {
         if (existingCell && existingCell.isNode()) {
             // Update existing node - now we know it's a Node
             const existingNode = existingCell as Node;
+            const existingData = existingNode.getData() || {};
+            // Preserve local-only UI state when applying remote updates.
+            // Remote Yjs node data intentionally excludes ephemeral UI flags (e.g. isEditing/isSelected),
+            // but overwriting X6 node data without them would abruptly exit edit mode during collaboration.
+            const localUiState = {
+                isEditing: existingData.isEditing,
+                isSelected: existingData.isSelected,
+                isConnectionSource: existingData.isConnectionSource,
+                _batchId: existingData._batchId,
+            };
             // Update position and data; isRemoteUpdate guard prevents echo loops.
             existingNode.setPosition(data.x, data.y);
             existingNode.setData({
+                ...localUiState,
                 label: data.label,
                 type: mindmapType,
                 parentId: data.parentId,

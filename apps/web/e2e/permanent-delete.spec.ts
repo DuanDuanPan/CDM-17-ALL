@@ -236,7 +236,7 @@ test.describe('Permanent Delete Multi-Client Sync', () => {
         await contextB.close();
     });
 
-    test('permanent delete by User A removes node for User B', async (_, testInfo) => {
+    test('permanent delete by User A removes node for User B', async ({ browser: _browser }, testInfo) => {
         const graphId = await createTestGraph(pageA, testInfo, 'e2e-user-a');
         const urlA = makeTestGraphUrl(graphId, 'e2e-user-a');
         const urlB = makeTestGraphUrl(graphId, 'e2e-user-b');

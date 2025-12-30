@@ -11,18 +11,29 @@ type GanttApi = {
 
 type WindowWithGantt = Window & { gantt?: GanttApi };
 
+const waitForApi = (page: Page, method: string, path: string) =>
+  page.waitForResponse((res) => res.url().includes(path) && res.request().method() === method && res.ok());
+
 const openPropertyPanelForNode = async (page: Page, nodeId: string) => {
   const node = page.locator(`.x6-node[data-cell-id="${nodeId}"]`);
   await expect(node).toBeVisible();
   await node.click();
-  await page.waitForSelector('aside:has-text("属性面板")');
+
+  const propertyPanel = page.locator('aside:has-text("属性面板")');
+  await expect(propertyPanel).toBeVisible();
+  await expect(propertyPanel.getByText(new RegExp(`节点 ID:\\s*${nodeId}`))).toBeVisible();
 };
 
 const setSelectedNodeTypeToTask = async (page: Page) => {
-  const typeSelect = page.locator('aside:has-text("属性面板") select').first();
+  const propertyPanel = page.locator('aside:has-text("属性面板")');
+  const typeSelect = propertyPanel.locator('select').first();
   await expect(typeSelect).toBeVisible();
-  await typeSelect.selectOption('TASK');
-  await page.waitForSelector('label:has-text("状态")');
+  await Promise.all([
+    waitForApi(page, 'PATCH', '/type'),
+    typeSelect.selectOption('TASK'),
+  ]);
+  await expect(typeSelect).toHaveValue('TASK');
+  await expect(propertyPanel.locator('label:has-text("截止时间")')).toBeVisible();
 };
 
 const createTaskNode = async (page: Page, label: string) => {

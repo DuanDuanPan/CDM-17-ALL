@@ -46,7 +46,7 @@ test.describe('Real-time Collaboration Engine', () => {
         await contextB.close();
     });
 
-    test('both users can connect to the same document', async (_, testInfo) => {
+    test('both users can connect to the same document', async ({ browser: _browser }, testInfo) => {
         // Navigate both users to the same URL
         const { urlA, urlB } = await getTestUrls(testInfo);
         await Promise.all([
@@ -63,7 +63,7 @@ test.describe('Real-time Collaboration Engine', () => {
         await expect(pageB.locator('[data-testid="collab-status"]')).toContainText('已与远程同步', { timeout: 10000 });
     });
 
-    test('node added by User A appears for User B', async (_, testInfo) => {
+    test('node added by User A appears for User B', async ({ browser: _browser }, testInfo) => {
         const { urlA, urlB } = await getTestUrls(testInfo);
         await Promise.all([
             pageA.goto(urlA),
@@ -101,7 +101,7 @@ test.describe('Real-time Collaboration Engine', () => {
         await expect(nodeLocator).toBeVisible({ timeout: 5000 });
     });
 
-    test('layout mode switch by User A syncs to User B', async (_, testInfo) => {
+    test('layout mode switch by User A syncs to User B', async ({ browser: _browser }, testInfo) => {
         const { urlA, urlB } = await getTestUrls(testInfo);
         await Promise.all([
             pageA.goto(urlA),
@@ -139,7 +139,7 @@ test.describe('Real-time Collaboration Engine', () => {
         await expect(freeButtonB).toBeVisible();
     });
 
-    test('concurrent edits from both users are preserved', async (_, testInfo) => {
+    test('concurrent edits from both users are preserved', async ({ browser: _browser }, testInfo) => {
         const { urlA, urlB } = await getTestUrls(testInfo);
         await Promise.all([
             pageA.goto(urlA),
@@ -194,7 +194,7 @@ test.describe('Real-time Collaboration Engine', () => {
         await expect(pageB.locator('.x6-node', { hasText: 'Concurrent B' }).first()).toBeVisible({ timeout: 5000 });
     });
 
-    test('remote user cursors are visible when mouse moves', async (_, testInfo) => {
+    test('remote user cursors are visible when mouse moves', async ({ browser: _browser }, testInfo) => {
         const { urlA, urlB } = await getTestUrls(testInfo);
         await Promise.all([
             pageA.goto(urlA),
@@ -222,7 +222,7 @@ test.describe('Real-time Collaboration Engine', () => {
         await expect(remoteCursor).toBeVisible({ timeout: 3000 });
     });
 
-    test('active users count updates when users join', async (_, testInfo) => {
+    test('active users count updates when users join', async ({ browser: _browser }, testInfo) => {
         const { urlA, urlB } = await getTestUrls(testInfo);
         // User A goes to the page first
         await pageA.goto(urlA);

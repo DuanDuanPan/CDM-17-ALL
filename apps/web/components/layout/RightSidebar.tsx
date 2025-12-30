@@ -137,7 +137,7 @@ export function RightSidebar({
           : ((created.props as NodeProps | undefined) ?? {});
         const resolvedTags = Array.isArray(nodeTags) ? nodeTags : (created.tags ?? []);
         return prev
-          ? { ...prev, ...created, props: resolvedProps, tags: resolvedTags }
+          ? { ...created, ...prev, props: resolvedProps, tags: resolvedTags }
           : { ...created, props: resolvedProps, tags: resolvedTags };
       });
     };

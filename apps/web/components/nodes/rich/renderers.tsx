@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { NodeType, MindNodeData, PBSProps, TaskProps, RequirementProps, AppProps, DataProps } from '@cdm/types';
+import { NodeType, MindNodeData, TaskProps, RequirementProps, AppProps, DataProps } from '@cdm/types';
 import { Box, CheckCircle, FileText, Database } from 'lucide-react';
 
 /**
@@ -30,10 +30,7 @@ class PBSRenderer implements NodeRenderer {
         return 'solid';
     }
 
-    renderMetrics(data: MindNodeData): ReactNode {
-        const props = (data.props as PBSProps) || {};
-        const version = props.version || 'v1.0';
-
+    renderMetrics(_data: MindNodeData): ReactNode {
         // Mock aggregated stats from child nodes
         const taskCount = 5;
         const riskCount = 2;

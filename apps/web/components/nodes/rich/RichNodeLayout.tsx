@@ -10,8 +10,6 @@ export interface RichNodeLayoutProps {
     headerPattern?: 'solid' | 'striped';
     /** Whether node is selected */
     isSelected?: boolean;
-    /** Node type for shadow styling */
-    nodeType?: string;
     /** Children components (TitleRow, MetricsRow, Footer) */
     children: ReactNode;
     /** Optional hanging pill for rejected status */
@@ -32,7 +30,6 @@ export const RichNodeLayout = memo(
         headerColor,
         headerPattern = 'solid',
         isSelected = false,
-        nodeType,
         children,
         hangingPill,
         onDoubleClick,
