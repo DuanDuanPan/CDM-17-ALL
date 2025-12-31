@@ -6,6 +6,28 @@
 import { Injectable } from '@nestjs/common';
 import { prisma, type Graph } from '@cdm/database';
 import type { Prisma } from '@cdm/database';
+import { NodeType } from '@cdm/types';
+
+/**
+ * Story 7.5 Fix: Batch upsert data structure for CollabService node sync
+ * Kept in GraphRepository to maintain kernel isolation from business plugins
+ */
+export interface NodeUpsertBatchData {
+  id: string;
+  label: string;
+  graphId: string;
+  type: NodeType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  parentId: string | null;
+  creatorName: string;
+  description: string | null;
+  tags: string[];
+  isArchived: boolean;
+}
+
 
 export type GraphWithRelations = Prisma.GraphGetPayload<{
   include: {
@@ -79,5 +101,53 @@ export class GraphRepository {
       select: { id: true },
     });
     return graph !== null;
+  }
+
+  /**
+   * Story 7.5 Fix: Batch upsert nodes from Yjs sync
+   * Used by CollabService.onStoreDocument to sync nodes to relational DB
+   * Encapsulates Prisma calls to maintain Repository pattern compliance
+   * @param nodes Array of node data to upsert
+   */
+  async upsertNodesBatch(nodes: NodeUpsertBatchData[]): Promise<void> {
+    if (nodes.length === 0) {
+      return;
+    }
+
+    const upsertOperations = nodes.map((node) =>
+      prisma.node.upsert({
+        where: { id: node.id },
+        create: {
+          id: node.id,
+          label: node.label,
+          graphId: node.graphId,
+          type: node.type,
+          x: node.x,
+          y: node.y,
+          width: node.width,
+          height: node.height,
+          parentId: node.parentId,
+          creatorName: node.creatorName,
+          description: node.description,
+          tags: node.tags,
+          isArchived: node.isArchived,
+        },
+        update: {
+          label: node.label,
+          type: node.type,
+          x: node.x,
+          y: node.y,
+          width: node.width,
+          height: node.height,
+          parentId: node.parentId,
+          creatorName: node.creatorName,
+          description: node.description,
+          tags: node.tags,
+          isArchived: node.isArchived,
+        },
+      }),
+    );
+
+    await prisma.$transaction(upsertOperations);
   }
 }

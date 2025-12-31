@@ -711,3 +711,47 @@ So that **消除数据竞态条件和潜在的脑裂风险。**
 **And** 移除所有组件层面的直接 `updateNode` API 调用
 **And** 并在高并发场景下验证数据一致性
 
+### Story 7.7: ProductSearchDialog 组件拆分 (UI Component Refactor)
+
+As a **前端开发者**,
+I want **将 ProductSearchDialog 组件拆分为职责单一的小型模块**,
+So that **代码可读性提升，维护成本降低，单元测试更易编写。**
+
+**Acceptance Criteria:**
+
+**Given** `ProductSearchDialog.tsx` 当前有 948 行
+**When** 执行拆分后
+**Then** 主文件行数应降低至 300 行以内
+**And** 搜索逻辑应提取至 `useProductSearch.ts` hook
+**And** 产品卡片、搜索表单应拆分为独立组件
+**And** 产品搜索、筛选、选择功能通过回归测试
+
+### Story 7.8: RightSidebar 组件拆分 (UI Component Refactor)
+
+As a **前端开发者**,
+I want **将 RightSidebar 组件按面板类型拆分为独立模块**,
+So that **各面板可独立开发维护，降低组件复杂度。**
+
+**Acceptance Criteria:**
+
+**Given** `RightSidebar.tsx` 当前有 693 行
+**When** 执行拆分后
+**Then** 主文件行数应降低至 300 行以内
+**And** 每个面板类型应有独立的组件文件
+**And** 面板切换逻辑应提取至 hook 或 switcher 组件
+**And** 侧边栏所有功能通过回归测试
+
+### Story 7.9: ApprovalStatusPanel 组件拆分 (UI Component Refactor)
+
+As a **前端开发者**,
+I want **将 ApprovalStatusPanel 组件拆分为状态展示和操作独立的模块**,
+So that **审批流 UI 更易维护，各部分可独立复用和测试。**
+
+**Acceptance Criteria:**
+
+**Given** `ApprovalStatusPanel.tsx` 当前有 685 行
+**When** 执行拆分后
+**Then** 主文件行数应降低至 300 行以内
+**And** 应分离为 `ApprovalStatus.tsx`, `ApprovalActions.tsx`, `DeliverablesSection.tsx`, `ApprovalHistory.tsx`
+**And** 审批提交、审批/驳回、交付物上传、历史查看功能通过回归测试
+

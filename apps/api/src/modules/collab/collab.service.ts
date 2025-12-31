@@ -4,8 +4,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Server as HocuspocusServer } from '@hocuspocus/server';
 import * as Y from 'yjs';
 import { NodeType } from '@cdm/types';
-import { prisma } from '@cdm/database';
-import { GraphRepository } from '../graphs/graph.repository';
+
+import { GraphRepository, NodeUpsertBatchData } from '../graphs/graph.repository';
 
 // Event constants for Collab module
 export const COLLAB_EVENTS = {
@@ -20,25 +20,8 @@ export interface YjsNodeChangedEvent {
     changeType: 'update' | 'delete' | 'create';
 }
 
-/**
- * Story 7.5: Batch upsert data structure for CollabService node sync.
- * Kept local to CollabService to avoid kernel → business-module coupling.
- */
-interface NodeUpsertBatchData {
-    id: string;
-    label: string;
-    graphId: string;
-    type: NodeType;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    parentId: string | null;
-    creatorName: string;
-    description: string | null;
-    tags: string[];
-    isArchived: boolean;
-}
+// Story 7.5 Fix: NodeUpsertBatchData moved to GraphRepository
+// to encapsulate all Prisma calls and maintain Repository pattern
 
 /**
  * CollabService - Real-time Collaboration Service
@@ -361,42 +344,9 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                         }
                     });
 
+                    // Story 7.5 Fix: Use GraphRepository to maintain Repository pattern
                     if (nodeUpdates.length > 0) {
-                        const upsertOperations = nodeUpdates.map((node) =>
-                            prisma.node.upsert({
-                                where: { id: node.id },
-                                create: {
-                                    id: node.id,
-                                    label: node.label,
-                                    graphId: node.graphId,
-                                    type: node.type,
-                                    x: node.x,
-                                    y: node.y,
-                                    width: node.width,
-                                    height: node.height,
-                                    parentId: node.parentId,
-                                    creatorName: node.creatorName,
-                                    description: node.description,
-                                    tags: node.tags,
-                                    isArchived: node.isArchived,
-                                },
-                                update: {
-                                    label: node.label,
-                                    type: node.type,
-                                    x: node.x,
-                                    y: node.y,
-                                    width: node.width,
-                                    height: node.height,
-                                    parentId: node.parentId,
-                                    creatorName: node.creatorName,
-                                    description: node.description,
-                                    tags: node.tags,
-                                    isArchived: node.isArchived,
-                                },
-                            }),
-                        );
-
-                        await prisma.$transaction(upsertOperations);
+                        await this.graphRepository.upsertNodesBatch(nodeUpdates);
                         Logger.log(
                             `Synced ${nodeUpdates.length} nodes to Node table for graph ${graphId}`,
                             'CollabService',
