@@ -9,6 +9,8 @@ module.exports = {
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
   moduleNameMapper: {
+    '^@cdm/plugins$':
+      '<rootDir>/../../../packages/plugins/src',
     '^@cdm/plugin-mindmap-core/server$':
       '<rootDir>/../../../packages/plugins/plugin-mindmap-core/src/server',
     '^@cdm/plugin-workflow-approval/server$':

@@ -2,8 +2,15 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@cdm/types": ["../../packages/types/src"],
-      "@cdm/database": ["../../packages/database/src"],
+      "@cdm/types": [
+        "../../packages/types/src"
+      ],
+      "@cdm/database": [
+        "../../packages/database/src"
+      ],
+      "@cdm/plugins": [
+        "../../packages/plugins/src"
+      ],
       "@cdm/plugin-mindmap-core/server": [
         "../../packages/plugins/plugin-mindmap-core/src/server/index.ts"
       ],
@@ -25,4 +32,3 @@
     }
   }
 }
-

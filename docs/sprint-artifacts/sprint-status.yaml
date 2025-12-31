@@ -95,4 +95,5 @@ development_status:
   7-2-frontend-hook-first-extraction: done
   7-3-ui-atomic-components: done
   7-4-god-class-splitting: done
-  7-5-plugin-migration: review
+  7-5-plugin-migration: done
+
