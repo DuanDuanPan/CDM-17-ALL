@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@cdm/plugin-mindmap-core/server": ["../plugin-mindmap-core/src/server/index.ts"],
+      "@cdm/plugin-mindmap-core/server/*": ["../plugin-mindmap-core/src/server/*"]
+    }
+  }
+}
+

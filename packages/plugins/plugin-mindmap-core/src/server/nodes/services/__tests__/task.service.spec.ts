@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { TaskService } from '../task.service';
 import { NodeTaskRepository } from '../../repositories/node-task.repository';
-import { NotificationService } from '../../../notification/notification.service';
+import type { INotificationService } from '../task.service';
 
 // Mock task data aligned with Prisma schema
 interface MockNodeTask {
@@ -33,7 +33,7 @@ describe('TaskService', () => {
         update: jest.Mock;
         upsert: jest.Mock;
     };
-    let mockNotificationService: jest.Mocked<NotificationService>;
+    let mockNotificationService: jest.Mocked<INotificationService>;
 
     const mockTask: MockNodeTask = {
         nodeId: 'task-1',
@@ -58,7 +58,7 @@ describe('TaskService', () => {
         // Create mock notification service
         mockNotificationService = {
             createAndNotify: jest.fn(),
-        } as unknown as jest.Mocked<NotificationService>;
+        } as unknown as jest.Mocked<INotificationService>;
 
         // Instantiate service with mocks
         service = new TaskService(
@@ -78,7 +78,7 @@ describe('TaskService', () => {
 
             mockTaskRepo.findByNodeId.mockResolvedValue(idleTask);
             mockTaskRepo.update.mockResolvedValue(updatedTask);
-            mockNotificationService.createAndNotify.mockResolvedValue(null);
+            mockNotificationService.createAndNotify.mockResolvedValue(undefined);
 
             const result = await service.dispatchTask('task-1', 'owner-1');
 
@@ -114,7 +114,7 @@ describe('TaskService', () => {
 
             mockTaskRepo.findByNodeId.mockResolvedValue(rejectedTask);
             mockTaskRepo.update.mockResolvedValue(updatedTask);
-            mockNotificationService.createAndNotify.mockResolvedValue(null);
+            mockNotificationService.createAndNotify.mockResolvedValue(undefined);
 
             const result = await service.dispatchTask('task-1', 'owner-1');
 
@@ -170,7 +170,7 @@ describe('TaskService', () => {
 
                 mockTaskRepo.findByNodeId.mockResolvedValue(dispatchedTask);
                 mockTaskRepo.update.mockResolvedValue(updatedTask);
-                mockNotificationService.createAndNotify.mockResolvedValue(null);
+                mockNotificationService.createAndNotify.mockResolvedValue(undefined);
 
                 const result = await service.feedbackTask('task-1', 'assignee-1', 'accept');
 
@@ -205,7 +205,7 @@ describe('TaskService', () => {
 
                 mockTaskRepo.findByNodeId.mockResolvedValue(dispatchedTask);
                 mockTaskRepo.update.mockResolvedValue(updatedTask);
-                mockNotificationService.createAndNotify.mockResolvedValue(null);
+                mockNotificationService.createAndNotify.mockResolvedValue(undefined);
 
                 const result = await service.feedbackTask(
                     'task-1',

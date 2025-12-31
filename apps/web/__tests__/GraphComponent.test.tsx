@@ -3,7 +3,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { ConfirmDialogProvider, ToastProvider } from '@cdm/ui';
-import { GraphComponent } from '@/components/graph/GraphComponent';
+
+vi.mock('@cdm/plugin-mindmap-core', () => ({
+  AddChildCommand: class AddChildCommand {},
+  AddSiblingCommand: class AddSiblingCommand {},
+  NavigationCommand: class NavigationCommand {},
+}));
 
 vi.mock('@/hooks/useGraph', () => ({
   useGraph: vi.fn(() => ({ graph: null, isReady: false })),
@@ -12,6 +17,10 @@ vi.mock('@/hooks/useGraph', () => ({
 
 vi.mock('@/hooks/useMindmapPlugin', () => ({
   useMindmapPlugin: vi.fn(),
+}));
+
+vi.mock('@/hooks/useLayoutPlugin', () => ({
+  useLayoutPlugin: vi.fn(() => ({ gridEnabled: false })),
 }));
 
 vi.mock('@/hooks/useCollaboration', () => ({
@@ -30,7 +39,8 @@ vi.mock('@/hooks/useCollaboration', () => ({
 }));
 
 describe('GraphComponent', () => {
-  it('renders a focusable graph container', () => {
+  it('renders a focusable graph container', async () => {
+    const { GraphComponent } = await import('@/components/graph/GraphComponent');
     render(
       <ToastProvider>
         <ConfirmDialogProvider>

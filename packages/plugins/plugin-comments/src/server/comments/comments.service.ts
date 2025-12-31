@@ -1,5 +1,6 @@
 /**
  * Story 4.3: Contextual Comments & Mentions
+ * Story 7.5: Migrated to plugin-comments
  * Comments Service - Business logic for comments
  * Story 7.1 Fix: Refactored to use AttachmentsRepository
  */
@@ -10,15 +11,45 @@ import {
     ForbiddenException,
     NotFoundException,
     Logger,
+    Inject,
+    Optional,
 } from '@nestjs/common';
 import { prisma } from '@cdm/database';
 import { CommentsRepository, CommentWithAuthor } from './comments.repository';
 import { AttachmentsRepository } from './attachments.repository';
 import { CommentsGateway } from './comments.gateway';
-import { NotificationService } from '../notification/notification.service';
-import { UsersService } from '../users/users.service';
 import { parseMentions, buildUserLookup } from './mention.util';
 import type { Comment, CreateCommentDto } from '@cdm/types';
+
+/**
+ * Story 7.5: Injection token for NotificationService from the kernel
+ */
+export const NOTIFICATION_SERVICE = 'NOTIFICATION_SERVICE';
+
+/**
+ * Story 7.5: Injection token for UsersService from the kernel
+ */
+export const USERS_SERVICE = 'USERS_SERVICE';
+
+/**
+ * Interface for NotificationService (defined to avoid direct dependency on kernel)
+ */
+export interface INotificationService {
+    createAndNotify(data: {
+        recipientId: string;
+        type: string;
+        title: string;
+        content: Record<string, unknown>;
+        refNodeId?: string;
+    }): Promise<void>;
+}
+
+/**
+ * Interface for UsersService (defined to avoid direct dependency on kernel)
+ */
+export interface IUsersService {
+    list(options: { limit?: number }): Promise<{ users: Array<{ id: string; name: string | null }> }>;
+}
 
 @Injectable()
 export class CommentsService {
@@ -28,8 +59,8 @@ export class CommentsService {
         private readonly repo: CommentsRepository,
         private readonly attachmentsRepository: AttachmentsRepository,
         private readonly gateway: CommentsGateway,
-        private readonly notificationService: NotificationService,
-        private readonly usersService: UsersService
+        @Optional() @Inject(NOTIFICATION_SERVICE) private readonly notificationService?: INotificationService,
+        @Optional() @Inject(USERS_SERVICE) private readonly usersService?: IUsersService
     ) { }
 
     /**
@@ -220,6 +251,12 @@ export class CommentsService {
         node: { id: string; label: string; graphId: string },
         authorId: string
     ): Promise<void> {
+        // Story 7.5: UsersService and NotificationService are optional
+        if (!this.usersService || !this.notificationService) {
+            this.logger.debug('Mentions handling skipped - services not available');
+            return;
+        }
+
         try {
             // Get all users for mention lookup
             const { users } = await this.usersService.list({ limit: 1000 });

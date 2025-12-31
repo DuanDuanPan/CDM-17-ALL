@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@cdm/types": ["../../packages/types/src"],
+      "@cdm/database": ["../../packages/database/src"],
+      "@cdm/plugin-mindmap-core/server": [
+        "../../packages/plugins/plugin-mindmap-core/src/server/index.ts"
+      ],
+      "@cdm/plugin-mindmap-core/server/*": [
+        "../../packages/plugins/plugin-mindmap-core/src/server/*"
+      ],
+      "@cdm/plugin-workflow-approval/server": [
+        "../../packages/plugins/plugin-workflow-approval/src/server/index.ts"
+      ],
+      "@cdm/plugin-workflow-approval/server/*": [
+        "../../packages/plugins/plugin-workflow-approval/src/server/*"
+      ],
+      "@cdm/plugin-comments/server": [
+        "../../packages/plugins/plugin-comments/src/server/index.ts"
+      ],
+      "@cdm/plugin-comments/server/*": [
+        "../../packages/plugins/plugin-comments/src/server/*"
+      ]
+    }
+  }
+}
+

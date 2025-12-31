@@ -1,17 +1,42 @@
 /**
  * Story 4.1: Approval Driven Workflow
+ * Story 7.5: Migrated to plugin-workflow-approval
  * Approval Listener - Event handlers for approval events
  * Handles dependency unlocking when approval is resolved
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ApprovalRepository } from './approval.repository';
-import { NotificationService } from '../notification/notification.service';
-import { CollabService } from '../collab/collab.service';
 import { APPROVAL_EVENTS } from './approval.service';
 import type { ApprovalRequestedEvent, ApprovalResolvedEvent, ApprovalPipeline } from '@cdm/types';
 import type { Doc as YDoc } from 'yjs';
+
+/**
+ * Story 7.5: Injection tokens for kernel services
+ */
+export const NOTIFICATION_SERVICE = 'NOTIFICATION_SERVICE';
+export const COLLAB_SERVICE = 'COLLAB_SERVICE';
+
+/**
+ * Interface for NotificationService (to avoid direct dependency on kernel)
+ */
+export interface INotificationService {
+    createAndNotify(data: {
+        recipientId: string;
+        type: string;
+        title: string;
+        content: Record<string, unknown>;
+        refNodeId?: string;
+    }): Promise<void>;
+}
+
+/**
+ * Interface for CollabService (to avoid direct dependency on kernel)
+ */
+export interface ICollabService {
+    getServer(): unknown;
+}
 
 @Injectable()
 export class ApprovalListener {
@@ -19,8 +44,8 @@ export class ApprovalListener {
 
     constructor(
         private readonly approvalRepo: ApprovalRepository,
-        private readonly notificationService: NotificationService,
-        private readonly collabService: CollabService
+        @Optional() @Inject(NOTIFICATION_SERVICE) private readonly notificationService?: INotificationService,
+        @Optional() @Inject(COLLAB_SERVICE) private readonly collabService?: ICollabService
     ) { }
 
     /**
@@ -45,19 +70,24 @@ export class ApprovalListener {
             // Get requester name using Repository
             const requesterName = await this.approvalRepo.getUserName(event.requesterId);
 
-            await this.notificationService.createAndNotify({
-                recipientId: event.approverId,
-                type: 'APPROVAL_REQUESTED',
-                title: `需要您审批: ${nodeInfo.label}`,
-                content: {
-                    nodeId: event.nodeId,
-                    nodeName: nodeInfo.label,
-                    action: 'approval_requested',
-                    senderName: requesterName || 'Unknown User',
-                    stepIndex: event.stepIndex,
-                },
-                refNodeId: event.nodeId,
-            });
+            // Story 7.5: NotificationService is optional - provided by kernel
+            if (this.notificationService) {
+                await this.notificationService.createAndNotify({
+                    recipientId: event.approverId,
+                    type: 'APPROVAL_REQUESTED',
+                    title: `需要您审批: ${nodeInfo.label}`,
+                    content: {
+                        nodeId: event.nodeId,
+                        nodeName: nodeInfo.label,
+                        action: 'approval_requested',
+                        senderName: requesterName || 'Unknown User',
+                        stepIndex: event.stepIndex,
+                    },
+                    refNodeId: event.nodeId,
+                });
+            } else {
+                this.logger.warn('NotificationService not available - skipping notification');
+            }
 
             // Story 4.1: Sync approval status (PENDING / step transitions) to Yjs for real-time node header updates
             if (nodeInfo.approval) {
@@ -99,7 +129,8 @@ export class ApprovalListener {
             const submitter = approvalData?.history?.find(h => h.action === 'submitted');
             const submitterId = submitter?.actorId || nodeInfo.assigneeId;
 
-            if (submitterId && submitterId !== event.approverId) {
+            // Story 7.5: NotificationService is optional - provided by kernel
+            if (this.notificationService && submitterId && submitterId !== event.approverId) {
                 if (event.status === 'REJECTED') {
                     // Send rejection notification to submitter with reason
                     await this.notificationService.createAndNotify({
@@ -196,6 +227,11 @@ export class ApprovalListener {
      * Updates the node's approval field in the active Yjs document
      */
     private async syncApprovalToYjs(nodeId: string, graphId: string, approval: ApprovalPipeline): Promise<void> {
+        // Story 7.5: CollabService is optional - provided by kernel
+        if (!this.collabService) {
+            this.logger.debug('CollabService not available - skipping Yjs sync');
+            return;
+        }
         try {
             const server = this.collabService.getServer();
             if (!server) {
@@ -239,6 +275,11 @@ export class ApprovalListener {
      * Used when dependency unlocking changes a task's status
      */
     private async syncTaskStatusToYjs(nodeId: string, graphId: string, status: string): Promise<void> {
+        // Story 7.5: CollabService is optional - provided by kernel
+        if (!this.collabService) {
+            this.logger.debug('CollabService not available - skipping Yjs sync');
+            return;
+        }
         try {
             const server = this.collabService.getServer();
             if (!server) {

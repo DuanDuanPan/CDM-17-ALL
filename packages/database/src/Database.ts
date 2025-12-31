@@ -10,7 +10,10 @@ import { prisma } from './client';
 import { Repository } from './Repository';
 import {
   CollectionDefinition,
+  CreateOptions,
   DatabaseEventHandler,
+  DestroyOptions,
+  UpdateOptions,
 } from './types';
 
 /**
@@ -166,8 +169,8 @@ export class Database {
 
         // Wrap specific methods with events
         if (prop === 'create') {
-          return async function (options: unknown) {
-            await emitEvent(`${collectionName}.beforeCreate`, (options as { values: unknown }).values);
+          return async function (options: CreateOptions) {
+            await emitEvent(`${collectionName}.beforeCreate`, options.values);
             const result = await original.create.call(target, options);
             await emitEvent(`${collectionName}.afterCreate`, result);
             return result;
@@ -175,7 +178,7 @@ export class Database {
         }
 
         if (prop === 'update') {
-          return async function (options: unknown) {
+          return async function (options: UpdateOptions) {
             await emitEvent(`${collectionName}.beforeUpdate`, options);
             const result = await original.update.call(target, options);
             await emitEvent(`${collectionName}.afterUpdate`, result);
@@ -184,7 +187,7 @@ export class Database {
         }
 
         if (prop === 'destroy') {
-          return async function (options: unknown) {
+          return async function (options: DestroyOptions) {
             await emitEvent(`${collectionName}.beforeDestroy`, options);
             const result = await original.destroy.call(target, options);
             await emitEvent(`${collectionName}.afterDestroy`, result);

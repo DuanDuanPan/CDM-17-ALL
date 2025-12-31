@@ -14,7 +14,11 @@
   },
   "dependencies": {
     "@cdm/database": "workspace:*",
+    "@cdm/plugins": "workspace:*",
     "@cdm/types": "workspace:*",
+    "@cdm/plugin-mindmap-core": "workspace:*",
+    "@cdm/plugin-workflow-approval": "workspace:*",
+    "@cdm/plugin-comments": "workspace:*",
     "@hocuspocus/server": "^3.4.3",
     "@nestjs/common": "^11.1.9",
     "@nestjs/config": "^4.0.2",

@@ -1,10 +1,11 @@
 /**
  * Story 2.1: Node Service with polymorphic type support
  * Story 2.5: Extended with search, tags, and archive functionality
+ * Story 7.5: Migrated to plugin-mindmap-core
  * Handles node CRUD operations and type-specific property management
  */
 
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Inject, Optional } from '@nestjs/common';
 import {
   AppProps, // Story 2.9
   type ApprovalPipeline,
@@ -34,7 +35,19 @@ import { RequirementService } from './services/requirement.service';
 import { PBSService } from './services/pbs.service';
 import { DataService } from './services/data.service';
 import { AppService } from './services/app.service'; // Story 2.9
-import { AppExecutorService } from '../app-library/app-executor.service';
+
+/**
+ * Injection token for AppExecutorService from the kernel
+ * Story 7.5: Plugin Migration - AppExecutorService is provided by AppLibraryModule in the kernel
+ */
+export const APP_EXECUTOR_SERVICE = 'APP_EXECUTOR_SERVICE';
+
+/**
+ * Interface for AppExecutorService (defined to avoid direct dependency on kernel)
+ */
+export interface IAppExecutorService {
+  execute(nodeId: string, appProps: AppProps): Promise<{ outputs: Array<{ key: string; value: unknown }> }>;
+}
 
 const DEFAULT_CREATOR_NAME = 'Mock User';
 
@@ -47,7 +60,7 @@ export class NodesService {
     private readonly pbsService: PBSService,
     private readonly dataService: DataService,
     private readonly appService: AppService, // Story 2.9
-    private readonly appExecutor: AppExecutorService,
+    @Optional() @Inject(APP_EXECUTOR_SERVICE) private readonly appExecutor?: IAppExecutorService,
   ) { }
 
   private normalizeTags(tags: string[]): string[] {
@@ -133,6 +146,11 @@ export class NodesService {
       inputs: dto.inputs ?? existingProps.inputs ?? [],
       outputs: dto.outputs ?? existingProps.outputs ?? [],
     };
+
+    // Story 7.5: AppExecutorService is optional - provided by kernel's AppLibraryModule
+    if (!this.appExecutor) {
+      throw new BadRequestException('App execution is not available - AppLibraryModule not loaded');
+    }
 
     return this.appExecutor.execute(nodeId, appProps);
   }

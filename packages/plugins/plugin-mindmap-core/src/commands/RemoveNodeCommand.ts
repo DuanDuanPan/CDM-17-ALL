@@ -1,4 +1,4 @@
-import { Graph, Node } from '@antv/x6';
+import type { Graph, Node } from '@antv/x6';
 import {
   getHierarchicalParent,
   getHierarchicalChildren,

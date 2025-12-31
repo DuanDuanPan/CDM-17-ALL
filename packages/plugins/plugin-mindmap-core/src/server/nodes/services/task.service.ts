@@ -3,18 +3,37 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { TaskProps } from '@cdm/types';
 import { Prisma } from '@cdm/database';
 import { NodeTaskRepository } from '../repositories/node-task.repository';
-import { NotificationService } from '../../notification/notification.service';
+
+/**
+ * Story 7.5: Injection token for NotificationService from the kernel
+ */
+export const NOTIFICATION_SERVICE = 'NOTIFICATION_SERVICE';
+
+/**
+ * Interface for NotificationService (defined to avoid direct dependency on kernel)
+ */
+export interface INotificationService {
+  createAndNotify(data: {
+    recipientId: string;
+    type: string;
+    title: string;
+    content: Record<string, unknown>;
+    refNodeId?: string;
+  }): Promise<void>;
+}
 
 @Injectable()
 export class TaskService {
   constructor(
     private readonly taskRepo: NodeTaskRepository,
-    private readonly notificationService: NotificationService
-  ) {}
+    @Optional() @Inject(NOTIFICATION_SERVICE) private readonly notificationService?: INotificationService
+  ) { }
 
   async initialize(nodeId: string) {
     return this.taskRepo.upsert(nodeId, { status: 'todo', priority: 'medium' });
@@ -70,19 +89,21 @@ export class TaskService {
       rejectionReason: null, // 清除之前的驳回理由
     });
 
-    // 3. 创建通知
-    await this.notificationService.createAndNotify({
-      recipientId: task.assigneeId,
-      type: 'TASK_DISPATCH',
-      title: '您有新任务待确认',
-      content: {
-        taskId: nodeId,
-        taskName: task.node.label,
-        action: 'dispatch',
-        senderName: ownerId,
-      },
-      refNodeId: nodeId,
-    });
+    // 3. 创建通知 (Story 7.5: NotificationService is optional)
+    if (this.notificationService) {
+      await this.notificationService.createAndNotify({
+        recipientId: task.assigneeId,
+        type: 'TASK_DISPATCH',
+        title: '您有新任务待确认',
+        content: {
+          taskId: nodeId,
+          taskName: task.node.label,
+          action: 'dispatch',
+          senderName: ownerId,
+        },
+        refNodeId: nodeId,
+      });
+    }
 
     // 4. TODO: 审计日志 (delayed to future story)
     // await this.auditService.log('TASK_DISPATCHED', nodeId, ownerId, { assigneeId: task.assigneeId });
@@ -132,8 +153,8 @@ export class TaskService {
 
     const updated = await this.taskRepo.update(nodeId, updateData);
 
-    // 3. 通知 Owner
-    if (task.ownerId) {
+    // 3. 通知 Owner (Story 7.5: NotificationService is optional)
+    if (this.notificationService && task.ownerId) {
       await this.notificationService.createAndNotify({
         recipientId: task.ownerId,
         type: action === 'accept' ? 'TASK_ACCEPTED' : 'TASK_REJECTED',

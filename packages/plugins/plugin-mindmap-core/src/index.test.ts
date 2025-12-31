@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Graph } from '@antv/x6';
 import { MindmapCorePlugin } from './index';
 
 function createGraph() {
@@ -8,30 +7,32 @@ function createGraph() {
   container.style.height = '600px';
   document.body.appendChild(container);
 
-  const graph = new Graph({
+  const graph = {
     container,
-    width: 800,
-    height: 600,
-  });
+    bindKey: () => { },
+    dispose: () => { },
+  };
 
   return { graph, container };
 }
 
 describe('MindmapCorePlugin', () => {
-  it('initialize does not bind keyboard shortcuts or DOM events (handled by app layer)', () => {
+  it('initialize does not bind keyboard shortcuts (handled by app layer)', () => {
     const { graph, container } = createGraph();
 
     const plugin = new MindmapCorePlugin();
     const bindKeySpy = vi.spyOn(graph, 'bindKey');
     const addEventListenerSpy = vi.spyOn(container, 'addEventListener');
 
-    plugin.initialize(graph);
+    plugin.initialize(graph as any);
 
     expect(bindKeySpy).not.toHaveBeenCalled();
-    expect(addEventListenerSpy).not.toHaveBeenCalled();
+    expect(addEventListenerSpy).toHaveBeenCalledWith(
+      'mindmap:node-operation',
+      expect.any(Function)
+    );
 
     graph.dispose();
     container.remove();
   });
 });
-

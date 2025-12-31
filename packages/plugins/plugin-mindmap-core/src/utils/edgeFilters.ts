@@ -39,7 +39,7 @@
  * ```
  */
 
-import { Graph, Node, Edge } from '@antv/x6';
+import type { Graph, Node, Edge } from '@antv/x6';
 import type { EdgeKind, EdgeMetadata } from '@cdm/types';
 
 /**

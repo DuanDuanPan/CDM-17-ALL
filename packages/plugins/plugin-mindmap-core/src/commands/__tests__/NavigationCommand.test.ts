@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NavigationCommand } from '../NavigationCommand';
-import { Graph, Node, Edge } from '@antv/x6';
+import type { Graph, Node } from '@antv/x6';
 
 // Mock X6 Graph and Node
 const createMockNode = (id: string, position: { x: number; y: number }) => ({

@@ -3,13 +3,12 @@ import { ConfigModule } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CollabService } from './collab.service';
 import { GraphRepository } from '../graphs/graph.repository';
-import { NodeRepository } from '../nodes/repositories/node.repository';
 
 /**
  * Unit tests for CollabService
  *
  * Story 1.4: Real-time Collaboration Engine
- * Story 7.1: Updated to mock GraphRepository and NodeRepository
+ * Story 7.5: Node sync uses prisma directly (no NodeRepository)
  */
 
 jest.mock('@hocuspocus/server', () => ({
@@ -25,11 +24,6 @@ const mockGraphRepository = {
     updateYjsState: jest.fn(),
     findById: jest.fn(),
     exists: jest.fn(),
-};
-
-const mockNodeRepository = {
-    upsertBatch: jest.fn(),
-    findById: jest.fn(),
 };
 
 describe('CollabService', () => {
@@ -58,10 +52,6 @@ describe('CollabService', () => {
                 {
                     provide: GraphRepository,
                     useValue: mockGraphRepository,
-                },
-                {
-                    provide: NodeRepository,
-                    useValue: mockNodeRepository,
                 },
             ],
         }).compile();
@@ -128,10 +118,6 @@ describe('CollabService', () => {
                     {
                         provide: GraphRepository,
                         useValue: mockGraphRepository,
-                    },
-                    {
-                        provide: NodeRepository,
-                        useValue: mockNodeRepository,
                     },
                 ],
             }).compile();

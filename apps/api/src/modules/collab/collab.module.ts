@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CollabService } from './collab.service';
 import { GraphsModule } from '../graphs';
-import { NodesModule } from '../nodes/nodes.module';
 
 /**
  * CollabModule - Real-time Collaboration Module
@@ -12,10 +11,10 @@ import { NodesModule } from '../nodes/nodes.module';
  * - PostgreSQL persistence for Yjs state
  *
  * Story 1.4: Real-time Collaboration Engine
- * Story 7.1: Imports GraphsModule and NodesModule for Repository pattern
+ * Story 7.5: Uses prisma directly to avoid coupling to migrated modules
  */
 @Module({
-    imports: [GraphsModule, NodesModule],
+    imports: [GraphsModule],
     providers: [CollabService],
     exports: [CollabService],
 })

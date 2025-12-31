@@ -28,7 +28,7 @@ import {
   TagUpdateRequestDto,
   ExecuteAppNodeDto,
 } from './nodes.request.dto';
-import { ZodValidationPipe } from '../../pipes/zod-validation.pipe';
+import { ZodValidationPipe } from '../pipes/zod-validation.pipe';
 
 // [AI-Review-2][HIGH-2] Fixed: Removed 'api/' prefix (global prefix already set in main.ts)
 @Controller('nodes')

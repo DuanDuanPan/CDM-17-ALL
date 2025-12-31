@@ -1,47 +1,114 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Graph } from '@antv/x6';
 import { NodeType } from '@cdm/types';
 import { AddChildCommand } from './AddChildCommand';
 import { AddSiblingCommand } from './AddSiblingCommand';
 import { RemoveNodeCommand } from './RemoveNodeCommand';
 
-const cleanups: Array<() => void> = [];
+type Point = { x: number; y: number };
+
+class FakeNode {
+  constructor(
+    public id: string,
+    private position: Point,
+    private data: Record<string, unknown> = {}
+  ) { }
+
+  isNode() {
+    return true;
+  }
+
+  getPosition(): Point {
+    return this.position;
+  }
+
+  getData(): Record<string, unknown> {
+    return this.data;
+  }
+
+  setData(next: Record<string, unknown>) {
+    this.data = next;
+  }
+}
+
+class FakeEdge {
+  constructor(
+    private readonly sourceId: string,
+    private readonly targetId: string,
+    private readonly data: Record<string, unknown> = {}
+  ) { }
+
+  getSourceCellId(): string {
+    return this.sourceId;
+  }
+
+  getTargetCellId(): string {
+    return this.targetId;
+  }
+
+  getData(): Record<string, unknown> {
+    return this.data;
+  }
+}
+
+class FakeGraph {
+  private nodes = new Map<string, FakeNode>();
+  private edges: FakeEdge[] = [];
+  private nextId = 0;
+
+  addNode(config: {
+    id?: string;
+    x: number;
+    y: number;
+    data?: Record<string, unknown>;
+  }): FakeNode {
+    const id = config.id ?? `node-${++this.nextId}`;
+    const node = new FakeNode(id, { x: config.x, y: config.y }, config.data ?? {});
+    this.nodes.set(id, node);
+    return node;
+  }
+
+  addEdge(config: { source: string; target: string; data?: Record<string, unknown> }): FakeEdge {
+    const edge = new FakeEdge(config.source, config.target, config.data ?? {});
+    this.edges.push(edge);
+    return edge;
+  }
+
+  getOutgoingEdges(node: FakeNode): FakeEdge[] {
+    return this.edges.filter((e) => e.getSourceCellId() === node.id);
+  }
+
+  getIncomingEdges(node: FakeNode): FakeEdge[] {
+    return this.edges.filter((e) => e.getTargetCellId() === node.id);
+  }
+
+  getCellById(id: string): FakeNode | null {
+    return this.nodes.get(id) ?? null;
+  }
+
+  removeNode(node: FakeNode): void {
+    this.nodes.delete(node.id);
+    this.edges = this.edges.filter(
+      (e) => e.getSourceCellId() !== node.id && e.getTargetCellId() !== node.id
+    );
+  }
+}
 
 function createGraph() {
-  Graph.registerNode('mind-node', { inherit: 'rect' }, true);
-
-  const container = document.createElement('div');
-  container.style.width = '800px';
-  container.style.height = '600px';
-  document.body.appendChild(container);
-
-  const graph = new Graph({
-    container,
-    width: 800,
-    height: 600,
-  });
-
-  cleanups.push(() => {
-    graph.dispose();
-    container.remove();
-  });
-
-  return { graph };
+  return { graph: new FakeGraph() };
 }
 
 describe('Mindmap Commands', () => {
   afterEach(() => {
-    cleanups.splice(0).forEach((fn) => fn());
     document.body.innerHTML = '';
   });
 
   describe('AddChildCommand', () => {
     it('creates first child at x+200, same y, and connects edge', () => {
       const { graph } = createGraph();
-      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
 
       const cmd = new AddChildCommand();
-      const child = cmd.execute(graph, root)!;
+      const child = cmd.execute(graph as any, root as any)!;
 
       expect(child).toBeTruthy();
       expect(child.getPosition().x).toBe(300);
@@ -56,11 +123,11 @@ describe('Mindmap Commands', () => {
 
     it('stacks children vertically under the same parent', () => {
       const { graph } = createGraph();
-      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
 
       const cmd = new AddChildCommand();
-      const child1 = cmd.execute(graph, root)!;
-      const child2 = cmd.execute(graph, root)!;
+      const child1 = cmd.execute(graph as any, root as any)!;
+      const child2 = cmd.execute(graph as any, root as any)!;
 
       expect(child1.getPosition().x).toBe(300);
       expect(child2.getPosition().x).toBe(300);
@@ -71,11 +138,11 @@ describe('Mindmap Commands', () => {
   describe('AddSiblingCommand', () => {
     it('treats root Enter as AddChild and stacks correctly', () => {
       const { graph } = createGraph();
-      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
 
       const cmd = new AddSiblingCommand();
-      const child1 = cmd.execute(graph, root)!;
-      const child2 = cmd.execute(graph, root)!;
+      const child1 = cmd.execute(graph as any, root as any)!;
+      const child2 = cmd.execute(graph as any, root as any)!;
 
       expect(child1.getPosition().x).toBe(300);
       expect(child2.getPosition().x).toBe(300);
@@ -84,13 +151,13 @@ describe('Mindmap Commands', () => {
 
     it('creates sibling under the same parent (x same, y + 80)', () => {
       const { graph } = createGraph();
-      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
 
       const addChild = new AddChildCommand();
-      const first = addChild.execute(graph, root)!;
+      const first = addChild.execute(graph as any, root as any)!;
 
       const addSibling = new AddSiblingCommand();
-      const sibling = addSibling.execute(graph, first)!;
+      const sibling = addSibling.execute(graph as any, first as any)!;
 
       expect(sibling.getPosition().x).toBe(first.getPosition().x);
       expect(sibling.getPosition().y).toBe(first.getPosition().y + 80);
@@ -103,59 +170,59 @@ describe('Mindmap Commands', () => {
 
     it('inherits nodeType from selected sibling node (TASK)', () => {
       const { graph } = createGraph();
-      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
 
       const addChild = new AddChildCommand();
-      const first = addChild.execute(graph, root)!;
+      const first = addChild.execute(graph as any, root as any)!;
       // Set first child as TASK type
       first.setData({ ...first.getData(), nodeType: NodeType.TASK });
 
       const addSibling = new AddSiblingCommand();
-      const sibling = addSibling.execute(graph, first)!;
+      const sibling = addSibling.execute(graph as any, first as any)!;
 
       expect((sibling.getData() as any).nodeType).toBe(NodeType.TASK);
     });
 
     it('inherits nodeType from selected sibling node (REQUIREMENT)', () => {
       const { graph } = createGraph();
-      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
 
       const addChild = new AddChildCommand();
-      const first = addChild.execute(graph, root)!;
+      const first = addChild.execute(graph as any, root as any)!;
       // Set first child as REQUIREMENT type
       first.setData({ ...first.getData(), nodeType: NodeType.REQUIREMENT });
 
       const addSibling = new AddSiblingCommand();
-      const sibling = addSibling.execute(graph, first)!;
+      const sibling = addSibling.execute(graph as any, first as any)!;
 
       expect((sibling.getData() as any).nodeType).toBe(NodeType.REQUIREMENT);
     });
 
     it('defaults to ORDINARY when no nodeType is set on siblings', () => {
       const { graph } = createGraph();
-      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
 
       const addChild = new AddChildCommand();
-      const first = addChild.execute(graph, root)!;
+      const first = addChild.execute(graph as any, root as any)!;
       // first has no nodeType set (default behavior)
 
       const addSibling = new AddSiblingCommand();
-      const sibling = addSibling.execute(graph, first)!;
+      const sibling = addSibling.execute(graph as any, first as any)!;
 
       expect((sibling.getData() as any).nodeType).toBe(NodeType.ORDINARY);
     });
 
     it('inherits nodeType from last sibling when creating child from root', () => {
       const { graph } = createGraph();
-      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
 
       // Create first child from root (Enter on root)
       const addSibling = new AddSiblingCommand();
-      const first = addSibling.execute(graph, root)!;
+      const first = addSibling.execute(graph as any, root as any)!;
       first.setData({ ...first.getData(), nodeType: NodeType.PBS });
 
       // Create second child from root (Enter on root again)
-      const second = addSibling.execute(graph, root)!;
+      const second = addSibling.execute(graph as any, root as any)!;
 
       expect((second.getData() as any).nodeType).toBe(NodeType.PBS);
     });
@@ -164,15 +231,15 @@ describe('Mindmap Commands', () => {
   describe('RemoveNodeCommand', () => {
     it('removes a node and its subtree, but keeps root', () => {
       const { graph } = createGraph();
-      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
 
       const addChild = new AddChildCommand();
-      const child1 = addChild.execute(graph, root)!;
-      const child2 = addChild.execute(graph, root)!;
-      const grandchild = addChild.execute(graph, child1)!;
+      const child1 = addChild.execute(graph as any, root as any)!;
+      const child2 = addChild.execute(graph as any, root as any)!;
+      const grandchild = addChild.execute(graph as any, child1 as any)!;
 
       const remove = new RemoveNodeCommand();
-      remove.execute(graph, child1);
+      remove.execute(graph as any, child1 as any);
 
       expect(graph.getCellById(root.id)).toBeTruthy();
       expect(graph.getCellById(child1.id)).toBeNull();
@@ -186,10 +253,10 @@ describe('Mindmap Commands', () => {
 
     it('does not remove root node', () => {
       const { graph } = createGraph();
-      const root = graph.addNode({ id: 'root', x: 100, y: 100, width: 120, height: 50 });
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
 
       const remove = new RemoveNodeCommand();
-      remove.execute(graph, root);
+      remove.execute(graph as any, root as any);
 
       expect(graph.getCellById(root.id)).toBeTruthy();
     });

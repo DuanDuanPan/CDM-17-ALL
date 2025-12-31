@@ -22,7 +22,7 @@ import {
     UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { existsSync, mkdirSync, unlinkSync, createReadStream } from 'fs';
@@ -53,10 +53,18 @@ if (!existsSync(UPLOAD_DIR)) {
 
 // Multer storage configuration
 const storage = diskStorage({
-    destination: (_req, _file, cb) => {
+    destination: (
+        _req: Express.Request,
+        _file: Express.Multer.File,
+        cb: (error: Error | null, destination: string) => void
+    ) => {
         cb(null, UPLOAD_DIR);
     },
-    filename: (_req, file, cb) => {
+    filename: (
+        _req: Express.Request,
+        file: Express.Multer.File,
+        cb: (error: Error | null, filename: string) => void
+    ) => {
         // Generate unique filename: timestamp + random + original extension
         const uniqueId = `${Date.now()}-${randomBytes(8).toString('hex')}`;
         const ext = extname(file.originalname);

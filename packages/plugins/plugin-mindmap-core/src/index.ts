@@ -1,5 +1,5 @@
 import { Plugin } from '@cdm/plugins';
-import { Graph, Node } from '@antv/x6';
+import type { Graph, Node } from '@antv/x6';
 import {
   AddSiblingCommand,
   AddChildCommand,

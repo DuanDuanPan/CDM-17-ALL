@@ -13,7 +13,7 @@ import { RequirementService } from './services/requirement.service';
 import { PBSService } from './services/pbs.service';
 import { DataService } from './services/data.service';
 import { AppService } from './services/app.service'; // Story 2.9
-import { AppExecutorService } from '../app-library/app-executor.service';
+import { APP_EXECUTOR_SERVICE } from './nodes.service';
 
 describe('NodesService', () => {
   let service: NodesService;
@@ -42,7 +42,7 @@ describe('NodesService', () => {
         { provide: PBSService, useValue: mockPBSService },
         { provide: DataService, useValue: mockDataService },
         { provide: AppService, useValue: mockAppService }, // Story 2.9
-        { provide: AppExecutorService, useValue: mockAppExecutor },
+        { provide: APP_EXECUTOR_SERVICE, useValue: mockAppExecutor },
       ],
     }).compile();
 
