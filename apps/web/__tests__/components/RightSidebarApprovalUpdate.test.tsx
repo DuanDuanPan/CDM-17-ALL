@@ -24,13 +24,14 @@ vi.mock('@/lib/api/nodes', () => ({
   unarchiveNode: vi.fn(),
 }));
 
-import { fetchNode } from '@/lib/api/nodes';
+import { fetchNode, updateNodeProps } from '@/lib/api/nodes';
 import { RightSidebar } from '@/components/layout/RightSidebar';
 
 describe('RightSidebar approval refresh', () => {
   beforeEach(() => {
     capturedPropertyPanelProps = undefined;
     vi.mocked(fetchNode).mockReset();
+    vi.mocked(updateNodeProps).mockReset();
   });
 
   it('syncs approval refresh to X6 with overwrite so empty deliverables clears', async () => {
@@ -61,37 +62,22 @@ describe('RightSidebar approval refresh', () => {
       cleanSelection: vi.fn(),
     };
 
-    vi.mocked(fetchNode)
-      // ensureNodeExists fetch (API is older → should not sync back to X6)
-      .mockResolvedValueOnce({
-        id: 'node-1',
-        label: 'Task',
-        type: NodeType.TASK,
-        x: 0,
-        y: 0,
-        width: 120,
-        height: 50,
-        graphId: 'g1',
-        createdAt: '2025-01-01T00:00:00.000Z',
-        updatedAt: '2025-01-01T00:00:00.000Z',
-        creator: 'Mock',
-        props: {},
-      })
-      // onApprovalUpdate fetch (deliverables cleared)
-      .mockResolvedValueOnce({
-        id: 'node-1',
-        label: 'Task',
-        type: NodeType.TASK,
-        x: 0,
-        y: 0,
-        width: 120,
-        height: 50,
-        graphId: 'g1',
-        createdAt: '2025-01-01T00:00:00.000Z',
-        updatedAt: '2025-01-01T00:00:00.000Z',
-        creator: 'Mock',
-        props: { deliverables: [] },
-      });
+    // ensureNodeExists fetch (API is older → should not sync back to X6)
+    vi.mocked(fetchNode).mockResolvedValueOnce({
+      id: 'node-1',
+      label: 'Task',
+      type: NodeType.TASK,
+      x: 0,
+      y: 0,
+      width: 120,
+      height: 50,
+      graphId: 'g1',
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+      creator: 'Mock',
+      props: {},
+    });
+    vi.mocked(updateNodeProps).mockResolvedValueOnce(true);
 
     render(<RightSidebar selectedNodeId="node-1" graph={graph as unknown as Graph} graphId="g1" yDoc={null} />);
 

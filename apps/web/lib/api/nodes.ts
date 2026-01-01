@@ -2,7 +2,7 @@ import { CreateNodeDto, NodeProps, NodeResponse, NodeType, sanitizeNodeProps } f
 
 /**
  * Sanitize props before sending to API
- * - Converts empty strings to null for nullable fields
+ * - Drops empty strings (treat as "unset") to avoid schema mismatches
  * - Removes undefined values
  */
 function sanitizeProps(props: NodeProps, nodeType?: NodeType): NodeProps {
@@ -13,12 +13,12 @@ function sanitizeProps(props: NodeProps, nodeType?: NodeType): NodeProps {
     // Skip undefined values
     if (value === undefined) continue;
 
-    // Convert empty strings to null for better API compatibility
-    if (value === '') {
-      sanitized[key] = null;
-    } else {
-      sanitized[key] = value;
-    }
+    // IMPORTANT: Do NOT coerce empty string -> null.
+    // Some props are validated as `z.string()` (non-nullable) on the server (e.g. REQUIREMENT.acceptanceCriteria).
+    // Treat empty string as "unset" and let backend services apply their own normalization (often `|| null`).
+    if (value === '') continue;
+
+    sanitized[key] = value;
   }
 
   // Drop null for non-nullable array fields to satisfy API validation
