@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2026-01-01 - Story 4.5 Smart Notification Center completed; Priority filtering, time grouping, noise aggregation
+last_updated: 2026-01-01 - Epic 4 completed; Story 4.4 Watch & Subscription done
 
 development_status:
   epic-1: done
@@ -61,11 +61,11 @@ development_status:
   2-9-app-node-type: done  # App node execution + I/O implemented; DB reset + migration applied
   epic-2-retrospective: done
 
-  epic-4: in-progress
+  epic-4: done
   4-1-approval-driven-workflow: done
   4-2-rich-node-design: done # New story for Rich UI/UX
   4-3-contextual-comments-and-mentions: done # Story 4.3: 评论系统实现完成
-  4-4-watch-subscription: ready-for-dev
+  4-4-watch-subscription: done
   4-5-smart-notification-center: done
   epic-4-retrospective: optional
 

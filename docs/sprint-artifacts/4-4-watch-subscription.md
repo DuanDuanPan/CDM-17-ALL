@@ -1,6 +1,6 @@
 # Story 4.4: 关注订阅机制 (Watch & Subscription)
 
-Status: in-progress
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

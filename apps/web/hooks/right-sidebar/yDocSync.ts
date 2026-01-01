@@ -75,7 +75,8 @@ export function syncApprovalToYDoc(
     return {
       ...existing,
       deliverables,
-      approval,
+      // Convert null to undefined to match YjsNodeData type
+      approval: approval ?? undefined,
       props: nextProps as NodeProps,
       createdAt: base.createdAt,
       updatedAt: now,
