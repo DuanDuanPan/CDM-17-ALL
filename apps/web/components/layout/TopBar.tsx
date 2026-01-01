@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Archive, Menu, Search, Share2, Settings } from 'lucide-react';
 import { LayoutSwitcher } from '../toolbar/LayoutSwitcher';
 import { ViewSwitcher } from '@/features/views';
@@ -68,6 +68,8 @@ export function TopBar({
     markAllAsRead,
     refresh,
     isLoading: notificationsLoading,
+    hasNewHighPriority,
+    clearHighPriorityFlag,
   } = useNotifications({
     userId, // Use dynamic userId passed from props
     // Disable WebSocket in development to prevent console spam when backend isn't running
@@ -75,6 +77,21 @@ export function TopBar({
     enableWebSocket: process.env.NEXT_PUBLIC_ENABLE_WS === 'true',
     enablePolling: true,
   });
+
+  // Story 4.5: Allow toast action to navigate to node (if graph context is available)
+  useEffect(() => {
+    const handleNavigate = (event: Event) => {
+      const custom = event as CustomEvent<{ nodeId?: string }>;
+      if (custom.detail?.nodeId) {
+        navigateToNode?.(custom.detail.nodeId);
+      }
+    };
+
+    window.addEventListener('notification:navigate', handleNavigate);
+    return () => {
+      window.removeEventListener('notification:navigate', handleNavigate);
+    };
+  }, [navigateToNode]);
 
   const handleSearchSelect = useCallback(
     (nodeId: string) => {
@@ -175,6 +192,8 @@ export function TopBar({
             onMarkAllAsRead={markAllAsRead}
             onRefresh={refresh}
             onNavigate={navigateToNode}
+            hasNewHighPriority={hasNewHighPriority}
+            onClearHighPriority={clearHighPriorityFlag}
           />
           <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <Share2 className="w-4 h-4 text-gray-600" />

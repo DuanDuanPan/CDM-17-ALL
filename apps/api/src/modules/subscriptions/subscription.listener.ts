@@ -1,9 +1,13 @@
 /**
  * Story 4.4: Watch & Subscription
+ * Story 4.5: Smart Notification Center - Noise Aggregation
  * Subscription Listener - Listens for node changes and triggers notifications
  *
  * This listener hooks into node change events and notifies subscribers.
  * Uses event-driven architecture with throttling to prevent notification spam.
+ *
+ * HIGH priority notifications (MENTION, APPROVAL_*) bypass this throttling -
+ * they are handled directly by their respective services via NotificationService.createAndNotify().
  */
 
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
@@ -20,9 +24,30 @@ export const SUBSCRIPTION_EVENTS = {
   NODE_CHANGED: 'subscription.node.changed',
 } as const;
 
-// Throttle interval: 5 seconds for development/testing (AC#2: 生产环境建议 5 分钟)
-// Production suggestion: 5 * 60 * 1000
-export const THROTTLE_WINDOW_MS = 5 * 1000;
+/**
+ * Story 4.5: Configurable throttle window
+ * - Default: 5 minutes for production (5 * 60 * 1000 = 300000ms)
+ * - Can be overridden via NOTIFICATION_THROTTLE_MS environment variable
+ * - Dev/tests can use shorter values (e.g., 5000ms = 5 seconds)
+ */
+const DEFAULT_THROTTLE_MS = 5 * 60 * 1000; // 5 minutes
+const parsedThrottleMs = Number.parseInt(process.env.NOTIFICATION_THROTTLE_MS ?? '', 10);
+export const THROTTLE_WINDOW_MS =
+  Number.isFinite(parsedThrottleMs) && parsedThrottleMs > 0 ? parsedThrottleMs : DEFAULT_THROTTLE_MS;
+
+/**
+ * Story 4.5: Maximum number of node names to buffer per throttle key
+ * Prevents memory blowup during batch operations while preserving total count
+ */
+export const MAX_CHANGED_NODES = 100;
+
+type ThrottleState = {
+  pendingChanges: number;
+  changedNodes: Set<string>;
+  firstNodeId: string;
+  firstNodeName: string;
+  actorIds: Set<string>;
+};
 
 // Event payload for node changes
 export interface NodeChangedEvent {
@@ -38,8 +63,8 @@ export interface NodeChangedEvent {
 export class SubscriptionListener implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SubscriptionListener.name);
 
-  // Throttle map: recipientId:mindmapId -> { lastNotified: timestamp, pendingChanges: count, changedNodes: Set }
-  private throttleMap = new Map<string, { lastNotified: number; pendingChanges: number; changedNodes: Set<string> }>();
+  // Throttle map: recipientId:mindmapId -> aggregated state (debounced within window)
+  private throttleMap = new Map<string, ThrottleState>();
 
   // [MEDIUM FIX] Timer map for OnModuleDestroy cleanup
   private timerMap = new Map<string, NodeJS.Timeout>();
@@ -162,51 +187,53 @@ export class SubscriptionListener implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Process notification with 5-minute throttling (AC#2)
-   * Aggregates multiple changes into a single notification
+   * Process notification with 5-minute throttling (AC#1)
+   * Debounce within the window and emit one summarized notification per recipientId + mindmapId
    */
   private async processThrottledNotification(
     recipientId: string,
     event: NodeChangedEvent,
   ): Promise<void> {
     const throttleKey = `${recipientId}:${event.mindmapId}`;
-    const now = Date.now();
 
-    const throttleState = this.throttleMap.get(throttleKey) || {
-      lastNotified: 0,
+    const existing = this.throttleMap.get(throttleKey);
+    const throttleState: ThrottleState = existing || {
       pendingChanges: 0,
       changedNodes: new Set<string>(),
+      firstNodeId: event.nodeId,
+      firstNodeName: event.nodeName,
+      actorIds: new Set<string>(),
     };
 
     throttleState.pendingChanges++;
-    throttleState.changedNodes.add(event.nodeName);
 
-    // Check if we should send notification now or wait
-    if (now - throttleState.lastNotified >= this.THROTTLE_INTERVAL) {
-      // Throttle window passed, send notification
-      await this.sendWatchNotification(recipientId, event.mindmapId, throttleState);
-
-      // Reset throttle state
-      this.throttleMap.set(throttleKey, {
-        lastNotified: now,
-        pendingChanges: 0,
-        changedNodes: new Set(),
-      });
-    } else {
-      // Still in throttle window, just track the change
-      this.throttleMap.set(throttleKey, throttleState);
-
-      // Schedule a delayed notification if this is the first pending change
-      if (throttleState.pendingChanges === 1) {
-        const delay = this.THROTTLE_INTERVAL - (now - throttleState.lastNotified);
-        // [MEDIUM FIX] Store timer reference for cleanup on module destroy
-        const timer = setTimeout(() => {
-          this.timerMap.delete(throttleKey);
-          this.flushPendingNotification(throttleKey);
-        }, delay);
-        this.timerMap.set(throttleKey, timer);
-      }
+    if (event.userId) {
+      throttleState.actorIds.add(event.userId);
     }
+
+    // Story 4.5: Cap changedNodes to MAX_CHANGED_NODES to prevent memory blowup
+    // The total count (pendingChanges) is still preserved for accurate reporting
+    if (throttleState.changedNodes.size < MAX_CHANGED_NODES) {
+      throttleState.changedNodes.add(event.nodeName);
+    }
+
+    this.throttleMap.set(throttleKey, throttleState);
+
+    // Debounce: reset timer on every change within the window.
+    const existingTimer = this.timerMap.get(throttleKey);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      this.timerMap.delete(throttleKey);
+    }
+
+    const timer = setTimeout(() => {
+      this.timerMap.delete(throttleKey);
+      this.flushPendingNotification(throttleKey).catch((error) => {
+        this.logger.error(`Failed to flush pending notification for ${throttleKey}: ${error}`);
+      });
+    }, this.THROTTLE_INTERVAL);
+
+    this.timerMap.set(throttleKey, timer);
   }
 
   /**
@@ -233,12 +260,8 @@ export class SubscriptionListener implements OnModuleInit, OnModuleDestroy {
 
     await this.sendWatchNotification(recipientId, mindmapId, throttleState);
 
-    // Reset throttle state
-    this.throttleMap.set(throttleKey, {
-      lastNotified: Date.now(),
-      pendingChanges: 0,
-      changedNodes: new Set(),
-    });
+    // Clear state after flushing (next batch will create a fresh throttle state)
+    this.throttleMap.delete(throttleKey);
   }
 
   /**
@@ -247,36 +270,30 @@ export class SubscriptionListener implements OnModuleInit, OnModuleDestroy {
   private async sendWatchNotification(
     recipientId: string,
     mindmapId: string,
-    state: { pendingChanges: number; changedNodes: Set<string> },
+    state: ThrottleState,
   ): Promise<void> {
     const changedNodeNames = Array.from(state.changedNodes);
     const changeCount = state.pendingChanges;
 
-    // Generate aggregated message (AC#2: aggregated summary)
-    let message: string;
-    if (changedNodeNames.length === 1) {
-      message = `节点 "${changedNodeNames[0]}" 发生变更`;
-    } else if (changedNodeNames.length <= 3) {
-      message = `节点 ${changedNodeNames.map(n => `"${n}"`).join('、')} 发生变更`;
-    } else {
-      message = `节点 "${changedNodeNames[0]}" 等 ${changedNodeNames.length} 个节点发生变更`;
+    // Story 4.5: Summary templates (AC#1)
+    let actorLabel = '多人';
+    if (state.actorIds.size === 1) {
+      const [actorId] = Array.from(state.actorIds);
+      const actor = await prisma.user.findUnique({
+        where: { id: actorId },
+        select: { name: true },
+      });
+      actorLabel = actor?.name || '某人';
     }
 
-    // Use the first changed node as reference
-    const firstNodeName = changedNodeNames[0] || '未知节点';
+    const message = `${actorLabel}修改了 ${changeCount} 个节点`;
 
-    // Get first node ID for reference
-    const firstNode = await prisma.node.findFirst({
-      where: {
-        graphId: mindmapId,
-        label: firstNodeName,
-      },
-      select: { id: true },
-    });
+    const firstNodeName = state.firstNodeName || changedNodeNames[0] || '未知节点';
+    const firstNodeId = state.firstNodeId;
 
     const content: WatchNotificationContent = {
       mindmapId,
-      nodeId: firstNode?.id || '',
+      nodeId: firstNodeId,
       nodeName: firstNodeName,
       message,
       changeCount,
@@ -289,7 +306,7 @@ export class SubscriptionListener implements OnModuleInit, OnModuleDestroy {
         type: 'WATCH_UPDATE',
         title: `关注内容更新: ${message}`,
         content,
-        refNodeId: firstNode?.id,
+        refNodeId: firstNodeId || undefined,
       });
 
       this.logger.log(`Sent WATCH_UPDATE notification to ${recipientId}: ${message}`);

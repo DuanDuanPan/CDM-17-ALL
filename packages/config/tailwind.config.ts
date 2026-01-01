@@ -56,6 +56,15 @@ const config: Partial<Config> = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      keyframes: {
+        swing: {
+          '0%, 100%': { transform: 'rotate(-6deg)' },
+          '50%': { transform: 'rotate(6deg)' },
+        },
+      },
+      animation: {
+        swing: 'swing 0.5s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

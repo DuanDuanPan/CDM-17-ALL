@@ -1,5 +1,6 @@
 /**
  * Story 2.4: Task Dispatch & Feedback
+ * Story 4.5: Smart Notification Center
  * Notification Service - Business logic for notifications
  * [AI-Review][MEDIUM-1] Fixed: Proper TypeScript types instead of 'any'
  */
@@ -8,7 +9,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NotificationRepository } from './notification.repository';
 import { NotificationGateway } from './notification.gateway';
 import type { Notification, Prisma } from '@cdm/database';
-import type { CreateNotificationDto } from '@cdm/types';
+import type { CreateNotificationDto, NotificationListQuery, NotificationType, NotificationPriority } from '@cdm/types';
+import { getNotificationPriority } from '@cdm/types';
 
 type BatchPayload = Prisma.BatchPayload;
 
@@ -77,5 +79,30 @@ export class NotificationService {
    */
   async getUnreadCount(recipientId: string): Promise<number> {
     return this.notificationRepo.countUnread(recipientId);
+  }
+
+  /**
+   * Story 4.5: List notifications with pagination, filtering, and computed priority
+   */
+  async listPaginated(
+    recipientId: string,
+    query: NotificationListQuery
+  ): Promise<(Notification & { priority: NotificationPriority })[]> {
+    const notifications = await this.notificationRepo.findPaginated(recipientId, query);
+
+    // Add computed priority field to each notification
+    return notifications.map(notification => ({
+      ...notification,
+      priority: getNotificationPriority(notification.type as NotificationType),
+    }));
+  }
+
+  /**
+   * Story 4.5: Get notification counts grouped by priority
+   */
+  async getCountByPriority(
+    recipientId: string
+  ): Promise<{ total: number; high: number; normal: number; low: number }> {
+    return this.notificationRepo.countByPriority(recipientId);
   }
 }

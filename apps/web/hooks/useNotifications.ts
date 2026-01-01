@@ -1,13 +1,16 @@
 /**
  * Story 2.4: Task Dispatch & Feedback
+ * Story 4.5: Smart Notification Center
  * useNotifications Hook - WebSocket + Polling Fallback
  * [AI-Review][MEDIUM-4] Fixed: Polling effect memory leak
  * [AI-Review][MEDIUM-6] Fixed: Use correct env variable NEXT_PUBLIC_API_BASE_URL
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Notification } from '@cdm/types';
+import type { Notification, NotificationListQuery, NotificationType } from '@cdm/types';
+import { getNotificationPriority } from '@cdm/types';
 import { io, Socket } from 'socket.io-client';
+import { toast } from 'sonner';
 
 // [AI-Review][MEDIUM-6] Use project-standard env variable
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
@@ -17,6 +20,8 @@ export interface UseNotificationsOptions {
   userId: string;
   enableWebSocket?: boolean;
   enablePolling?: boolean;
+  /** Story 4.5: Enable HIGH priority toast notifications */
+  enableHighPriorityToast?: boolean;
 }
 
 export interface UseNotificationsReturn {
@@ -26,27 +31,44 @@ export interface UseNotificationsReturn {
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   refresh: () => Promise<void>;
+  /** Story 4.5: Refresh with filter query */
+  refreshWithFilter: (query: NotificationListQuery) => Promise<void>;
   isLoading: boolean;
   error: Error | null;
+  /** Story 4.5: Track if HIGH priority notification arrived (for bell animation) */
+  hasNewHighPriority: boolean;
+  /** Story 4.5: Clear the HIGH priority flag */
+  clearHighPriorityFlag: () => void;
 }
 
 export function useNotifications({
   userId,
   enableWebSocket = true,
   enablePolling = true,
+  enableHighPriorityToast = true,
 }: UseNotificationsOptions): UseNotificationsReturn {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  // Story 4.5: Track HIGH priority notifications for bell animation
+  const [hasNewHighPriority, setHasNewHighPriority] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
 
   // Fetch notifications from REST API
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (query?: NotificationListQuery) => {
     try {
-      const response = await fetch(`/api/notifications?userId=${encodeURIComponent(userId)}`, {
+      // Build query string with optional filters (Story 4.5)
+      const params = new URLSearchParams({ userId });
+      if (query?.page) params.append('page', String(query.page));
+      if (query?.limit) params.append('limit', String(query.limit));
+      if (query?.unreadOnly !== undefined) params.append('unreadOnly', String(query.unreadOnly));
+      if (query?.priority) params.append('priority', query.priority);
+      if (query?.isRead !== undefined) params.append('isRead', String(query.isRead));
+
+      const response = await fetch(`/api/notifications?${params.toString()}`, {
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store', // Prevent browser caching
       });
@@ -157,6 +179,33 @@ export function useNotifications({
       console.log('[useNotifications] New notification received:', notification);
       setNotifications((prev) => [notification, ...prev]);
       setUnreadCount((prev) => prev + 1);
+
+      // Story 4.5: Show toast and set flag for HIGH priority notifications
+      const priority = getNotificationPriority(notification.type as NotificationType);
+      if (priority === 'HIGH') {
+        setHasNewHighPriority(true);
+
+        if (enableHighPriorityToast) {
+          // Show urgency toast for HIGH priority notifications
+          toast(notification.title, {
+            description: getNotificationPreview(notification),
+            duration: 5000,
+            action: {
+              label: '查看',
+              onClick: () => {
+                // Dispatch custom event to navigate to the notification target
+                if (notification.refNodeId) {
+                  window.dispatchEvent(
+                    new CustomEvent('notification:navigate', {
+                      detail: { nodeId: notification.refNodeId, notification },
+                    })
+                  );
+                }
+              },
+            },
+          });
+        }
+      }
     });
 
     socket.on('connect_error', () => {
@@ -170,7 +219,7 @@ export function useNotifications({
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [userId, enableWebSocket]);
+  }, [userId, enableWebSocket, enableHighPriorityToast]);
 
   // [AI-Review][MEDIUM-4] Fixed: Use refs for callbacks to avoid recreating interval
   const fetchNotificationsRef = useRef(fetchNotifications);
@@ -204,14 +253,43 @@ export function useNotifications({
     };
   }, [enablePolling, userId]); // Minimal stable dependencies
 
+  // Story 4.5: Clear HIGH priority flag
+  const clearHighPriorityFlag = useCallback(() => {
+    setHasNewHighPriority(false);
+  }, []);
+
   return {
     notifications,
     unreadCount,
     isConnected,
     markAsRead,
     markAllAsRead,
-    refresh: fetchNotifications,
+    refresh: () => fetchNotifications(),
+    refreshWithFilter: fetchNotifications,
     isLoading,
     error,
+    hasNewHighPriority,
+    clearHighPriorityFlag,
   };
+}
+
+/**
+ * Story 4.5: Extract preview text from notification for toast display
+ */
+function getNotificationPreview(notification: Notification): string {
+  const content = notification.content as unknown as Record<string, unknown>;
+
+  if (notification.type === 'MENTION' && 'preview' in content) {
+    return String(content.preview || '');
+  }
+
+  if ('nodeName' in content) {
+    return `节点: ${content.nodeName}`;
+  }
+
+  if ('taskName' in content) {
+    return `任务: ${content.taskName}`;
+  }
+
+  return '';
 }

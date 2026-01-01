@@ -1,13 +1,25 @@
 /**
  * Story 2.4: Task Dispatch & Feedback
+ * Story 4.5: Smart Notification Center
  * NotificationList - Dropdown list of notifications
  */
 
 'use client';
 
+import { useState, useMemo } from 'react';
 import { CheckCircle, XCircle, Send, RefreshCw, CheckCheck, X, AtSign, Eye } from 'lucide-react';
-import type { WatchNotificationContent } from '@cdm/types';
-import type { Notification, NotificationContent } from '@cdm/types';
+import type {
+  WatchNotificationContent,
+  NotificationType,
+  NotificationPriority,
+  Notification,
+  NotificationContent,
+} from '@cdm/types';
+import { getNotificationPriority } from '@cdm/types';
+import { isToday, isYesterday } from 'date-fns';
+
+// Story 4.5: Filter tab types
+type FilterTab = 'all' | 'high' | 'unread';
 
 export interface NotificationListProps {
   notifications: Notification[];
@@ -32,8 +44,53 @@ export function NotificationList({
   onNavigate,
   onUnsubscribe,
 }: NotificationListProps) {
+  // Story 4.5: Filter state
+  const [activeTab, setActiveTab] = useState<FilterTab>('all');
+
+  // Story 4.5: Filter notifications based on active tab
+  const filteredNotifications = useMemo(() => {
+    switch (activeTab) {
+      case 'high':
+        return notifications.filter(
+          (n) => getNotificationPriority(n.type as NotificationType) === 'HIGH'
+        );
+      case 'unread':
+        return notifications.filter((n) => !n.isRead);
+      default:
+        return notifications;
+    }
+  }, [notifications, activeTab]);
+
+  // Story 4.5: Group notifications by time buckets
+  const groupedNotifications = useMemo(() => {
+    const groups: { title: string; items: Notification[] }[] = [];
+    const today: Notification[] = [];
+    const yesterday: Notification[] = [];
+    const earlier: Notification[] = [];
+
+    for (const n of filteredNotifications) {
+      const date = new Date(n.createdAt);
+      if (isToday(date)) {
+        today.push(n);
+      } else if (isYesterday(date)) {
+        yesterday.push(n);
+      } else {
+        earlier.push(n);
+      }
+    }
+
+    if (today.length > 0) groups.push({ title: '今天', items: today });
+    if (yesterday.length > 0) groups.push({ title: '昨天', items: yesterday });
+    if (earlier.length > 0) groups.push({ title: '更早', items: earlier });
+
+    return groups;
+  }, [filteredNotifications]);
+
   const hasNotifications = notifications.length > 0;
   const hasUnread = notifications.some((n) => !n.isRead);
+  const highPriorityCount = notifications.filter(
+    (n) => getNotificationPriority(n.type as NotificationType) === 'HIGH'
+  ).length;
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -70,10 +127,10 @@ export function NotificationList({
   };
 
   return (
-    <div className="w-[380px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
+    <div className="w-[380px] bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h3 className="text-sm font-semibold text-gray-800">通知中心</h3>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50/80">
+        <h3 className="text-sm font-semibold text-gray-800">🔔 通知中心</h3>
         <div className="flex items-center gap-2">
           {hasUnread && (
             <button
@@ -103,8 +160,44 @@ export function NotificationList({
         </div>
       </div>
 
+      {/* Story 4.5: Filter Tabs */}
+      <div className="flex border-b border-gray-200 bg-gray-50/50">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${activeTab === 'all'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+              : 'text-gray-500 hover:text-gray-700'
+            }`}
+        >
+          全部
+        </button>
+        <button
+          onClick={() => setActiveTab('high')}
+          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors relative ${activeTab === 'high'
+              ? 'text-red-600 border-b-2 border-red-600 bg-white'
+              : 'text-gray-500 hover:text-gray-700'
+            }`}
+        >
+          高优先级
+          {highPriorityCount > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-red-100 text-red-600 rounded-full">
+              {highPriorityCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('unread')}
+          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${activeTab === 'unread'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+              : 'text-gray-500 hover:text-gray-700'
+            }`}
+        >
+          未读
+        </button>
+      </div>
+
       {/* Content */}
-      <div className="max-h-[480px] overflow-y-auto">
+      <div className="max-h-[420px] overflow-y-auto">
         {isLoading && notifications.length === 0 ? (
           <div className="flex items-center justify-center py-12 text-gray-500 text-sm">
             <RefreshCw className="w-4 h-4 animate-spin mr-2" />
@@ -115,24 +208,43 @@ export function NotificationList({
             <Bell className="w-12 h-12 text-gray-300 mb-3" />
             <p className="text-sm text-gray-500">暂无通知</p>
           </div>
+        ) : filteredNotifications.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <Bell className="w-10 h-10 text-gray-300 mb-3" />
+            <p className="text-sm text-gray-500">
+              {activeTab === 'high' ? '暂无高优先级通知' : '暂无未读通知'}
+            </p>
+          </div>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {notifications.map((notification) => {
-              const content = notification.content as NotificationContent;
-              return (
-                <NotificationItem
-                  key={notification.id}
-                  notification={notification}
-                  content={content}
-                  formatTime={formatTime}
-                  getIcon={getNotificationIcon}
-                  onMarkAsRead={onMarkAsRead}
-                  onNavigate={onNavigate}
-                  onClose={onClose}
-                  onUnsubscribe={onUnsubscribe}
-                />
-              );
-            })}
+          <div>
+            {/* Story 4.5: Grouped by time buckets */}
+            {groupedNotifications.map((group) => (
+              <div key={group.title}>
+                <div className="px-4 py-2 text-xs font-medium text-gray-500 bg-gray-50/50 sticky top-0">
+                  {group.title}
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {group.items.map((notification) => {
+                    const content = notification.content as NotificationContent;
+                    const priority = getNotificationPriority(notification.type as NotificationType);
+                    return (
+                      <NotificationItem
+                        key={notification.id}
+                        notification={notification}
+                        content={content}
+                        priority={priority}
+                        formatTime={formatTime}
+                        getIcon={getNotificationIcon}
+                        onMarkAsRead={onMarkAsRead}
+                        onNavigate={onNavigate}
+                        onClose={onClose}
+                        onUnsubscribe={onUnsubscribe}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -161,6 +273,8 @@ function Bell({ className }: { className?: string }) {
 interface NotificationItemProps {
   notification: Notification;
   content: NotificationContent;
+  /** Story 4.5: Priority level for styling */
+  priority: NotificationPriority;
   formatTime: (date: string) => string;
   getIcon: (type: string) => React.ReactElement;
   onMarkAsRead: (id: string) => Promise<void>;
@@ -175,6 +289,7 @@ interface NotificationItemProps {
 function NotificationItem({
   notification,
   content,
+  priority,
   formatTime,
   getIcon,
   onMarkAsRead,
@@ -182,6 +297,20 @@ function NotificationItem({
   onClose,
   onUnsubscribe,
 }: NotificationItemProps) {
+  // Story 4.5: Priority-based background styling
+  const getPriorityBgClass = () => {
+    if (!notification.isRead) {
+      switch (priority) {
+        case 'HIGH':
+          return 'bg-red-50/70 border-l-2 border-l-red-500';
+        case 'LOW':
+          return 'bg-amber-50/50';
+        default:
+          return 'bg-blue-50/50';
+      }
+    }
+    return '';
+  };
   const handleClick = () => {
     // 1. Mark as read if not already
     if (!notification.isRead) {
@@ -223,10 +352,18 @@ function NotificationItem({
   };
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={notification.title}
       onClick={handleClick}
-      className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${!notification.isRead ? 'bg-blue-50/50' : ''
-        }`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
+      className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer ${getPriorityBgClass()}`}
     >
       <div className="flex gap-3">
         {/* Icon */}
@@ -314,6 +451,6 @@ function NotificationItem({
           </span>
         </div>
       </div>
-    </button>
+    </div>
   );
 }

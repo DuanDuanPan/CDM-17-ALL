@@ -1,5 +1,6 @@
 /**
  * Story 2.4: Task Dispatch & Feedback
+ * Story 4.5: Smart Notification Center
  * Unit Tests for NotificationService
  * [AI-Review][HIGH-1] Created to address missing test coverage
  */
@@ -8,7 +9,7 @@
 import { NotificationService } from '../notification.service';
 import { NotificationRepository } from '../notification.repository';
 import { NotificationGateway } from '../notification.gateway';
-import type { CreateNotificationDto } from '@cdm/types';
+import type { CreateNotificationDto, NotificationListQuery } from '@cdm/types';
 
 // Mock types aligned with Prisma schema
 interface MockNotification {
@@ -50,9 +51,11 @@ describe('NotificationService', () => {
         mockRepository = {
             create: jest.fn(),
             findByRecipient: jest.fn(),
+            findPaginated: jest.fn(),
             markAsRead: jest.fn(),
             markAllAsRead: jest.fn(),
             countUnread: jest.fn(),
+            countByPriority: jest.fn(),
         } as unknown as jest.Mocked<NotificationRepository>;
 
         // Create mock gateway
@@ -170,6 +173,101 @@ describe('NotificationService', () => {
 
             expect(mockRepository.countUnread).toHaveBeenCalledWith('user-1');
             expect(result).toBe(3);
+        });
+    });
+
+    // Story 4.5: Smart Notification Center - Pagination and Priority Tests
+    describe('listPaginated (Story 4.5)', () => {
+        const mockMentionNotification: MockNotification = {
+            id: 'notif-2',
+            recipientId: 'user-1',
+            type: 'MENTION',
+            title: '@张三 提到了你',
+            content: {
+                commentId: 'comment-1',
+                nodeId: 'node-1',
+                nodeName: 'Test Node',
+                preview: 'Test preview',
+                senderName: 'John',
+                mindmapId: 'mindmap-1',
+            },
+            refNodeId: 'node-1',
+            isRead: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+
+        it('should support pagination with page and limit', async () => {
+            mockRepository.findPaginated.mockResolvedValue([mockNotification] as any);
+
+            const query: NotificationListQuery = { page: 1, limit: 20 };
+            const result = await service.listPaginated('user-1', query);
+
+            expect(mockRepository.findPaginated).toHaveBeenCalledWith('user-1', query);
+            expect(result).toHaveLength(1);
+        });
+
+        it('should add computed priority field to notifications', async () => {
+            mockRepository.findPaginated.mockResolvedValue([
+                mockMentionNotification,
+                mockNotification,
+            ] as any);
+
+            const result = await service.listPaginated('user-1', {});
+
+            // MENTION should be HIGH priority
+            expect(result[0].priority).toBe('HIGH');
+            // TASK_DISPATCH should be NORMAL priority
+            expect(result[1].priority).toBe('NORMAL');
+        });
+
+        it('should filter by unreadOnly when provided', async () => {
+            mockRepository.findPaginated.mockResolvedValue([mockNotification] as any);
+
+            await service.listPaginated('user-1', { unreadOnly: true });
+
+            expect(mockRepository.findPaginated).toHaveBeenCalledWith('user-1', {
+                unreadOnly: true,
+            });
+        });
+
+        it('should filter by priority when provided', async () => {
+            mockRepository.findPaginated.mockResolvedValue([mockMentionNotification] as any);
+
+            await service.listPaginated('user-1', { priority: 'HIGH' });
+
+            expect(mockRepository.findPaginated).toHaveBeenCalledWith('user-1', {
+                priority: 'HIGH',
+            });
+        });
+
+        it('should default limit to 50 when not specified', async () => {
+            mockRepository.findPaginated.mockResolvedValue([]);
+
+            await service.listPaginated('user-1', {});
+
+            expect(mockRepository.findPaginated).toHaveBeenCalledWith('user-1', {});
+        });
+    });
+
+    describe('getCountByPriority (Story 4.5)', () => {
+        it('should return counts grouped by priority', async () => {
+            mockRepository.countByPriority.mockResolvedValue({
+                total: 10,
+                high: 3,
+                normal: 5,
+                low: 2,
+            });
+
+            const result = await service.getCountByPriority('user-1');
+
+            expect(mockRepository.countByPriority).toHaveBeenCalledWith('user-1');
+            expect(result).toEqual({
+                total: 10,
+                high: 3,
+                normal: 5,
+                low: 2,
+            });
         });
     });
 });

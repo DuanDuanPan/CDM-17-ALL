@@ -1,5 +1,6 @@
 /**
  * Story 2.4: Task Dispatch & Feedback
+ * Story 4.5: Smart Notification Center
  * NotificationBell - Bell icon with unread count badge
  */
 
@@ -20,6 +21,10 @@ export interface NotificationBellProps {
   onRefresh: () => Promise<void>;
   /** Story 2.4: Navigate to the related node when clicking a notification */
   onNavigate?: (nodeId: string) => void;
+  /** Story 4.5: Flag indicating HIGH priority notification arrived */
+  hasNewHighPriority?: boolean;
+  /** Story 4.5: Clear the HIGH priority flag */
+  onClearHighPriority?: () => void;
 }
 
 export function NotificationBell({
@@ -31,6 +36,8 @@ export function NotificationBell({
   onMarkAllAsRead,
   onRefresh,
   onNavigate,
+  hasNewHighPriority = false,
+  onClearHighPriority,
 }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -54,17 +61,32 @@ export function NotificationBell({
 
   const handleToggle = () => {
     setIsOpen((prev) => !prev);
+    // Story 4.5: Clear HIGH priority flag when opening panel
+    if (hasNewHighPriority && onClearHighPriority) {
+      onClearHighPriority();
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    await onMarkAllAsRead();
+    if (hasNewHighPriority && onClearHighPriority) {
+      onClearHighPriority();
+    }
   };
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Bell Button */}
+      {/* Bell Button - Story 4.5: Add pulse animation for HIGH priority */}
       <button
         onClick={handleToggle}
-        className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        className={`relative p-2 hover:bg-gray-100 rounded-lg transition-colors ${hasNewHighPriority ? 'animate-pulse' : ''
+          }`}
         aria-label={`Notifications (${unreadCount} unread)`}
       >
-        <Bell className="w-4 h-4 text-gray-600" />
+        <Bell
+          className={`w-4 h-4 text-gray-600 ${hasNewHighPriority ? 'animate-swing origin-top' : ''
+            }`}
+        />
 
         {/* Unread Count Badge */}
         {unreadCount > 0 && (
@@ -89,7 +111,7 @@ export function NotificationBell({
             notifications={notifications}
             isLoading={isLoading}
             onMarkAsRead={onMarkAsRead}
-            onMarkAllAsRead={onMarkAllAsRead}
+            onMarkAllAsRead={handleMarkAllAsRead}
             onRefresh={onRefresh}
             onClose={() => setIsOpen(false)}
             onNavigate={onNavigate}

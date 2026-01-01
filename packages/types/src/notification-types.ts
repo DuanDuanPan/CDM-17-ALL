@@ -1,6 +1,7 @@
 /**
  * Story 2.4: Task Dispatch & Feedback
  * Story 4.1: Approval Workflow
+ * Story 4.5: Smart Notification Center
  * Notification types and schemas for real-time task communication
  */
 
@@ -19,6 +20,39 @@ export type NotificationType =
   | 'APPROVAL_REJECTED'    // Story 4.1: New
   | 'MENTION'              // Story 4.3: Contextual Comments
   | 'WATCH_UPDATE';        // Story 4.4: Watch & Subscription
+
+// Story 4.5: Notification Priority Levels
+export type NotificationPriority = 'HIGH' | 'NORMAL' | 'LOW';
+
+/**
+ * Story 4.5: Get notification priority based on type
+ * HIGH: @mentions, approval requests/results - immediate attention needed
+ * NORMAL: Task assignments and responses - standard workflow items
+ * LOW: Watch/subscription updates - noise-reduced, aggregated notifications
+ */
+export function getNotificationPriority(type: NotificationType): NotificationPriority {
+  switch (type) {
+    // HIGH priority: Require immediate attention
+    case 'MENTION':
+    case 'APPROVAL_REQUESTED':
+    case 'APPROVAL_APPROVED':
+    case 'APPROVAL_REJECTED':
+      return 'HIGH';
+
+    // NORMAL priority: Standard workflow notifications
+    case 'TASK_DISPATCH':
+    case 'TASK_ACCEPTED':
+    case 'TASK_REJECTED':
+      return 'NORMAL';
+
+    // LOW priority: Aggregated/throttled notifications
+    case 'WATCH_UPDATE':
+      return 'LOW';
+
+    default:
+      return 'NORMAL';
+  }
+}
 
 // Base Notification Content (JSON payload for task notifications)
 export interface TaskNotificationContent {
@@ -64,6 +98,7 @@ export interface WatchNotificationContent {
 export type NotificationContent = TaskNotificationContent | ApprovalNotificationContent | MentionNotificationContent | WatchNotificationContent;
 
 // Notification Entity
+// Story 4.5: Added optional priority field (computed from type, not stored in DB)
 export interface Notification {
   id: string;
   recipientId: string;
@@ -73,6 +108,7 @@ export interface Notification {
   refNodeId?: string;
   isRead: boolean;
   createdAt: string;
+  priority?: NotificationPriority; // Story 4.5: Computed field, not persisted
 }
 
 // Zod Schema for API validation
@@ -152,6 +188,11 @@ export interface MarkNotificationReadDto {
   id: string;
 }
 
+// Story 4.5: Extended query parameters for filtering and pagination
 export interface NotificationListQuery {
-  isRead?: boolean;
+  isRead?: boolean;           // Backward compatibility
+  page?: number;              // Story 4.5: Pagination page (1-based)
+  limit?: number;             // Story 4.5: Page size (default 50)
+  unreadOnly?: boolean;       // Story 4.5: Filter to unread only
+  priority?: NotificationPriority; // Story 4.5: Filter by priority level
 }
