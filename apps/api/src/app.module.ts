@@ -14,9 +14,11 @@ import { EventEmitterModule } from '@nestjs/event-emitter'; // Story 4.1
 import { MindmapCoreServerModule } from '@cdm/plugin-mindmap-core/server';
 import { WorkflowApprovalServerModule } from '@cdm/plugin-workflow-approval/server';
 import { CommentsServerModule } from '@cdm/plugin-comments/server';
+import { TemplatesServerModule } from '@cdm/plugin-template/server'; // Story 5.1
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { GraphsModule } from './modules/graphs/graphs.module'; // Dynamic Graph ID
+import { DemoSeedService } from './demo/demo-seed.service'; // Story 5.1: For template instantiation
 import { ProductLibraryModule } from './modules/product-library'; // Story 2.7
 import { KnowledgeLibraryModule } from './modules/knowledge-library'; // Story 2.8
 import { FileModule } from './modules/file/file.module'; // Story 4.1: FIX-11
@@ -43,6 +45,12 @@ import { PluginKernelModule } from './modules/plugin-kernel/plugin-kernel.module
     MindmapCoreServerModule.register(),
     WorkflowApprovalServerModule.register(),
     CommentsServerModule.register(),
+
+    // Story 5.1: Template Library Plugin
+    TemplatesServerModule.forRoot({
+      imports: [GraphsModule],
+      demoSeedServiceProvider: DemoSeedService,
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],

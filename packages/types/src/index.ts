@@ -95,3 +95,6 @@ export * from './comment';
 
 // Story 4.4: Export subscription types for watch & subscription
 export * from './subscription-types';
+
+// Story 5.1: Export template library types
+export * from './template-types';

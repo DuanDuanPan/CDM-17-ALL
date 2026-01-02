@@ -1,0 +1,52 @@
+{
+    "name": "@cdm/plugin-template",
+    "version": "0.0.1",
+    "private": true,
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./server": {
+            "types": "./dist/server/index.d.ts",
+            "default": "./dist/server/index.js"
+        }
+    },
+    "typesVersions": {
+        "*": {
+            "server": [
+                "./dist/server/index.d.ts"
+            ]
+        }
+    },
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "test": "jest"
+    },
+    "dependencies": {
+        "@cdm/types": "workspace:*",
+        "@cdm/database": "workspace:*",
+        "@cdm/plugins": "workspace:*",
+        "@nestjs/common": "^11.1.9",
+        "@nestjs/core": "^11.1.9",
+        "@nestjs/platform-express": "^11.1.9",
+        "class-validator": "^0.14.1",
+        "class-transformer": "^0.5.1"
+    },
+    "devDependencies": {
+        "@nestjs/testing": "^11.1.9",
+        "@types/jest": "^29.5.14",
+        "@types/express": "^5.0.0",
+        "@types/node": "^22.0.0",
+        "jest": "^29.7.0",
+        "ts-jest": "^29.2.6",
+        "typescript": "^5.7.0"
+    },
+    "peerDependencies": {
+        "@nestjs/common": "^11.0.0",
+        "@nestjs/core": "^11.0.0"
+    }
+}

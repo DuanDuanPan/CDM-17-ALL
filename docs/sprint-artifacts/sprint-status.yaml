@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2026-01-01 - Epic 4 completed; Story 4.4 Watch & Subscription done
+last_updated: 2026-01-01 - Story 5.1 Template Library DONE; Backend, Frontend, Tests complete
 
 development_status:
   epic-1: done
@@ -69,8 +69,8 @@ development_status:
   4-5-smart-notification-center: done
   epic-4-retrospective: optional
 
-  epic-5: backlog
-  5-1-template-library: backlog
+  epic-5: in-progress
+  5-1-template-library: done  # All phases complete: data model, backend plugin, frontend, tests
   5-2-subtree-fragments: backlog
   5-3-cross-graph-linking: backlog
   5-4-ai-generation: backlog

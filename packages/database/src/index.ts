@@ -62,7 +62,11 @@ export { Database, db } from './Database';
 // Re-export Prisma generated types (available after prisma generate)
 // Story 2.9: Added NodeApp export
 // Story 7.1: Added CommentAttachment export for AttachmentsRepository
-export type { User, Project, Graph, Node, Edge, Notification, NodePBS, NodeTask, NodeRequirement, NodeData, NodeApp, Comment, CommentRead, Subscription, CommentAttachment } from '@prisma/client';
+// Story 5.1: Added Template types for template library
+export type { User, Project, Graph, Node, Edge, Notification, NodePBS, NodeTask, NodeRequirement, NodeData, NodeApp, Comment, CommentRead, Subscription, CommentAttachment, Template, TemplateCategory, TemplateUsageLog } from '@prisma/client';
+
+// Story 5.1: Export enums for template library
+export { NodeType, TemplateStatus } from '@prisma/client';
 
 // HIGH-1 Fix: Export Prisma namespace as both type and value for DbNull access
 export { Prisma } from '@prisma/client';

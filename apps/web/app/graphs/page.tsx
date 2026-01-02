@@ -3,12 +3,15 @@
 /**
  * 图谱列表页面
  * 显示当前用户的所有图谱，支持创建和删除操作
+ * Story 5.1: 添加从模板创建功能
  */
 
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { PlusCircle, Folder, Trash2, Clock, Boxes, GitBranch } from 'lucide-react';
+import { PlusCircle, Folder, Trash2, Clock, Boxes, GitBranch, LayoutTemplate } from 'lucide-react';
 import { useGraphs } from '@/hooks/useGraphs';
+import { TemplateLibraryDialog } from '@/components/TemplateLibrary';
+import type { CreateFromTemplateResponse } from '@cdm/types';
 
 function GraphsListContent() {
     const router = useRouter();
@@ -16,6 +19,15 @@ function GraphsListContent() {
     const userId = searchParams.get('userId') || 'test1';
 
     const { graphs, isLoading, error, createGraph, deleteGraph } = useGraphs(userId);
+
+    // Story 5.1: Template library dialog state
+    const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+
+    // Story 5.1: Handle template selection - navigate to new graph
+    const handleTemplateSelect = (result: CreateFromTemplateResponse) => {
+        setTemplateDialogOpen(false);
+        router.push(`/graph/${result.graphId}?userId=${userId}`);
+    };
 
     const handleCreateGraph = async () => {
         try {
@@ -85,15 +97,27 @@ function GraphsListContent() {
                                 用户：<span className="font-medium text-gray-700">{userId}</span>
                             </p>
                         </div>
-                        <button
-                            onClick={handleCreateGraph}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 
-                       text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 
-                       transition-all shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30"
-                        >
-                            <PlusCircle className="w-5 h-5" />
-                            创建新图谱
-                        </button>
+                        {/* Story 5.1: Button group for graph creation */}
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setTemplateDialogOpen(true)}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-blue-200
+                                           text-blue-600 rounded-xl hover:bg-blue-50 hover:border-blue-300
+                                           transition-all shadow-sm hover:shadow-md"
+                            >
+                                <LayoutTemplate className="w-5 h-5" />
+                                从模板创建
+                            </button>
+                            <button
+                                onClick={handleCreateGraph}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 
+                                           text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 
+                                           transition-all shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30"
+                            >
+                                <PlusCircle className="w-5 h-5" />
+                                创建空白图谱
+                            </button>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -189,6 +213,14 @@ function GraphsListContent() {
                     </div>
                 )}
             </main>
+
+            {/* Story 5.1: Template Library Dialog */}
+            <TemplateLibraryDialog
+                open={templateDialogOpen}
+                onOpenChange={setTemplateDialogOpen}
+                onSelect={handleTemplateSelect}
+                userId={userId}
+            />
         </div>
     );
 }

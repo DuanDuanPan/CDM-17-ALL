@@ -29,3 +29,6 @@ export * from './comments';
 
 // Approval operations
 export * from './approval';
+
+// Template operations (Story 5.1)
+export * from './templates';

@@ -12,6 +12,6 @@ import { DemoSeedService } from '../../demo/demo-seed.service';
 @Module({
     controllers: [GraphsController],
     providers: [GraphsService, GraphRepository, DemoSeedService],
-    exports: [GraphsService, GraphRepository],
+    exports: [GraphsService, GraphRepository, DemoSeedService],
 })
 export class GraphsModule { }
