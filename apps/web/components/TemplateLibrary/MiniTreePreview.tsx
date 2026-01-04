@@ -57,7 +57,7 @@ function MiniNode({
     depth,
     maxDepth,
     maxChildren,
-    isLast,
+    isLast: _isLast,
     siblingIndex,
 }: {
     node: TemplateNode;

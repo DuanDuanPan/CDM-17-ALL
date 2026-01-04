@@ -1,6 +1,7 @@
 /**
  * Story 5.1: Template Library API Service
  * Story 5.2: Subtree Template Save & Reuse
+ * Story 5.3: Delete Template
  * Centralized API calls for template library operations
  *
  * Endpoints:
@@ -9,6 +10,7 @@
  * - GET /api/templates/:id - Get template details
  * - POST /api/templates/:id/instantiate - Create graph from template
  * - POST /api/templates - Create new template from subtree (Story 5.2)
+ * - DELETE /api/templates/:id - Delete a template (Story 5.3)
  */
 
 import type {
@@ -20,6 +22,7 @@ import type {
     CreateFromTemplateResponse,
     CreateTemplateRequest,
     CreateTemplateResponse,
+    DeleteTemplateResponse,
 } from '@cdm/types';
 
 /**
@@ -177,6 +180,33 @@ export async function createTemplate(
         return data.template;
     } catch (error) {
         console.error('[templates.api] Error creating template:', error);
+        throw error;
+    }
+}
+
+/**
+ * Story 5.3: Delete a template by ID
+ * @param templateId - The template ID to delete
+ * @param userId - The user ID (required for authorization)
+ */
+export async function deleteTemplate(
+    templateId: string,
+    userId: string
+): Promise<DeleteTemplateResponse> {
+    try {
+        const params = new URLSearchParams({ userId });
+        const response = await fetch(`/api/templates/${templateId}?${params}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || `Failed to delete template: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('[templates.api] Error deleting template:', error);
         throw error;
     }
 }

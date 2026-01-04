@@ -107,3 +107,10 @@ export class CreateTemplateBodyDto {
   @IsBoolean()
   isPublic?: boolean;
 }
+
+// Story 5.3: Query parameters for deleting a template
+export class DeleteTemplateQueryDto {
+  @IsString()
+  @IsNotEmpty()
+  userId!: string;
+}

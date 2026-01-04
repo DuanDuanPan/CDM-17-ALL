@@ -8,6 +8,7 @@ import {
     Controller,
     Get,
     Post,
+    Delete,
     Param,
     Query,
     Body,
@@ -23,6 +24,7 @@ import {
     CreateTemplateQueryDto,
     CreateTemplateBodyDto,
     GetTemplateQueryDto,
+    DeleteTemplateQueryDto,
 } from './templates.request.dto';
 import type {
     TemplatesListResponse,
@@ -30,6 +32,7 @@ import type {
     CategoriesListResponse,
     CreateFromTemplateResponse,
     CreateTemplateResponse,
+    DeleteTemplateResponse,
 } from '@cdm/types';
 
 @Controller('templates')
@@ -105,5 +108,24 @@ export class TemplatesController {
         @Body() body?: InstantiateTemplateBodyDto
     ): Promise<CreateFromTemplateResponse> {
         return this.service.instantiate(id, query.userId, body?.name);
+    }
+
+    /**
+     * Story 5.3: Delete a template by ID
+     * DELETE /templates/:id?userId=xxx
+     * Only the creator can delete their own templates.
+     * System templates (creatorId = null) cannot be deleted.
+     */
+    @Delete(':id')
+    @HttpCode(HttpStatus.OK)
+    async delete(
+        @Param('id') id: string,
+        @Query() query: DeleteTemplateQueryDto
+    ): Promise<DeleteTemplateResponse> {
+        if (!query.userId) {
+            throw new BadRequestException('userId query parameter is required');
+        }
+
+        return this.service.deleteTemplate(id, query.userId);
     }
 }

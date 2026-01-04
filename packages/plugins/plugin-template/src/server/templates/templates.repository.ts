@@ -263,4 +263,25 @@ export class TemplatesRepository {
             updatedAt: template.updatedAt.toISOString(),
         };
     }
+
+    /**
+     * Story 5.3: Find template by ID for deletion (lightweight query)
+     * Returns only fields needed for authorization check
+     */
+    async findByIdForDelete(id: string): Promise<{ id: string; creatorId: string | null } | null> {
+        return prisma.template.findUnique({
+            where: { id },
+            select: { id: true, creatorId: true },
+        });
+    }
+
+    /**
+     * Story 5.3: Delete a template by ID
+     * Note: TemplateUsageLog entries are cascade-deleted via Prisma schema
+     */
+    async delete(id: string): Promise<void> {
+        await prisma.template.delete({
+            where: { id },
+        });
+    }
 }
