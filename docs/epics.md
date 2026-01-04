@@ -112,6 +112,7 @@ FR22: Epic 3 - 审计追踪视图
 FR23: Epic 1 - 快速上手与指引
 FR24: Epic 3 - 安全分享闭环
 FR28: Epic 2 - 多选与剪贴板操作
+FR25: Epic 8 - 大规模图谱体验优化
 
 ## Epic List
 
@@ -144,6 +145,11 @@ FR28: Epic 2 - 多选与剪贴板操作
 为航天/军工级场景提供严密的数据保护、权限控制和全生命周期的审计追踪。
 **FRs covered:** FR5, FR2, FR21, FR22, FR24
 **Core Value:** 安全官和管理员可以放心地让敏感数据上云，确保合规与可追溯性。
+
+### Epic 8: 大规模图谱体验优化 (Large Graph UX Optimization)
+针对 500-5000+ 节点场景，提供高效的导航、组织和聚焦能力，确保复杂图谱"不迷路、不卡顿、好管理"。
+**FRs covered:** FR1 (增强), FR8 (增强), FR18 (增强), FR25
+**Core Value:** 用户在处理企业级复杂图谱时仍能保持高效和专注。
 
 ---
 
@@ -754,4 +760,216 @@ So that **审批流 UI 更易维护，各部分可独立复用和测试。**
 **Then** 主文件行数应降低至 300 行以内
 **And** 应分离为 `ApprovalStatus.tsx`, `ApprovalActions.tsx`, `DeliverablesSection.tsx`, `ApprovalHistory.tsx`
 **And** 审批提交、审批/驳回、交付物上传、历史查看功能通过回归测试
+
+
+## Epic 8: 大规模图谱体验优化 (Large Graph UX Optimization)
+
+**目标**: 针对 500-5000+ 节点场景，提供高效的导航、组织和聚焦能力，确保复杂图谱"不迷路、不卡顿、好管理"。
+
+### Story 8.1: 节点折叠/展开 (Node Collapse & Expand)
+
+As a **用户**,
+I want **折叠和展开节点的子树**,
+So that **我能减少视觉复杂度，专注于当前关注的分支。**
+
+**Acceptance Criteria:**
+
+**Given** 一个有子节点的节点
+**When** 点击节点左侧的折叠图标（或按快捷键）
+**Then** 所有子节点应隐藏，父节点显示子节点数量徽章 (如 "+12")
+**When** 再次点击展开图标
+**Then** 子节点应恢复显示，保持原有布局位置
+**And** 支持递归折叠（一键折叠所有后代）
+**And** 折叠状态应保存到用户会话，刷新后保留
+**And** 当通过搜索定位到被折叠的节点时，路径应自动展开
+
+### Story 8.2: 小地图导航 (Minimap Navigation)
+
+As a **用户**,
+I want **通过小地图快速了解全图结构并导航定位**,
+So that **我在处理大型图谱时不会迷失方向。**
+
+**Acceptance Criteria:**
+
+**Given** 一个包含 100+ 节点的图谱
+**When** 页面加载时
+**Then** 右下角应显示小地图（可通过按钮隐藏）
+**When** 拖动小地图中的视口矩形
+**Then** 主画布应实时平移到对应位置
+**When** 点击小地图上的某个区域
+**Then** 主画布应快速定位（带平滑动画）到该位置
+**And** 小地图应显示节点的缩略轮廓
+**And** 当前选中节点在小地图上高亮显示
+**And** 搜索匹配的节点在小地图上高亮标记
+
+### Story 8.3: 缩放快捷键系统 (Zoom Shortcuts System)
+
+As a **用户**,
+I want **通过快捷键快速控制缩放级别**,
+So that **我能高效地在全局概览和细节编辑之间切换。**
+
+**Acceptance Criteria:**
+
+**Given** 画布处于任意缩放级别
+**When** 按下 `Cmd/Ctrl + 滚轮`
+**Then** 画布应以鼠标位置为中心平滑缩放
+**When** 按下 `Cmd/Ctrl + 0`
+**Then** 画布应缩放到"适应屏幕"，显示全部节点
+**When** 按下 `Cmd/Ctrl + 1`
+**Then** 画布恢复到 100% 缩放
+**When** 双击某个节点
+**Then** 画布应缩放并定位，使该节点居中显示
+**And** 缩放过程应有惯性动画，体验流畅
+
+### Story 8.4: 大纲/轮廓视图 (Outline View)
+
+As a **架构师**,
+I want **以树形大纲形式浏览和管理图谱结构**,
+So that **我能清晰了解层级关系，快速跳转和重组节点。**
+
+**Acceptance Criteria:**
+
+**Given** 一个复杂的多层级图谱
+**When** 点击侧边栏的"大纲"Tab
+**Then** 显示完整的树形节点列表，反映图谱层级结构
+**When** 在大纲中点击某个节点
+**Then** 画布应自动定位到该节点并选中
+**When** 在大纲中拖拽节点
+**Then** 图谱中的父子关系应同步更新
+**And** 大纲视图应与画布保持实时双向同步
+**And** 大纲中应支持折叠/展开目录
+
+### Story 8.5: 聚焦模式 (Focus Mode)
+
+As a **日常编辑者**,
+I want **聚焦到当前分支，淡化无关节点**,
+So that **我能专注编辑而不被其他内容干扰。**
+
+**Acceptance Criteria:**
+
+**Given** 选中了画布上的某个节点
+**When** 按下聚焦快捷键（如 `F` 或菜单激活）
+**Then** 非直接关联节点（非父/子/兄弟）应淡化至 20% 透明度
+**When** 再次按下快捷键或点击空白处
+**Then** 所有节点恢复正常视觉状态
+**And** 聚焦模式应有视觉指示器（如工具栏中的开关状态）
+**And** 聚焦区域应支持配置（1层、2层、3层等）
+
+### Story 8.6: 分组 Frame (Grouping Frame)
+
+As a **架构师**,
+I want **将相关节点组织到一个可折叠的 Frame 分组中**,
+So that **我能对大型图谱进行逻辑分区管理。**
+
+**Acceptance Criteria:**
+
+**Given** 画布上选中了多个节点
+**When** 右键选择"创建分组"或使用快捷键
+**Then** 应创建一个包含这些节点的 Frame 容器
+**And** Frame 应有标题栏（可编辑名称）和背景色（可选择）
+**When** 拖动 Frame 标题栏
+**Then** Frame 及其内部所有节点应整体移动
+**When** 点击 Frame 的折叠按钮
+**Then** Frame 内容折叠为一个紧凑图标，只显示标题
+**And** Frame 应支持嵌套（Frame 中包含 Frame）
+
+### Story 8.7: 快捷键面板 (Command Palette Enhancement)
+
+As a **高级用户**,
+I want **通过命令面板快速执行任意功能**,
+So that **我能以最快速度访问任何命令而不需要记忆菜单位置。**
+
+**Acceptance Criteria:**
+
+**Given** 画布处于任意状态
+**When** 按下 `Cmd/Ctrl + K`
+**Then** 应弹出命令面板（扩展现有 GlobalSearchDialog）
+**When** 输入关键词
+**Then** 应模糊匹配所有可用命令并实时过滤
+**When** 选中并执行命令
+**Then** 对应功能应被触发，面板自动关闭
+**And** 每个命令应显示其对应的快捷键（如 "全屏 ⌘+Enter"）
+**And** 面板应记忆最近使用的命令，优先展示
+**Note** 基础搜索功能已在 Story 2.5 中实现，本 Story 扩展命令执行能力
+
+### Story 8.8: 语义缩放 LOD (Semantic Zoom / Level of Detail)
+
+As a **用户**,
+I want **缩放时节点自动调整显示详细程度**,
+So that **我在缩小全局视图时仍能获取关键信息而不杂乱。**
+
+**Acceptance Criteria:**
+
+**Given** 一个包含详细内容的节点
+**When** 缩放到 < 50% 时
+**Then** 节点应只显示标题，隐藏描述和属性
+**When** 缩放到 < 25% 时
+**Then** 节点应只显示图标/色块，隐藏标题
+**When** 放大回 ≥ 50% 时
+**Then** 节点应恢复完整显示
+**And** 过渡应平滑，无跳变
+
+### Story 8.9: 智能折叠 (Smart Collapse)
+
+As a **用户**,
+I want **系统自动折叠远离当前焦点的分支**,
+So that **我无需手动管理，画布自动保持整洁。**
+
+**Acceptance Criteria:**
+
+**Given** 正在编辑某个节点
+**When** 开启"智能折叠"模式
+**Then** 距离当前节点 > 3 层的分支应自动折叠
+**When** 选中另一个分支时
+**Then** 之前的分支应折叠，新分支自动展开
+**And** 用户可配置自动折叠的距离阈值
+**And** 智能折叠可通过开关禁用
+
+### Story 8.10: 小地图热力图 (Minimap Heatmap)
+
+As a **架构师**,
+I want **小地图上用颜色深浅表示节点密度**,
+So that **我能快速识别图谱中的信息密集区域。**
+
+**Acceptance Criteria:**
+
+**Given** 一个节点分布不均的大型图谱
+**When** 查看小地图时
+**Then** 节点密集区域应显示为更深的颜色
+**And** 稀疏区域显示为浅色或透明
+**And** 热力图可通过小地图设置开关
+
+### Story 8.11: 视图书签 (View Bookmarks)
+
+As a **用户**,
+I want **保存当前视口位置和缩放为书签，一键恢复**,
+So that **我能在不同工作区域之间快速切换。**
+
+**Acceptance Criteria:**
+
+**Given** 画布定位到某个特定区域和缩放级别
+**When** 按下 `Cmd/Ctrl + Shift + 1-9` 保存书签
+**Then** 当前视口状态应被保存（位置 + 缩放 + 可选名称）
+**When** 按下对应书签快捷键
+**Then** 画布应平滑动画恢复到保存的状态
+**And** 书签列表可在侧边栏或下拉菜单中管理
+**And** 书签应持久化到项目/用户级别
+
+### Story 8.12: 演示模式 (Presentation Mode)
+
+As a **汇报者**,
+I want **按照预设顺序渐进展开图谱分支**,
+So that **我能流畅地向观众讲解复杂的结构。**
+
+**Acceptance Criteria:**
+
+**Given** 配置了演示路径（节点顺序）
+**When** 进入演示模式（全屏 + 隐藏工具栏）
+**Then** 画布应只显示第一个节点，其余折叠或隐藏
+**When** 按下 `Space` 或 `→`
+**Then** 应平滑动画展开下一个预设节点/分支
+**When** 按下 `ESC`
+**Then** 退出演示模式，恢复正常编辑视图
+**And** 演示路径可通过拖拽节点顺序配置
+**And** 支持导出为自动播放动画
 
