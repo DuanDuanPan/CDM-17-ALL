@@ -131,6 +131,17 @@ vi.mock('@/components/graph/hooks', () => ({
   })),
   useGraphCursor: vi.fn(() => ({ handleMouseMove: vi.fn() })),
   useGraphInitialization: vi.fn(),
+  useNodeCollapse: vi.fn(() => ({
+    isCollapsed: vi.fn(() => false),
+    toggleCollapse: vi.fn(),
+    collapseNode: vi.fn(),
+    expandNode: vi.fn(),
+    collapseDescendants: vi.fn(),
+    expandPathToNode: vi.fn(),
+    getHiddenDescendantCount: vi.fn(() => 0),
+    getChildCount: vi.fn(() => 0),
+    hasChildren: vi.fn(() => false),
+  })),
 }));
 
 // Mock context

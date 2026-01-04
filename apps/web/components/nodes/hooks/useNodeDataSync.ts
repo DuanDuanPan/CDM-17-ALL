@@ -37,6 +37,8 @@ export interface UseNodeDataSyncReturn {
     unreadCount: number;
     /** Whether node is watched/subscribed */
     isWatched: boolean;
+    /** Story 8.1: Whether node is collapsed */
+    isCollapsed: boolean;
 }
 
 /**
@@ -60,6 +62,9 @@ export function useNodeDataSync(node: Node): UseNodeDataSyncReturn {
 
     // Story 4.4: Subscription indicator
     const [isWatched, setIsWatched] = useState(() => isNodeSubscribed(node.id));
+
+    // Story 8.1: Collapsed state
+    const [isCollapsed, setIsCollapsed] = useState(() => !!getData().collapsed);
 
     // Subscribe to unread count changes
     useEffect(() => {
@@ -88,6 +93,8 @@ export function useNodeDataSync(node: Node): UseNodeDataSyncReturn {
             if (data.nodeType !== NodeType.APP) {
                 setAppRunning(false);
             }
+            // Story 8.1: Sync collapsed state
+            setIsCollapsed(!!data.collapsed);
             if (!data.isEditing) {
                 setLabel(data.label ?? '');
                 setDescription(data.description ?? '');
@@ -113,6 +120,7 @@ export function useNodeDataSync(node: Node): UseNodeDataSyncReturn {
         setAppRunning,
         unreadCount,
         isWatched,
+        isCollapsed,
     };
 }
 

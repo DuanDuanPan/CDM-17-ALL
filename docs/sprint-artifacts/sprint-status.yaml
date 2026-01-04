@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2026-01-04 - Story 5.2 code review Round 2 completed; all HIGH issues fixed; status set to review
+last_updated: 2026-01-05 - Story 8.1 Node Collapse & Expand: unit tests + story E2E passing; ready for review
 
 development_status:
   epic-1: done
@@ -99,3 +99,18 @@ development_status:
   7-7-product-search-dialog-refactor: done
   7-8-right-sidebar-refactor: done
   7-9-approval-status-panel-refactor: done
+
+  epic-8: in-progress
+  8-1-node-collapse-expand: review
+  8-2-minimap-navigation: backlog
+  8-3-zoom-shortcuts-system: backlog
+  8-4-outline-view: backlog
+  8-5-focus-mode: backlog
+  8-6-grouping-frame: backlog
+  8-7-command-palette-enhancement: backlog
+  8-8-semantic-zoom-lod: backlog
+  8-9-smart-collapse: backlog
+  8-10-minimap-heatmap: backlog
+  8-11-view-bookmarks: backlog
+  8-12-presentation-mode: backlog
+  epic-8-retrospective: optional

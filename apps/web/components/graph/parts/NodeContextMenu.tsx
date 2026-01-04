@@ -1,7 +1,7 @@
 'use client';
 
 import type { Graph } from '@antv/x6';
-import { LayoutTemplate } from 'lucide-react';
+import { LayoutTemplate, ChevronRight, ChevronDown, ChevronsDownUp } from 'lucide-react';
 
 export interface NodeContextMenuProps {
     visible: boolean;
@@ -21,11 +21,18 @@ export interface NodeContextMenuProps {
     onSubscriptionToggle: () => void;
     onSaveAsTemplate?: () => void; // Story 5.2
     onClose: () => void;
+    // Story 8.1: Collapse/expand
+    isCollapsed?: boolean;
+    hasChildren?: boolean;
+    onCollapse?: () => void;
+    onExpand?: () => void;
+    onCollapseDescendants?: () => void;
 }
 
 /**
- * Node context menu for clipboard operations and subscriptions.
+ * Node context menu for clipboard operations, subscriptions, and collapse/expand.
  * Story 7.4: Extracted from GraphComponent for single responsibility.
+ * Story 8.1: Added collapse/expand menu items.
  */
 export function NodeContextMenu({
     visible,
@@ -44,6 +51,12 @@ export function NodeContextMenu({
     onSubscriptionToggle,
     onSaveAsTemplate,
     onClose,
+    // Story 8.1: Collapse/expand
+    isCollapsed,
+    hasChildren,
+    onCollapse,
+    onExpand,
+    onCollapseDescendants,
 }: NodeContextMenuProps) {
     if (!visible) return null;
 
@@ -114,9 +127,45 @@ export function NodeContextMenu({
                             {isSubscriptionLoading
                                 ? '处理中...'
                                 : isSubscribed
-                                  ? '取消关注'
-                                  : '关注节点'}
+                                    ? '取消关注'
+                                    : '关注节点'}
                         </button>
+                    </>
+                )}
+                {/* Story 8.1: Collapse/expand menu items */}
+                {nodeId && hasChildren && (
+                    <>
+                        <div className="border-t border-gray-100 my-1" />
+                        {!isCollapsed && onCollapse && (
+                            <button
+                                onClick={() => handleAction(onCollapse)}
+                                className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
+                            >
+                                <ChevronRight className="w-4 h-4 text-gray-500" />
+                                折叠子节点
+                                <span className="ml-auto text-xs text-gray-400">⌘[</span>
+                            </button>
+                        )}
+                        {isCollapsed && onExpand && (
+                            <button
+                                onClick={() => handleAction(onExpand)}
+                                className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
+                            >
+                                <ChevronDown className="w-4 h-4 text-gray-500" />
+                                展开子节点
+                                <span className="ml-auto text-xs text-gray-400">⌘]</span>
+                            </button>
+                        )}
+                        {onCollapseDescendants && (
+                            <button
+                                onClick={() => handleAction(onCollapseDescendants)}
+                                className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
+                            >
+                                <ChevronsDownUp className="w-4 h-4 text-gray-500" />
+                                折叠所有后代
+                                <span className="ml-auto text-xs text-gray-400">⌘⌥[</span>
+                            </button>
+                        )}
                     </>
                 )}
             </div>

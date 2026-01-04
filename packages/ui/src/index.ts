@@ -27,3 +27,7 @@ export type { Toast, ToastType } from './toast';
 // Confirm dialog
 export { ConfirmDialogProvider, useConfirmDialog } from './confirm-dialog';
 export type { ConfirmDialogOptions } from './confirm-dialog';
+
+// Story 8.1: Collapse toggle
+export { CollapseToggle } from './collapse-toggle';
+export type { CollapseToggleProps } from './collapse-toggle';

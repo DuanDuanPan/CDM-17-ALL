@@ -32,3 +32,7 @@ export type {
 
 export { useGraphCursor } from './useGraphCursor';
 export type { UseGraphCursorOptions, UseGraphCursorReturn } from './useGraphCursor';
+
+// Story 8.1: Node Collapse & Expand
+export { useNodeCollapse } from './useNodeCollapse';
+export type { UseNodeCollapseOptions, UseNodeCollapseReturn } from './useNodeCollapse';

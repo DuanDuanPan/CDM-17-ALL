@@ -24,6 +24,13 @@ export interface UseGraphHotkeysOptions {
     onExitDependencyMode?: () => void;
     /** Remove dependency edge helper */
     removeEdge: (graph: Graph, edge: Edge) => void;
+    // Story 8.1: Collapse/expand handlers
+    /** Collapse a node */
+    onCollapseNode?: (nodeId: string) => void;
+    /** Expand a node */
+    onExpandNode?: (nodeId: string) => void;
+    /** Recursively collapse all descendants */
+    onCollapseDescendants?: (nodeId: string) => void;
 }
 
 export interface UseGraphHotkeysReturn {
@@ -41,6 +48,7 @@ export interface UseGraphHotkeysReturn {
  * - Edit mode (Space)
  * - Edge deletion (Delete/Backspace)
  * - Escape to exit modes
+ * - Story 8.1: Collapse/expand (Cmd+[, Cmd+], Cmd+Alt+[)
  */
 export function useGraphHotkeys({
     graph,
@@ -52,6 +60,10 @@ export function useGraphHotkeys({
     isDependencyMode,
     onExitDependencyMode,
     removeEdge,
+    // Story 8.1: Collapse/expand
+    onCollapseNode,
+    onExpandNode,
+    onCollapseDescendants,
 }: UseGraphHotkeysOptions): UseGraphHotkeysReturn {
     // Global Space-to-edit: allow editing even when graph container isn't focused
     useEffect(() => {
@@ -110,6 +122,40 @@ export function useGraphHotkeys({
                 e.stopPropagation();
                 if (graph.canRedo()) {
                     graph.redo();
+                }
+                return;
+            }
+
+            // Story 8.1: Collapse shortcuts (must check before single-node selection)
+            // Cmd/Ctrl + Alt + [ : Recursive collapse all descendants
+            if ((e.metaKey || e.ctrlKey) && e.altKey && e.key === '[') {
+                e.preventDefault();
+                e.stopPropagation();
+                const selectedNodes = graph.getSelectedCells().filter((cell) => cell.isNode());
+                if (selectedNodes.length === 1 && onCollapseDescendants) {
+                    onCollapseDescendants(selectedNodes[0].id);
+                }
+                return;
+            }
+
+            // Cmd/Ctrl + [ : Collapse current node
+            if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key === '[') {
+                e.preventDefault();
+                e.stopPropagation();
+                const selectedNodes = graph.getSelectedCells().filter((cell) => cell.isNode());
+                if (selectedNodes.length === 1 && onCollapseNode) {
+                    onCollapseNode(selectedNodes[0].id);
+                }
+                return;
+            }
+
+            // Cmd/Ctrl + ] : Expand current node
+            if ((e.metaKey || e.ctrlKey) && e.key === ']') {
+                e.preventDefault();
+                e.stopPropagation();
+                const selectedNodes = graph.getSelectedCells().filter((cell) => cell.isNode());
+                if (selectedNodes.length === 1 && onExpandNode) {
+                    onExpandNode(selectedNodes[0].id);
                 }
                 return;
             }
@@ -200,7 +246,7 @@ export function useGraphHotkeys({
                     break;
             }
         },
-        [graph, isReady, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge, setSelectedEdge, setConnectionStartNode]
+        [graph, isReady, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge, setSelectedEdge, setConnectionStartNode, onCollapseNode, onExpandNode, onCollapseDescendants]
     );
 
     return { handleKeyDown };

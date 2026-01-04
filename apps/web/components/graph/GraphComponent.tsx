@@ -26,7 +26,7 @@ import { setSubscriptions } from '@/lib/subscriptionStore';
 import { useToast } from '@cdm/ui';
 
 // Story 7.4: Extracted hooks and UI components
-import { useGraphTransform, useGraphHotkeys, useGraphEvents, useGraphSelection, useGraphDependencyMode, useGraphContextMenu, useGraphCursor, useGraphInitialization } from './hooks';
+import { useGraphTransform, useGraphHotkeys, useGraphEvents, useGraphSelection, useGraphDependencyMode, useGraphContextMenu, useGraphCursor, useGraphInitialization, useNodeCollapse } from './hooks';
 import type { EdgeContextMenuState, NodeContextMenuState } from './hooks';
 import { EdgeContextMenu, NodeContextMenu, ConnectionStatus, DependencyModeIndicator } from './parts';
 
@@ -165,9 +165,23 @@ export function GraphComponent({
     const { handleDependencyTypeChange, handleCloseContextMenu, removeEdge } = useGraphContextMenu({
         graph, contextMenu, setContextMenu,
     });
+
+    // Story 8.1: Node Collapse & Expand
+    const {
+        isCollapsed,
+        collapseNode,
+        expandNode,
+        collapseDescendants,
+        hasChildren,
+    } = useNodeCollapse({ graph, isReady });
+
     const { handleKeyDown } = useGraphHotkeys({
         graph, isReady, selectedEdge, setSelectedEdge,
         connectionStartNode, setConnectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge,
+        // Story 8.1: Collapse handlers
+        onCollapseNode: collapseNode,
+        onExpandNode: expandNode,
+        onCollapseDescendants: collapseDescendants,
     });
     useGraphEvents({
         graph, isReady, containerRef, onNodeSelect, setSelectedEdge,
@@ -348,6 +362,12 @@ export function GraphComponent({
                     }
                 }}
                 onClose={() => setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0, nodeId: null })}
+                // Story 8.1: Collapse/expand props
+                isCollapsed={nodeContextMenu.nodeId ? isCollapsed(nodeContextMenu.nodeId) : false}
+                hasChildren={nodeContextMenu.nodeId ? hasChildren(nodeContextMenu.nodeId) : false}
+                onCollapse={nodeContextMenu.nodeId ? () => collapseNode(nodeContextMenu.nodeId!) : undefined}
+                onExpand={nodeContextMenu.nodeId ? () => expandNode(nodeContextMenu.nodeId!) : undefined}
+                onCollapseDescendants={nodeContextMenu.nodeId ? () => collapseDescendants(nodeContextMenu.nodeId!) : undefined}
             />
 
             {/* Story 5.2: Save as Template Dialog */}

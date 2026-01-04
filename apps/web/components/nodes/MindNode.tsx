@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useLayoutEffect, useRef } from 'react';
-import type { Node } from '@antv/x6';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { Node, Graph, Edge } from '@antv/x6';
 import {
     NodeType,
     type TaskProps,
@@ -12,6 +12,8 @@ import {
     type AppExecutionStatus,
     type ApprovalPipeline,
 } from '@cdm/types';
+import { CollapseToggle } from '@cdm/ui';
+import { isDependencyEdge } from '@/lib/edgeValidation';
 
 // Story 7.4: Extracted hooks
 import { useNodeDataSync, useAppExecution, useNodeEditing } from './hooks';
@@ -24,6 +26,9 @@ import { OrdinaryNode } from './OrdinaryNode';
 import { RichNode } from './RichNode';
 import { LegacyCardNode } from './LegacyCardNode';
 import { getNodeRenderer } from './rich';
+
+// Story 8.1: Child count badge
+import { ChildCountBadge } from './ChildCountBadge';
 
 export interface MindNodeProps {
     node: Node;
@@ -38,7 +43,7 @@ export function MindNode({ node }: MindNodeProps) {
     const {
         getData, isEditing, setIsEditing, isSelected, label, setLabel,
         description, setDescription, tags, appRunning, setAppRunning,
-        unreadCount, isWatched,
+        unreadCount, isWatched, isCollapsed,
     } = useNodeDataSync(node);
 
     const { handleAppExecute } = useAppExecution({ node, getData, appRunning, setAppRunning });
@@ -120,6 +125,103 @@ export function MindNode({ node }: MindNodeProps) {
         [node.id, label]
     );
 
+    const graph = node.model?.graph as Graph | undefined;
+
+    // Story 8.1: Ensure the node UI reacts to outgoing edge changes (e.g. remote child added/removed)
+    // Without this, child count / collapse toggle can become stale when only edges change.
+    const [, bumpOutgoingEdgeRevision] = useState(0);
+    useEffect(() => {
+        if (!graph) return;
+
+        const bumpIfOutgoing = ({ edge }: { edge: Edge }) => {
+            if (edge.getSourceCellId() === node.id) {
+                bumpOutgoingEdgeRevision((v) => v + 1);
+            }
+        };
+
+        graph.on('edge:added', bumpIfOutgoing);
+        graph.on('edge:removed', bumpIfOutgoing);
+
+        return () => {
+            graph.off('edge:added', bumpIfOutgoing);
+            graph.off('edge:removed', bumpIfOutgoing);
+        };
+    }, [graph, node.id]);
+
+    // Story 8.1: Get child count from node's graph
+    const childCount = (() => {
+        if (!graph) return 0;
+        const outgoingEdges = graph.getOutgoingEdges(node) ?? [];
+        const uniqueChildIds = new Set<string>();
+
+        outgoingEdges.forEach((edge) => {
+            // Only hierarchical edges define children; skip dependency edges
+            if (isDependencyEdge(edge)) return;
+            const targetId = edge.getTargetCellId();
+            if (targetId) uniqueChildIds.add(targetId);
+        });
+
+        let count = 0;
+        uniqueChildIds.forEach((childId) => {
+            const cell = graph.getCellById(childId);
+            if (cell && cell.isNode()) count += 1;
+        });
+
+        return count;
+    })();
+
+    const hasChildren = childCount > 0;
+
+    // Story 8.1: Get hidden descendant count for collapsed node
+    const hiddenDescendantCount = (() => {
+        if (!isCollapsed) return 0;
+        if (!graph) return 0;
+        const visited = new Set<string>([node.id]);
+        const queue: string[] = [node.id];
+        let count = 0;
+
+        while (queue.length > 0) {
+            const currentId = queue.shift()!;
+            const outgoingEdges = graph.getOutgoingEdges(currentId) ?? [];
+            outgoingEdges.forEach((edge) => {
+                if (isDependencyEdge(edge)) return;
+                const targetId = edge.getTargetCellId();
+                if (!targetId || visited.has(targetId)) return;
+
+                visited.add(targetId);
+                const cell = graph.getCellById(targetId);
+                if (cell && cell.isNode()) {
+                    count += 1;
+                    queue.push(targetId);
+                }
+            });
+        }
+
+        return count;
+    })();
+
+    // Story 8.1: Handle collapse toggle
+    const handleToggleCollapse = useCallback(
+        (e?: React.MouseEvent) => {
+            e?.stopPropagation();
+            window.dispatchEvent(
+                new CustomEvent('mindmap:toggle-collapse', { detail: { nodeId: node.id } })
+            );
+        },
+        [node.id]
+    );
+
+    // Story 8.1: Handle expand (click on badge)
+    const handleExpand = useCallback(
+        (e?: React.MouseEvent) => {
+            e?.stopPropagation();
+            window.dispatchEvent(
+                new CustomEvent('mindmap:expand-node', { detail: { nodeId: node.id } })
+            );
+        },
+        [node.id]
+    );
+
     // Container classes
     const containerClasses = `
         relative flex flex-col w-full h-full transition-all duration-200 backdrop-blur-sm
@@ -134,20 +236,38 @@ export function MindNode({ node }: MindNodeProps) {
     // 1. ORDINARY NODE
     if (nodeType === NodeType.ORDINARY) {
         return (
-            <OrdinaryNode
-                containerRef={containerRef}
-                containerClasses={containerClasses}
-                titleMeasureRef={titleMeasureRef}
-                titleInputRef={titleInputRef}
-                label={label}
-                setLabel={setLabel}
-                isEditing={isEditing}
-                isWatched={isWatched}
-                getData={getData}
-                commit={commit}
-                handleKeyDown={handleKeyDown}
-                startEditing={startEditing}
-            />
+            <div className="relative">
+                {/* Story 8.1: Collapse toggle for nodes with children */}
+                {hasChildren && (
+                    <div className="absolute -left-7 top-1/2 -translate-y-1/2 z-10">
+                        <CollapseToggle
+                            isCollapsed={isCollapsed}
+                            childCount={childCount}
+                            onToggle={handleToggleCollapse}
+                        />
+                    </div>
+                )}
+                {/* Story 8.1: Hidden count badge for collapsed nodes */}
+                {isCollapsed && hiddenDescendantCount > 0 && (
+                    <div className="absolute -right-10 top-1/2 -translate-y-1/2 z-10">
+                        <ChildCountBadge count={hiddenDescendantCount} onClick={handleExpand} />
+                    </div>
+                )}
+                <OrdinaryNode
+                    containerRef={containerRef}
+                    containerClasses={containerClasses}
+                    titleMeasureRef={titleMeasureRef}
+                    titleInputRef={titleInputRef}
+                    label={label}
+                    setLabel={setLabel}
+                    isEditing={isEditing}
+                    isWatched={isWatched}
+                    getData={getData}
+                    commit={commit}
+                    handleKeyDown={handleKeyDown}
+                    startEditing={startEditing}
+                />
+            </div>
         );
     }
 
@@ -155,64 +275,100 @@ export function MindNode({ node }: MindNodeProps) {
     const renderer = getNodeRenderer(nodeType);
     if (renderer) {
         return (
-            <RichNode
-                containerRef={containerRef}
-                titleMeasureRef={titleMeasureRef}
-                titleInputRef={titleInputRef}
-                nodeId={node.id}
-                nodeType={nodeType}
-                data={data}
-                label={label}
-                setLabel={setLabel}
-                tags={tags}
-                isEditing={isEditing}
-                isSelected={isSelected}
-                isWatched={isWatched}
-                isTaskDone={isTaskDone}
-                appRunning={appRunning}
-                unreadCount={unreadCount}
-                approval={approval}
-                approvalStatus={approvalStatus}
-                approvalDecoration={approvalDecoration}
-                pill={pill}
-                handleKeyDown={handleKeyDown}
-                handleAppExecute={handleAppExecute}
-                handleOpenComments={handleOpenComments}
-                startEditing={startEditing}
-            />
+            <div className="relative">
+                {/* Story 8.1: Collapse toggle for nodes with children */}
+                {hasChildren && (
+                    <div className="absolute -left-7 top-1/2 -translate-y-1/2 z-10">
+                        <CollapseToggle
+                            isCollapsed={isCollapsed}
+                            childCount={childCount}
+                            onToggle={handleToggleCollapse}
+                        />
+                    </div>
+                )}
+                {/* Story 8.1: Hidden count badge for collapsed nodes */}
+                {isCollapsed && hiddenDescendantCount > 0 && (
+                    <div className="absolute -right-10 top-1/2 -translate-y-1/2 z-10">
+                        <ChildCountBadge count={hiddenDescendantCount} onClick={handleExpand} />
+                    </div>
+                )}
+                <RichNode
+                    containerRef={containerRef}
+                    titleMeasureRef={titleMeasureRef}
+                    titleInputRef={titleInputRef}
+                    nodeId={node.id}
+                    nodeType={nodeType}
+                    data={data}
+                    label={label}
+                    setLabel={setLabel}
+                    tags={tags}
+                    isEditing={isEditing}
+                    isSelected={isSelected}
+                    isWatched={isWatched}
+                    isTaskDone={isTaskDone}
+                    appRunning={appRunning}
+                    unreadCount={unreadCount}
+                    approval={approval}
+                    approvalStatus={approvalStatus}
+                    approvalDecoration={approvalDecoration}
+                    pill={pill}
+                    handleKeyDown={handleKeyDown}
+                    handleAppExecute={handleAppExecute}
+                    handleOpenComments={handleOpenComments}
+                    startEditing={startEditing}
+                />
+            </div>
         );
     }
 
     // 3. LEGACY CARD NODE
     return (
-        <LegacyCardNode
-            containerRef={containerRef}
-            containerClasses={containerClasses}
-            titleMeasureRef={titleMeasureRef}
-            descMeasureRef={descMeasureRef}
-            titleInputRef={titleInputRef}
-            descInputRef={descInputRef}
-            nodeId={node.id}
-            nodeType={nodeType}
-            label={label}
-            setLabel={setLabel}
-            description={description}
-            setDescription={setDescription}
-            tags={tags}
-            isEditing={isEditing}
-            isWatched={isWatched}
-            isTaskDone={isTaskDone}
-            appRunning={appRunning}
-            unreadCount={unreadCount}
-            styles={styles}
-            pill={pill}
-            approvalDecoration={approvalDecoration}
-            taskProps={taskProps}
-            commit={commit}
-            handleKeyDown={handleKeyDown}
-            handleAppExecute={handleAppExecute}
-            handleOpenComments={handleOpenComments}
-            startEditing={startEditing}
-        />
+        <div className="relative">
+            {/* Story 8.1: Collapse toggle for nodes with children */}
+            {hasChildren && (
+                <div className="absolute -left-7 top-1/2 -translate-y-1/2 z-10">
+                    <CollapseToggle
+                        isCollapsed={isCollapsed}
+                        childCount={childCount}
+                        onToggle={handleToggleCollapse}
+                    />
+                </div>
+            )}
+            {/* Story 8.1: Hidden count badge for collapsed nodes */}
+            {isCollapsed && hiddenDescendantCount > 0 && (
+                <div className="absolute -right-10 top-1/2 -translate-y-1/2 z-10">
+                    <ChildCountBadge count={hiddenDescendantCount} onClick={handleExpand} />
+                </div>
+            )}
+            <LegacyCardNode
+                containerRef={containerRef}
+                containerClasses={containerClasses}
+                titleMeasureRef={titleMeasureRef}
+                descMeasureRef={descMeasureRef}
+                titleInputRef={titleInputRef}
+                descInputRef={descInputRef}
+                nodeId={node.id}
+                nodeType={nodeType}
+                label={label}
+                setLabel={setLabel}
+                description={description}
+                setDescription={setDescription}
+                tags={tags}
+                isEditing={isEditing}
+                isWatched={isWatched}
+                isTaskDone={isTaskDone}
+                appRunning={appRunning}
+                unreadCount={unreadCount}
+                styles={styles}
+                pill={pill}
+                approvalDecoration={approvalDecoration}
+                taskProps={taskProps}
+                commit={commit}
+                handleKeyDown={handleKeyDown}
+                handleAppExecute={handleAppExecute}
+                handleOpenComments={handleOpenComments}
+                startEditing={startEditing}
+            />
+        </div>
     );
 }
