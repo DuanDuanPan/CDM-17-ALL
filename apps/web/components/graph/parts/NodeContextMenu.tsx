@@ -1,6 +1,7 @@
 'use client';
 
 import type { Graph } from '@antv/x6';
+import { LayoutTemplate } from 'lucide-react';
 
 export interface NodeContextMenuProps {
     visible: boolean;
@@ -18,6 +19,7 @@ export interface NodeContextMenuProps {
     onPaste: (position: { x: number; y: number }) => void;
     onSelectAll: () => void;
     onSubscriptionToggle: () => void;
+    onSaveAsTemplate?: () => void; // Story 5.2
     onClose: () => void;
 }
 
@@ -40,6 +42,7 @@ export function NodeContextMenu({
     onPaste,
     onSelectAll,
     onSubscriptionToggle,
+    onSaveAsTemplate,
     onClose,
 }: NodeContextMenuProps) {
     if (!visible) return null;
@@ -72,6 +75,16 @@ export function NodeContextMenu({
                             <span className="w-4">✂️</span>剪切
                             <span className="ml-auto text-xs text-gray-400">⌘X</span>
                         </button>
+                        {/* Story 5.2: Save as Template */}
+                        {onSaveAsTemplate && (
+                            <button
+                                onClick={() => handleAction(onSaveAsTemplate)}
+                                className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
+                            >
+                                <LayoutTemplate className="w-4 h-4 text-blue-500" />
+                                保存为模板
+                            </button>
+                        )}
                         <div className="border-t border-gray-100 my-1" />
                     </>
                 )}

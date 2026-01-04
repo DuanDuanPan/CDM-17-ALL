@@ -173,7 +173,7 @@ describe('TemplateLibraryDialog', () => {
             const templateButton = screen.getByText('敏捷研发管理');
             await user.click(templateButton);
 
-            expect(mockLoadTemplate).toHaveBeenCalledWith('tpl-1');
+            expect(mockLoadTemplate).toHaveBeenCalledWith('tpl-1', 'test1');
         });
 
         // TC-UI-6: Confirm button is disabled when no template selected

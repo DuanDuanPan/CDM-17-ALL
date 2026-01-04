@@ -1,5 +1,6 @@
 /**
  * Story 5.1: Template Library
+ * Story 5.2: Subtree Template Save & Reuse
  * Templates Service - Business logic for template operations
  */
 
@@ -7,6 +8,7 @@ import {
     Injectable,
     NotFoundException,
     BadRequestException,
+    ForbiddenException,
     Inject,
     Logger,
     Optional,
@@ -15,13 +17,20 @@ import {
 import { randomUUID } from 'crypto';
 import { prisma, NodeType, Prisma } from '@cdm/database';
 import { TemplatesRepository } from './templates.repository';
+import {
+    MAX_CLIPBOARD_NODES,
+    DependencyTypeSchema,
+} from '@cdm/types';
 import type {
     Template,
     TemplateListItem,
     TemplateCategory,
     TemplateQueryOptions,
     TemplateNode,
+    TemplateStructure,
     CreateFromTemplateResponse,
+    CreateTemplateRequest,
+    CreateTemplateResponse,
 } from '@cdm/types';
 
 /**
@@ -77,10 +86,16 @@ export class TemplatesService {
     /**
      * Get template by ID
      */
-    async getTemplate(id: string): Promise<Template> {
+    async getTemplate(id: string, userId?: string): Promise<Template> {
         const template = await this.repository.findById(id);
         if (!template) {
             throw new NotFoundException(`Template ${id} not found`);
+        }
+        // Story 5.2: Visibility control - private templates only accessible by creator
+        if (template.isPublic === false) {
+            if (!userId || template.creatorId !== userId) {
+                throw new ForbiddenException('Template is private');
+            }
         }
         return template;
     }
@@ -101,10 +116,7 @@ export class TemplatesService {
         graphName?: string
     ): Promise<CreateFromTemplateResponse> {
         // Get template
-        const template = await this.repository.findById(templateId);
-        if (!template) {
-            throw new NotFoundException(`Template ${templateId} not found`);
-        }
+        const template = await this.getTemplate(templateId, userId);
 
         // Validate template is published
         if (template.status !== 'PUBLISHED') {
@@ -264,5 +276,144 @@ export class TemplatesService {
      */
     private generateNodeId(): string {
         return `n_${randomUUID()}`;
+    }
+
+    // ===========================
+    // Story 5.2: Subtree Template Save & Reuse
+    // ===========================
+
+    /**
+     * Save a subtree as a reusable template
+     */
+    async saveSubtreeAsTemplate(
+        data: CreateTemplateRequest & { creatorId: string }
+    ): Promise<CreateTemplateResponse> {
+        // Validate name
+        if (!data.name || data.name.trim() === '') {
+            throw new BadRequestException('Template name is required');
+        }
+
+        // Validate template structure
+        this.validateTemplateStructure(data.structure);
+
+        // Validate category if provided
+        if (data.categoryId) {
+            const categories = await this.repository.findCategories();
+            if (!categories.find((c) => c.id === data.categoryId)) {
+                throw new BadRequestException('Invalid category ID');
+            }
+        }
+
+        // Create template with defaults
+        const template = await this.repository.create({
+            ...data,
+            isPublic: data.isPublic ?? true, // Default to public
+        });
+
+        this.logger.log(
+            `Created template ${template.id} "${template.name}" by user ${data.creatorId}`
+        );
+
+        return {
+            id: template.id,
+            name: template.name,
+            createdAt: template.createdAt!,
+        };
+    }
+
+    /**
+     * Validate template structure integrity
+     * Story 5.2 Code Review Fix: Added node count and dependencyType validation
+     */
+    private validateTemplateStructure(structure: TemplateStructure): void {
+        if (!structure) {
+            throw new BadRequestException('Template structure is required');
+        }
+
+        if (!structure.rootNode) {
+            throw new BadRequestException('Template must have a root node');
+        }
+
+        if (!structure.rootNode.label || structure.rootNode.label.trim() === '') {
+            throw new BadRequestException('Root node must have a label');
+        }
+
+        // HIGH-1 Fix: Validate node count to prevent oversized templates
+        const nodeCount = this.countTemplateNodes(structure.rootNode);
+        if (nodeCount > MAX_CLIPBOARD_NODES) {
+            throw new BadRequestException(
+                `Template too large (${nodeCount}/${MAX_CLIPBOARD_NODES} nodes). Please reduce selection.`
+            );
+        }
+
+        // Collect all _tempIds and check for duplicates
+        const allTempIds = new Set<string>();
+        this.collectTempIdsWithDuplicateCheck(structure.rootNode, allTempIds);
+
+        // Validate edge references if edges are present
+        if (structure.edges && structure.edges.length > 0) {
+            for (const edge of structure.edges) {
+                if (!edge.sourceRef || !edge.targetRef) {
+                    throw new BadRequestException('Edge must have sourceRef and targetRef');
+                }
+                if (!allTempIds.has(edge.sourceRef)) {
+                    throw new BadRequestException(
+                        `Edge sourceRef "${edge.sourceRef}" references non-existent node`
+                    );
+                }
+                if (!allTempIds.has(edge.targetRef)) {
+                    throw new BadRequestException(
+                        `Edge targetRef "${edge.targetRef}" references non-existent node`
+                    );
+                }
+                if (edge.kind !== 'dependency') {
+                    throw new BadRequestException(
+                        'Template edges must have kind "dependency"'
+                    );
+                }
+                // HIGH-2 Fix: Validate dependencyType using shared schema
+                if (edge.dependencyType !== undefined) {
+                    const parsed = DependencyTypeSchema.safeParse(edge.dependencyType);
+                    if (!parsed.success) {
+                        throw new BadRequestException(
+                            `Invalid dependencyType "${edge.dependencyType}". Must be one of: FS, SS, FF, SF`
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Count total nodes in a template structure (recursive)
+     * HIGH-1 Fix: Helper for node count validation
+     */
+    private countTemplateNodes(node: TemplateNode): number {
+        let count = 1;
+        if (node.children) {
+            for (const child of node.children) {
+                count += this.countTemplateNodes(child);
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Collect all _tempId values from the node tree and check for duplicates
+     */
+    private collectTempIdsWithDuplicateCheck(node: TemplateNode, ids: Set<string>): void {
+        if (node._tempId) {
+            if (ids.has(node._tempId)) {
+                throw new BadRequestException(
+                    `Duplicate _tempId found: "${node._tempId}"`
+                );
+            }
+            ids.add(node._tempId);
+        }
+        if (node.children) {
+            for (const child of node.children) {
+                this.collectTempIdsWithDuplicateCheck(child, ids);
+            }
+        }
     }
 }

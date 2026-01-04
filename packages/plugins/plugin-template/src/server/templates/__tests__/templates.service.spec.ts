@@ -1,13 +1,14 @@
 /**
  * Story 5.1: Template Library
+ * Story 5.2: Subtree Template Save & Reuse
  * Unit tests for TemplatesService
  * Tests business logic for template operations
  */
 
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TemplatesService, IDemoSeedService } from '../templates.service';
 import { TemplatesRepository } from '../templates.repository';
-import { NodeType, type Template } from '@cdm/types';
+import { NodeType, type Template, type TemplateStructure, type TemplateNode, type CreateTemplateRequest } from '@cdm/types';
 
 // Mock prisma at module level
 jest.mock('@cdm/database', () => ({
@@ -47,6 +48,7 @@ describe('TemplatesService', () => {
             findCategories: jest.fn(),
             logUsage: jest.fn(),
             count: jest.fn(),
+            create: jest.fn(), // Story 5.2
         } as unknown as jest.Mocked<TemplatesRepository>;
 
         mockDemoSeedService = {
@@ -101,6 +103,45 @@ describe('TemplatesService', () => {
 
             await expect(service.getTemplate('missing')).rejects.toThrow(NotFoundException);
         });
+
+        it('throws ForbiddenException when private template accessed without userId', async () => {
+            mockRepository.findById.mockResolvedValue({
+                id: 'tpl-private',
+                name: 'Private Template',
+                status: 'PUBLISHED',
+                isPublic: false,
+                creatorId: 'user-1',
+            } as Template);
+
+            await expect(service.getTemplate('tpl-private')).rejects.toThrow(ForbiddenException);
+        });
+
+        it('throws ForbiddenException when private template accessed by non-creator', async () => {
+            mockRepository.findById.mockResolvedValue({
+                id: 'tpl-private',
+                name: 'Private Template',
+                status: 'PUBLISHED',
+                isPublic: false,
+                creatorId: 'user-1',
+            } as Template);
+
+            await expect(service.getTemplate('tpl-private', 'user-2')).rejects.toThrow(ForbiddenException);
+        });
+
+        it('returns private template for creator', async () => {
+            const privateTemplate = {
+                id: 'tpl-private',
+                name: 'Private Template',
+                status: 'PUBLISHED',
+                isPublic: false,
+                creatorId: 'user-1',
+            } as Template;
+            mockRepository.findById.mockResolvedValue(privateTemplate);
+
+            const result = await service.getTemplate('tpl-private', 'user-1');
+
+            expect(result).toEqual(privateTemplate);
+        });
     });
 
     describe('getCategories', () => {
@@ -141,6 +182,20 @@ describe('TemplatesService', () => {
             await expect(
                 service.instantiate('missing', 'user-1')
             ).rejects.toThrow(NotFoundException);
+        });
+
+        it('throws ForbiddenException for private template instantiation by non-creator', async () => {
+            mockRepository.findById.mockResolvedValue({
+                ...mockTemplate,
+                isPublic: false,
+                creatorId: 'user-1',
+            } as Template);
+
+            await expect(
+                service.instantiate('tpl-1', 'user-2')
+            ).rejects.toThrow(ForbiddenException);
+
+            expect(mockRepository.logUsage).not.toHaveBeenCalled();
         });
 
         // TC-SVC-4: instantiate throws BadRequestException for non-PUBLISHED
@@ -269,6 +324,248 @@ describe('TemplatesService', () => {
 
             // Should have 4 nodes (root + 3 children)
             expect(result.nodeCount).toBe(4);
+        });
+    });
+
+    /**
+     * Story 5.2: saveSubtreeAsTemplate tests
+     */
+    describe('saveSubtreeAsTemplate', () => {
+        const validStructure: TemplateStructure = {
+            rootNode: {
+                label: 'Root Node',
+                _tempId: 'temp_root',
+                children: [
+                    { label: 'Child 1', _tempId: 'temp_child1' },
+                    { label: 'Child 2', _tempId: 'temp_child2', type: NodeType.TASK },
+                ],
+            },
+            edges: [
+                { sourceRef: 'temp_child1', targetRef: 'temp_child2', kind: 'dependency' },
+            ],
+        };
+
+        // TC-5.2-SVC-1: Valid template creation
+        it('TC-5.2-SVC-1: creates template with valid structure', async () => {
+            const mockCreatedTemplate = {
+                id: 'tpl-new-1',
+                name: 'My Template',
+                createdAt: new Date().toISOString(),
+            };
+            mockRepository.create.mockResolvedValue(mockCreatedTemplate as any);
+
+            const result = await service.saveSubtreeAsTemplate({
+                name: 'My Template',
+                description: 'Test description',
+                structure: validStructure,
+                creatorId: 'user-1',
+                isPublic: true,
+            });
+
+            expect(result).toHaveProperty('id', 'tpl-new-1');
+            expect(result).toHaveProperty('name', 'My Template');
+            expect(mockRepository.create).toHaveBeenCalled();
+        });
+
+        // TC-5.2-SVC-2: Empty name validation
+        it('TC-5.2-SVC-2: throws BadRequestException for empty name', async () => {
+            await expect(
+                service.saveSubtreeAsTemplate({
+                    name: '',
+                    structure: validStructure,
+                    creatorId: 'user-1',
+                })
+            ).rejects.toThrow(BadRequestException);
+
+            expect(mockRepository.create).not.toHaveBeenCalled();
+        });
+
+        // TC-5.2-SVC-3: Missing rootNode validation
+        it('TC-5.2-SVC-3: throws BadRequestException for missing rootNode', async () => {
+            await expect(
+                service.saveSubtreeAsTemplate({
+                    name: 'Valid Name',
+                    structure: {} as TemplateStructure,
+                    creatorId: 'user-1',
+                })
+            ).rejects.toThrow(BadRequestException);
+
+            expect(mockRepository.create).not.toHaveBeenCalled();
+        });
+
+        // TC-5.2-SVC-4: Duplicate _tempId validation
+        it('TC-5.2-SVC-4: throws BadRequestException for duplicate _tempId', async () => {
+            const structureWithDuplicateIds: TemplateStructure = {
+                rootNode: {
+                    label: 'Root',
+                    _tempId: 'same_id',
+                    children: [
+                        { label: 'Child', _tempId: 'same_id' }, // Duplicate!
+                    ],
+                },
+            };
+
+            await expect(
+                service.saveSubtreeAsTemplate({
+                    name: 'Valid Name',
+                    structure: structureWithDuplicateIds,
+                    creatorId: 'user-1',
+                })
+            ).rejects.toThrow(BadRequestException);
+
+            expect(mockRepository.create).not.toHaveBeenCalled();
+        });
+
+        // TC-5.2-SVC-5: Invalid edge reference validation
+        it('TC-5.2-SVC-5: throws BadRequestException for invalid edge reference', async () => {
+            const structureWithBadEdge: TemplateStructure = {
+                rootNode: {
+                    label: 'Root',
+                    _tempId: 'temp_root',
+                },
+                edges: [
+                    { sourceRef: 'temp_root', targetRef: 'non_existent', kind: 'dependency' },
+                ],
+            };
+
+            await expect(
+                service.saveSubtreeAsTemplate({
+                    name: 'Valid Name',
+                    structure: structureWithBadEdge,
+                    creatorId: 'user-1',
+                })
+            ).rejects.toThrow(BadRequestException);
+
+            expect(mockRepository.create).not.toHaveBeenCalled();
+        });
+
+        // TC-5.2-SVC-6: isPublic defaults to true
+        it('TC-5.2-SVC-6: defaults isPublic to true', async () => {
+            mockRepository.create.mockResolvedValue({ id: 'tpl-1', name: 'Test', createdAt: new Date().toISOString() } as any);
+
+            await service.saveSubtreeAsTemplate({
+                name: 'Test Template',
+                structure: validStructure,
+                creatorId: 'user-1',
+                // isPublic not specified
+            });
+
+            expect(mockRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    isPublic: true,
+                })
+            );
+        });
+
+        // TC-5.2-SVC-7: Private template creation
+        it('TC-5.2-SVC-7: creates private template when isPublic is false', async () => {
+            mockRepository.create.mockResolvedValue({ id: 'tpl-1', name: 'Private', createdAt: new Date().toISOString() } as any);
+
+            await service.saveSubtreeAsTemplate({
+                name: 'Private Template',
+                structure: validStructure,
+                creatorId: 'user-1',
+                isPublic: false,
+            });
+
+            expect(mockRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    isPublic: false,
+                })
+            );
+        });
+
+        // TC-5.2-SVC-8: Node count validation (HIGH-1 fix)
+        it('TC-5.2-SVC-8: throws BadRequestException when template exceeds MAX_CLIPBOARD_NODES', async () => {
+            // Create a structure with 101 nodes (exceeds limit of 100)
+            const generateChildren = (count: number): TemplateNode[] => {
+                return Array.from({ length: count }, (_, i) => ({
+                    label: `Child ${i}`,
+                    _tempId: `temp_child_${i}`,
+                }));
+            };
+
+            const oversizedStructure: TemplateStructure = {
+                rootNode: {
+                    label: 'Root',
+                    _tempId: 'temp_root',
+                    children: generateChildren(100), // 100 children + 1 root = 101 nodes
+                },
+            };
+
+            await expect(
+                service.saveSubtreeAsTemplate({
+                    name: 'Oversized Template',
+                    structure: oversizedStructure,
+                    creatorId: 'user-1',
+                })
+            ).rejects.toThrow(BadRequestException);
+
+            expect(mockRepository.create).not.toHaveBeenCalled();
+        });
+
+        // TC-5.2-SVC-9: Invalid dependencyType validation (HIGH-2 fix)
+        it('TC-5.2-SVC-9: throws BadRequestException for invalid dependencyType', async () => {
+            const structureWithInvalidDependencyType: TemplateStructure = {
+                rootNode: {
+                    label: 'Root',
+                    _tempId: 'temp_root',
+                    children: [
+                        { label: 'Child 1', _tempId: 'temp_child1' },
+                        { label: 'Child 2', _tempId: 'temp_child2' },
+                    ],
+                },
+                edges: [
+                    {
+                        sourceRef: 'temp_child1',
+                        targetRef: 'temp_child2',
+                        kind: 'dependency',
+                        dependencyType: 'INVALID_TYPE' as any, // Invalid!
+                    },
+                ],
+            };
+
+            await expect(
+                service.saveSubtreeAsTemplate({
+                    name: 'Invalid Edge Template',
+                    structure: structureWithInvalidDependencyType,
+                    creatorId: 'user-1',
+                })
+            ).rejects.toThrow(BadRequestException);
+
+            expect(mockRepository.create).not.toHaveBeenCalled();
+        });
+
+        // TC-5.2-SVC-10: Valid dependencyType passes validation
+        it('TC-5.2-SVC-10: accepts valid dependencyType values (FS, SS, FF, SF)', async () => {
+            mockRepository.create.mockResolvedValue({ id: 'tpl-1', name: 'Valid', createdAt: new Date().toISOString() } as any);
+
+            const structureWithValidDependencyType: TemplateStructure = {
+                rootNode: {
+                    label: 'Root',
+                    _tempId: 'temp_root',
+                    children: [
+                        { label: 'Child 1', _tempId: 'temp_child1' },
+                        { label: 'Child 2', _tempId: 'temp_child2' },
+                    ],
+                },
+                edges: [
+                    {
+                        sourceRef: 'temp_child1',
+                        targetRef: 'temp_child2',
+                        kind: 'dependency',
+                        dependencyType: 'FS',
+                    },
+                ],
+            };
+
+            await service.saveSubtreeAsTemplate({
+                name: 'Valid Edge Template',
+                structure: structureWithValidDependencyType,
+                creatorId: 'user-1',
+            });
+
+            expect(mockRepository.create).toHaveBeenCalled();
         });
     });
 });

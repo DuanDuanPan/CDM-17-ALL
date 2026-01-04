@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2026-01-01 - Story 5.1 Template Library DONE; Backend, Frontend, Tests complete
+last_updated: 2026-01-04 - Story 5.2 code review Round 2 completed; all HIGH issues fixed; status set to review
 
 development_status:
   epic-1: done
@@ -71,7 +71,7 @@ development_status:
 
   epic-5: in-progress
   5-1-template-library: done  # All phases complete: data model, backend plugin, frontend, tests
-  5-2-subtree-fragments: backlog
+  5-2-subtree-fragments: review  # Code review Round 2 completed; all HIGH issues fixed (2026-01-04)
   5-3-cross-graph-linking: backlog
   5-4-ai-generation: backlog
   epic-5-retrospective: optional

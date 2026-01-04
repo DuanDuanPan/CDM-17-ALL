@@ -8,10 +8,11 @@
  */
 
 import { useState, useCallback, useEffect, Suspense } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { TopBar, LeftSidebar, RightSidebar } from '@/components/layout';
 import type { Graph } from '@antv/x6';
 import { LayoutMode } from '@cdm/types';
+import type { CreateFromTemplateResponse } from '@cdm/types';
 import { CollaborationUIProvider, GraphProvider } from '@/contexts';
 import { collabLogger as logger } from '@/lib/logger';
 import { useViewStore } from '@/features/views';
@@ -19,6 +20,7 @@ import { ViewContainer } from '@/features/views';
 import { useCollaboration } from '@/hooks/useCollaboration';
 import { useCommentCount } from '@/hooks/useCommentCount';
 import { CommentPanel } from '@/components/Comments';
+import { TemplateLibraryDialog } from '@/components/TemplateLibrary';
 import { CommentCountContext } from '@/contexts/CommentCountContext';
 import {
     STORAGE_KEY_LAYOUT_MODE,
@@ -47,6 +49,7 @@ function getColorForUser(userId: string): string {
 function GraphPageContent() {
     const params = useParams();
     const searchParams = useSearchParams();
+    const router = useRouter();
 
     const graphId = params.graphId as string;
     const userId = searchParams.get('userId') || 'test1';
@@ -57,6 +60,8 @@ function GraphPageContent() {
     const [layoutMode, setLayoutMode] = useState<LayoutMode>('mindmap');
     const [gridEnabled, setGridEnabled] = useState(false);
     const [isDependencyMode, setIsDependencyMode] = useState(false);
+    // Story 5.2: Template library dialog (drag-drop insert)
+    const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
     // Story 4.3: Comment panel state
     const [commentNodeId, setCommentNodeId] = useState<string | null>(null);
     const [commentNodeLabel, setCommentNodeLabel] = useState<string>('');
@@ -106,6 +111,14 @@ function GraphPageContent() {
     const handleClosePanel = useCallback(() => {
         setSelectedNodeId(null);
     }, []);
+
+    const handleTemplateSelect = useCallback(
+        (result: CreateFromTemplateResponse) => {
+            setTemplateDialogOpen(false);
+            router.push(`/graph/${result.graphId}?userId=${userId}`);
+        },
+        [router, userId]
+    );
 
     const handleLayoutChange = useCallback((mode: LayoutMode) => {
         setIsLayoutLoading(true);
@@ -197,6 +210,7 @@ function GraphPageContent() {
                             <LeftSidebar
                                 isDependencyMode={isDependencyMode}
                                 onDependencyModeToggle={handleDependencyModeToggle}
+                                onTemplatesOpen={() => setTemplateDialogOpen(true)}
                             />
 
                             <main className="flex-1 relative overflow-hidden">
@@ -236,6 +250,16 @@ function GraphPageContent() {
                                 onMarkAsRead={refreshCommentCounts}
                             />
                         )}
+
+                        {/* Story 5.2: Template library (drag-drop to insert) */}
+                        <TemplateLibraryDialog
+                            open={templateDialogOpen}
+                            onOpenChange={setTemplateDialogOpen}
+                            onSelect={handleTemplateSelect}
+                            userId={userId}
+                            enableDragDrop
+                            onTemplateDragStart={() => setTemplateDialogOpen(false)}
+                        />
                     </div>
                 </GraphProvider>
             </CommentCountContext.Provider>

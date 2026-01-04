@@ -1,5 +1,6 @@
 /**
  * Story 5.1: Template Library API Service
+ * Story 5.2: Subtree Template Save & Reuse
  * Centralized API calls for template library operations
  *
  * Endpoints:
@@ -7,6 +8,7 @@
  * - GET /api/templates/categories - List categories
  * - GET /api/templates/:id - Get template details
  * - POST /api/templates/:id/instantiate - Create graph from template
+ * - POST /api/templates - Create new template from subtree (Story 5.2)
  */
 
 import type {
@@ -16,10 +18,13 @@ import type {
     TemplateQueryOptions,
     CreateFromTemplateRequest,
     CreateFromTemplateResponse,
+    CreateTemplateRequest,
+    CreateTemplateResponse,
 } from '@cdm/types';
 
 /**
  * Fetch templates with optional filtering
+ * Story 5.2: Added userId/mine support for visibility filtering
  */
 export async function fetchTemplates(
     options?: TemplateQueryOptions
@@ -37,6 +42,13 @@ export async function fetchTemplates(
         }
         if (options?.offset) {
             params.set('offset', options.offset.toString());
+        }
+        // Story 5.2: Visibility filtering
+        if (options?.userId) {
+            params.set('userId', options.userId);
+        }
+        if (options?.mine) {
+            params.set('mine', 'true');
         }
 
         const queryString = params.toString();
@@ -81,9 +93,17 @@ export async function fetchTemplateCategories(): Promise<TemplateCategory[]> {
 /**
  * Fetch a single template by ID with full structure
  */
-export async function fetchTemplate(id: string): Promise<Template> {
+export async function fetchTemplate(
+    id: string,
+    options?: { userId?: string }
+): Promise<Template> {
     try {
-        const response = await fetch(`/api/templates/${id}`);
+        const params = new URLSearchParams();
+        if (options?.userId) params.set('userId', options.userId);
+        const queryString = params.toString();
+        const url = queryString ? `/api/templates/${id}?${queryString}` : `/api/templates/${id}`;
+
+        const response = await fetch(url);
 
         if (!response.ok) {
             throw new Error(`Failed to fetch template: ${response.status}`);
@@ -127,6 +147,36 @@ export async function instantiateTemplate(
         return await response.json();
     } catch (error) {
         console.error('[templates.api] Error instantiating template:', error);
+        throw error;
+    }
+}
+
+/**
+ * Story 5.2: Create a new template from subtree
+ * @param request - Template data including structure
+ * @param userId - The creator user ID
+ */
+export async function createTemplate(
+    request: CreateTemplateRequest,
+    userId: string
+): Promise<CreateTemplateResponse> {
+    try {
+        const params = new URLSearchParams({ userId });
+        const response = await fetch(`/api/templates?${params}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || `Failed to create template: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.template;
+    } catch (error) {
+        console.error('[templates.api] Error creating template:', error);
         throw error;
     }
 }

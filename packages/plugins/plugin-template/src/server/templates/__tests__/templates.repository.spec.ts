@@ -1,5 +1,6 @@
 /**
  * Story 5.1: Template Library
+ * Story 5.2: Subtree Template Save & Reuse
  * Unit tests for TemplatesRepository
  * Tests database access layer for templates
  */
@@ -15,6 +16,7 @@ jest.mock('@cdm/database', () => ({
             findUnique: jest.fn(),
             update: jest.fn(),
             count: jest.fn(),
+            create: jest.fn(), // Story 5.2
         },
         templateCategory: {
             findMany: jest.fn(),
@@ -253,6 +255,115 @@ describe('TemplatesRepository', () => {
                 }),
             });
             expect(result).toBe(5);
+        });
+    });
+
+    /**
+     * Story 5.2: create and visibility tests
+     */
+    describe('create (Story 5.2)', () => {
+        const mockStructure = {
+            rootNode: {
+                label: 'Root',
+                _tempId: 'temp_root',
+                children: [{ label: 'Child', _tempId: 'temp_child' }],
+            },
+        };
+
+        const mockCreatedTemplate = {
+            id: 'tpl-new-1',
+            name: 'New Template',
+            description: 'Test description',
+            structure: mockStructure,
+            creatorId: 'user-1',
+            isPublic: true,
+            status: 'PUBLISHED',
+            version: 1,
+            usageCount: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+
+        // TC-5.2-REPO-1: create inserts new template
+        it('TC-5.2-REPO-1: creates a new template with required fields', async () => {
+            (mockPrisma.template.create as jest.Mock).mockResolvedValue(mockCreatedTemplate);
+
+            const result = await repository.create({
+                name: 'New Template',
+                description: 'Test description',
+                structure: mockStructure,
+                creatorId: 'user-1',
+                isPublic: true,
+            });
+
+            expect(mockPrisma.template.create).toHaveBeenCalled();
+            const callArgs = (mockPrisma.template.create as jest.Mock).mock.calls[0][0];
+            expect(callArgs.data.name).toBe('New Template');
+            expect(callArgs.data.description).toBe('Test description');
+            expect(callArgs.data.creatorId).toBe('user-1');
+            expect(callArgs.data.isPublic).toBe(true);
+            expect(callArgs.data.status).toBe('PUBLISHED');
+            expect(result.id).toBe('tpl-new-1');
+        });
+
+        // TC-5.2-REPO-2: create with categoryId
+        it('TC-5.2-REPO-2: creates template with categoryId', async () => {
+            (mockPrisma.template.create as jest.Mock).mockResolvedValue({
+                ...mockCreatedTemplate,
+                categoryId: 'cat-pm',
+            });
+
+            await repository.create({
+                name: 'New Template',
+                structure: mockStructure,
+                creatorId: 'user-1',
+                categoryId: 'cat-pm',
+                isPublic: true,
+            });
+
+            expect(mockPrisma.template.create).toHaveBeenCalled();
+            const callArgs = (mockPrisma.template.create as jest.Mock).mock.calls[0][0];
+            expect(callArgs.data.categoryId).toBe('cat-pm');
+        });
+    });
+
+    describe('findAll visibility filtering (Story 5.2)', () => {
+        // TC-5.2-REPO-3: findAll with userId includes private templates of user
+        it('TC-5.2-REPO-3: includes user private templates when userId provided', async () => {
+            (mockPrisma.template.findMany as jest.Mock).mockResolvedValue([]);
+
+            await repository.findAll({ userId: 'user-1' });
+
+            expect(mockPrisma.template.findMany).toHaveBeenCalled();
+            const callArgs = (mockPrisma.template.findMany as jest.Mock).mock.calls[0][0];
+            // When userId is provided, should have OR condition for public OR owned by user
+            expect(callArgs.where.OR).toBeDefined();
+            expect(callArgs.where.OR).toContainEqual({ isPublic: true });
+            expect(callArgs.where.OR).toContainEqual({ creatorId: 'user-1' });
+        });
+
+        // TC-5.2-REPO-4: findAll with mine=true returns only user's templates
+        it('TC-5.2-REPO-4: returns only user templates when mine=true', async () => {
+            (mockPrisma.template.findMany as jest.Mock).mockResolvedValue([]);
+
+            await repository.findAll({ userId: 'user-1', mine: true });
+
+            expect(mockPrisma.template.findMany).toHaveBeenCalled();
+            const callArgs = (mockPrisma.template.findMany as jest.Mock).mock.calls[0][0];
+            // When mine=true, should filter by creatorId only
+            expect(callArgs.where.creatorId).toBe('user-1');
+        });
+
+        // TC-5.2-REPO-5: findAll without userId returns only public templates
+        it('TC-5.2-REPO-5: returns only public templates when no userId', async () => {
+            (mockPrisma.template.findMany as jest.Mock).mockResolvedValue([]);
+
+            await repository.findAll({});
+
+            expect(mockPrisma.template.findMany).toHaveBeenCalled();
+            const callArgs = (mockPrisma.template.findMany as jest.Mock).mock.calls[0][0];
+            // Without userId, should only return public templates
+            expect(callArgs.where.isPublic).toBe(true);
         });
     });
 });

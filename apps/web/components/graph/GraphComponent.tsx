@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGraph } from '@/hooks/useGraph';
 import { useMindmapPlugin } from '@/hooks/useMindmapPlugin';
 import { useLayoutPlugin } from '@/hooks/useLayoutPlugin';
@@ -29,6 +29,13 @@ import { useToast } from '@cdm/ui';
 import { useGraphTransform, useGraphHotkeys, useGraphEvents, useGraphSelection, useGraphDependencyMode, useGraphContextMenu, useGraphCursor, useGraphInitialization } from './hooks';
 import type { EdgeContextMenuState, NodeContextMenuState } from './hooks';
 import { EdgeContextMenu, NodeContextMenu, ConnectionStatus, DependencyModeIndicator } from './parts';
+
+// Story 5.2: Template save functionality
+import { SaveTemplateDialog } from '@/components/TemplateLibrary/SaveTemplateDialog';
+import { extractSubtreeAsTemplate, type ExtractSubtreeResult } from '@/lib/subtree-extractor';
+import type { Template, TemplateStructure } from '@cdm/types';
+import { fetchTemplate } from '@/lib/api/templates';
+import { useTemplateInsert } from '@/hooks/useTemplateInsert';
 
 export interface GraphComponentProps {
     onNodeSelect?: (nodeId: string | null) => void;
@@ -65,18 +72,23 @@ export function GraphComponent({
     isDependencyMode = false,
     onExitDependencyMode,
 }: GraphComponentProps) {
-	const collabUIContext = useCollaborationUIOptional();
-	const { addToast } = useToast();
-	const containerRef = useRef<HTMLDivElement>(null);
-	const [container, setContainer] = useState<HTMLElement | null>(null);
-	const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
-	const [connectionStartNode, setConnectionStartNode] = useState<Node | null>(null);
-	const [contextMenu, setContextMenu] = useState<EdgeContextMenuState>({
-		visible: false, x: 0, y: 0, edge: null
-	});
+    const collabUIContext = useCollaborationUIOptional();
+    const { addToast } = useToast();
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [container, setContainer] = useState<HTMLElement | null>(null);
+    const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
+    const [connectionStartNode, setConnectionStartNode] = useState<Node | null>(null);
+    const [contextMenu, setContextMenu] = useState<EdgeContextMenuState>({
+        visible: false, x: 0, y: 0, edge: null
+    });
     const [nodeContextMenu, setNodeContextMenu] = useState<NodeContextMenuState>({
         visible: false, x: 0, y: 0, graphX: 0, graphY: 0, nodeId: null
     });
+
+    // Story 5.2: Save as Template dialog state
+    const [saveTemplateDialogOpen, setSaveTemplateDialogOpen] = useState(false);
+    const [templateStructure, setTemplateStructure] = useState<TemplateStructure | null>(null);
+    const [templateExtractStats, setTemplateExtractStats] = useState<ExtractSubtreeResult['stats'] | null>(null);
 
     // Story 4.4: Watch & Subscription
     const { isSubscribed, isLoading: isSubscriptionLoading, subscribe, unsubscribe } = useSubscription({
@@ -109,18 +121,21 @@ export function GraphComponent({
     // Collaboration fallback
     const fallbackCollab = {
         yDoc: null, isConnected: false, isSynced: false, syncStatus: 'idle' as const,
-        remoteUsers: [], updateCursor: () => {}, updateSelectedNode: () => {},
+        remoteUsers: [], updateCursor: () => { }, updateSelectedNode: () => { },
     };
     const { yDoc, isConnected, remoteUsers, updateCursor, updateSelectedNode, isSynced, syncStatus } =
         collaboration ?? fallbackCollab;
+
+    // Story 5.2: Insert template via drag-drop (Yjs-first)
+    const { insertTemplate } = useTemplateInsert({ graph, graphId, yDoc, selectedNodes });
 
     // Story 2.6: Clipboard
     const { copy, cut, paste, deleteNodes, hardDeleteNodes } = useClipboard({
         graph, graphId, yDoc, undoManager: null, selectedNodes, selectNodes, clearSelection,
     });
-	useClipboardShortcuts({
-		copy, cut, paste, deleteNodes, hardDeleteNodes, hasSelection, isEditing, enabled: isReady,
-	});
+    useClipboardShortcuts({
+        copy, cut, paste, deleteNodes, hardDeleteNodes, hasSelection, isEditing, enabled: isReady,
+    });
 
     // Story 4.4: Hydrate subscriptions
     const { subscriptions } = useSubscriptionList(user.id);
@@ -128,8 +143,8 @@ export function GraphComponent({
 
     // Story 1.4 MED-12: Report remote users to context
     const prevRemoteUsersRef = useRef<typeof remoteUsers>([]);
-	useEffect(() => {
-		if (!collabUIContext?.setRemoteUsers) return;
+    useEffect(() => {
+        if (!collabUIContext?.setRemoteUsers) return;
         const hasChanged = remoteUsers.length !== prevRemoteUsersRef.current.length ||
             remoteUsers.some((u, i) =>
                 u.id !== prevRemoteUsersRef.current[i]?.id ||
@@ -140,35 +155,102 @@ export function GraphComponent({
             prevRemoteUsersRef.current = remoteUsers;
             collabUIContext.setRemoteUsers([...remoteUsers]);
         }
-	}, [remoteUsers, collabUIContext]);
+    }, [remoteUsers, collabUIContext]);
 
     // Story 7.4: Extracted hooks
     const { canvasOffset, scale } = useGraphTransform({ graph, isReady });
     const { handleMouseMove } = useGraphCursor({ graph, isConnected, updateCursor });
     useGraphSelection({ graph, isReady, isConnected, updateSelectedNode });
-	useGraphDependencyMode({ graph, isReady, isDependencyMode, connectionStartNode, setConnectionStartNode });
-	const { handleDependencyTypeChange, handleCloseContextMenu, removeEdge } = useGraphContextMenu({
-		graph, contextMenu, setContextMenu,
-	});
-	const { handleKeyDown } = useGraphHotkeys({
-		graph, isReady, selectedEdge, setSelectedEdge,
-		connectionStartNode, setConnectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge,
-	});
-	useGraphEvents({
-		graph, isReady, containerRef, onNodeSelect, setSelectedEdge,
-		isDependencyMode, connectionStartNode, setContextMenu, setNodeContextMenu,
-	});
-	useGraphInitialization({
-		graph,
-		isReady,
-		graphId,
-		creatorName,
-		yDoc,
-		isConnected,
-		isSynced,
-		currentLayout,
-		onLayoutChange,
-	});
+    useGraphDependencyMode({ graph, isReady, isDependencyMode, connectionStartNode, setConnectionStartNode });
+    const { handleDependencyTypeChange, handleCloseContextMenu, removeEdge } = useGraphContextMenu({
+        graph, contextMenu, setContextMenu,
+    });
+    const { handleKeyDown } = useGraphHotkeys({
+        graph, isReady, selectedEdge, setSelectedEdge,
+        connectionStartNode, setConnectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge,
+    });
+    useGraphEvents({
+        graph, isReady, containerRef, onNodeSelect, setSelectedEdge,
+        isDependencyMode, connectionStartNode, setContextMenu, setNodeContextMenu,
+    });
+    useGraphInitialization({
+        graph,
+        isReady,
+        graphId,
+        creatorName,
+        yDoc,
+        isConnected,
+        isSynced,
+        currentLayout,
+        onLayoutChange,
+    });
+
+    // Story 5.2: Handle save as template
+    const handleSaveAsTemplate = () => {
+        if (!graph || !hasSelection) return;
+        try {
+            const selectedCells = graph.getSelectedCells();
+            const allNodes = graph.getNodes();
+            const allEdges = graph.getEdges();
+            const { structure, stats } = extractSubtreeAsTemplate(selectedCells, allNodes, allEdges);
+            setTemplateStructure(structure);
+            setTemplateExtractStats(stats);
+            setSaveTemplateDialogOpen(true);
+        } catch (err) {
+            console.error('[GraphComponent] Failed to extract subtree:', err);
+            addToast({
+                type: 'error',
+                title: '错误',
+                description: err instanceof Error ? err.message : '提取模板结构失败',
+            });
+        }
+    };
+
+    // Story 5.2: Handle template drop to insert into current graph
+    const handleTemplateDrop = useCallback(
+        async (e: React.DragEvent<HTMLDivElement>) => {
+            e.preventDefault();
+            if (!graph) return;
+
+            const raw = e.dataTransfer.getData('application/json');
+            if (!raw) return;
+
+            let payload: unknown;
+            try {
+                payload = JSON.parse(raw);
+            } catch {
+                return;
+            }
+
+            if (!payload || typeof payload !== 'object') return;
+            const type = (payload as { type?: unknown }).type;
+            if (type !== 'template') return;
+
+            const graphPoint = graph.clientToLocal(e.clientX, e.clientY);
+
+            const inlineTemplate = (payload as { template?: Template }).template;
+            if (inlineTemplate?.structure) {
+                insertTemplate(inlineTemplate.structure, { x: graphPoint.x, y: graphPoint.y });
+                return;
+            }
+
+            const templateId = (payload as { templateId?: unknown }).templateId;
+            if (typeof templateId !== 'string' || !templateId) return;
+
+            try {
+                const fullTemplate = await fetchTemplate(templateId, { userId: user.id });
+                insertTemplate(fullTemplate.structure, { x: graphPoint.x, y: graphPoint.y });
+            } catch (err) {
+                console.error('[GraphComponent] Failed to load template for insert:', err);
+                addToast({
+                    type: 'error',
+                    title: '错误',
+                    description: err instanceof Error ? err.message : '加载模板失败',
+                });
+            }
+        },
+        [graph, insertTemplate, user.id, addToast]
+    );
 
     return (
         <div className="relative w-full h-full">
@@ -181,6 +263,11 @@ export function GraphComponent({
                 tabIndex={0}
                 onKeyDown={handleKeyDown}
                 onMouseMove={handleMouseMove}
+                onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'copy';
+                }}
+                onDrop={handleTemplateDrop}
             />
 
             {/* Remote Cursors Overlay */}
@@ -248,6 +335,7 @@ export function GraphComponent({
                 isSubscriptionLoading={isSubscriptionLoading}
                 onCopy={copy}
                 onCut={cut}
+                onSaveAsTemplate={handleSaveAsTemplate}
                 onPaste={paste}
                 onSelectAll={() => graph?.select(graph.getNodes())}
                 onSubscriptionToggle={async () => {
@@ -261,6 +349,24 @@ export function GraphComponent({
                 }}
                 onClose={() => setNodeContextMenu({ visible: false, x: 0, y: 0, graphX: 0, graphY: 0, nodeId: null })}
             />
+
+            {/* Story 5.2: Save as Template Dialog */}
+            {templateStructure && (
+                <SaveTemplateDialog
+                    open={saveTemplateDialogOpen}
+                    onOpenChange={setSaveTemplateDialogOpen}
+                    structure={templateStructure}
+                    extractStats={templateExtractStats}
+                    userId={user.id}
+                    onSaved={(result) => {
+                        addToast({
+                            type: 'success',
+                            title: '保存成功',
+                            description: `模板 "${result.name}" 已保存`,
+                        });
+                    }}
+                />
+            )}
         </div>
     );
 }

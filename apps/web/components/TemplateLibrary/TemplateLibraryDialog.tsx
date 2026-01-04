@@ -1,31 +1,46 @@
 'use client';
-
 /**
  * Story 5.1: Template Library Selection Dialog
- * Allows users to browse, preview and select from template library
+ * Story 5.2: Enhanced with "My Templates" tab and drag-drop support
  *
  * Features:
  * - Search and filter templates
  * - Category-based filtering
+ * - "My Templates" tab (Story 5.2)
  * - Template preview with structure
  * - Create graph from template (instantiation)
+ * - Drag templates to insert into graph (Story 5.2)
  */
-
 import { useState, useEffect, useCallback } from 'react';
-import { Search, LayoutTemplate, X, Eye, Loader2, Check, ChevronRight } from 'lucide-react';
-import type { TemplateListItem, TemplateCategory, CreateFromTemplateResponse } from '@cdm/types';
+import { Search, LayoutTemplate, X, User, Globe } from 'lucide-react';
+import type { TemplateListItem, TemplateCategory, CreateFromTemplateResponse, Template } from '@cdm/types';
 import { useTemplates } from '@/hooks/useTemplates';
-
+import { TemplateLibraryFooter } from './TemplateLibraryFooter';
+import { TemplateLibraryPreviewPanel } from './TemplateLibraryPreviewPanel';
+import { TemplateLibraryTemplateGrid } from './TemplateLibraryTemplateGrid';
 export interface TemplateLibraryDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSelect: (result: CreateFromTemplateResponse) => void;
     userId: string;
+    /** Story 5.2: Enable drag-drop mode for inserting templates into existing graph */
+    enableDragDrop?: boolean;
+    /** Story 5.2: Callback when a drag starts (typically to close the dialog) */
+    onTemplateDragStart?: () => void;
 }
 
-export function TemplateLibraryDialog({ open, onOpenChange, onSelect, userId }: TemplateLibraryDialogProps) {
+export function TemplateLibraryDialog({
+    open,
+    onOpenChange,
+    onSelect,
+    userId,
+    enableDragDrop = false,
+    onTemplateDragStart,
+}: TemplateLibraryDialogProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+    // Story 5.2: Tab state for "All" vs "My Templates"
+    const [showMyTemplates, setShowMyTemplates] = useState(false);
     const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
     const [customGraphName, setCustomGraphName] = useState('');
     const [showPreview, setShowPreview] = useState(false);
@@ -45,35 +60,35 @@ export function TemplateLibraryDialog({ open, onOpenChange, onSelect, userId }: 
         clearSelectedTemplate,
         clearError,
     } = useTemplates();
-
     // Load data when dialog opens
     useEffect(() => {
         if (open) {
-            loadTemplates();
+            loadTemplates({ userId }); // Story 5.2: Include userId for visibility filtering
             loadCategories();
             setSearchQuery('');
             setSelectedCategoryId(null);
             setSelectedTemplateId(null);
             setCustomGraphName('');
             setShowPreview(false);
+            setShowMyTemplates(false); // Story 5.2: Reset tab
             clearSelectedTemplate();
             clearError();
         }
-    }, [open, loadTemplates, loadCategories, clearSelectedTemplate, clearError]);
+    }, [open, userId, loadTemplates, loadCategories, clearSelectedTemplate, clearError]);
 
-    // Search with debounce
+    // Search with debounce - Story 5.2: Added mine filter support
     useEffect(() => {
         if (!open) return;
-
         const timer = setTimeout(() => {
             loadTemplates({
                 search: searchQuery || undefined,
                 categoryId: selectedCategoryId || undefined,
+                userId, // Story 5.2: Always include userId for visibility
+                mine: showMyTemplates || undefined, // Story 5.2: Filter to my templates
             });
         }, 300);
-
         return () => clearTimeout(timer);
-    }, [searchQuery, selectedCategoryId, open, loadTemplates]);
+    }, [searchQuery, selectedCategoryId, showMyTemplates, userId, open, loadTemplates]);
 
     // Handle category change
     const handleCategoryChange = useCallback((categoryId: string | null) => {
@@ -82,12 +97,38 @@ export function TemplateLibraryDialog({ open, onOpenChange, onSelect, userId }: 
         clearSelectedTemplate();
     }, [clearSelectedTemplate]);
 
+    // Story 5.2: Handle tab change for My Templates
+    const handleTabChange = useCallback((myTemplates: boolean) => {
+        setShowMyTemplates(myTemplates);
+        setSelectedCategoryId(null);
+        setSelectedTemplateId(null);
+        clearSelectedTemplate();
+    }, [clearSelectedTemplate]);
+
+    // Story 5.2: Handle drag start for template insertion
+    // Note: dragstart must be synchronous; fetch template details on drop.
+    const handleDragStart = useCallback(
+        (e: React.DragEvent, template: TemplateListItem) => {
+            if (!enableDragDrop) return;
+            e.dataTransfer.setData(
+                'application/json',
+                JSON.stringify({
+                    type: 'template',
+                    templateId: template.id,
+                })
+            );
+            e.dataTransfer.effectAllowed = 'copy';
+            onTemplateDragStart?.();
+        },
+        [enableDragDrop, onTemplateDragStart]
+    );
+
     // Handle template selection
     const handleTemplateClick = useCallback(async (template: TemplateListItem) => {
         setSelectedTemplateId(template.id);
         setCustomGraphName(template.name);
-        await loadTemplate(template.id);
-    }, [loadTemplate]);
+        await loadTemplate(template.id, userId);
+    }, [loadTemplate, userId]);
 
     // Handle preview toggle
     const handlePreviewToggle = useCallback(() => {
@@ -115,6 +156,7 @@ export function TemplateLibraryDialog({ open, onOpenChange, onSelect, userId }: 
     if (!open) return null;
 
     const selectedTemplateItem = templates.find((t) => t.id === selectedTemplateId);
+    const isSplitView = showPreview && !!selectedTemplate;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -140,6 +182,32 @@ export function TemplateLibraryDialog({ open, onOpenChange, onSelect, userId }: 
                     </button>
                 </div>
 
+                {/* Story 5.2: Tabs for All vs My Templates */}
+                <div className="flex border-b border-gray-200">
+                    <button
+                        onClick={() => handleTabChange(false)}
+                        className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                            !showMyTemplates
+                                ? 'text-blue-600 border-blue-500'
+                                : 'text-gray-500 border-transparent hover:text-gray-700'
+                        }`}
+                    >
+                        <Globe className="w-4 h-4" />
+                        全部模板
+                    </button>
+                    <button
+                        onClick={() => handleTabChange(true)}
+                        className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                            showMyTemplates
+                                ? 'text-blue-600 border-blue-500'
+                                : 'text-gray-500 border-transparent hover:text-gray-700'
+                        }`}
+                    >
+                        <User className="w-4 h-4" />
+                        我的模板
+                    </button>
+                </div>
+
                 {/* Search and Filters */}
                 <div className="px-5 py-3 border-b border-gray-100">
                     <div className="relative">
@@ -154,8 +222,8 @@ export function TemplateLibraryDialog({ open, onOpenChange, onSelect, userId }: 
                         />
                     </div>
 
-                    {/* Category Filter */}
-                    {categories.length > 0 && (
+                    {/* Category Filter - Only show for "All Templates" tab */}
+                    {!showMyTemplates && categories.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-3">
                             <button
                                 onClick={() => handleCategoryChange(null)}
@@ -187,118 +255,21 @@ export function TemplateLibraryDialog({ open, onOpenChange, onSelect, userId }: 
 
                 {/* Main Content - Split View */}
                 <div className="flex-1 flex overflow-hidden">
-                    {/* Template List (Left) */}
-                    <div className={`overflow-y-auto p-4 ${showPreview && selectedTemplate ? 'w-1/2 border-r border-gray-200' : 'w-full'}`}>
-                        {isLoading ? (
-                            <div className="flex items-center justify-center py-12">
-                                <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
-                                <span className="ml-2 text-sm text-gray-500">加载中...</span>
-                            </div>
-                        ) : templates.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-                                <LayoutTemplate className="w-12 h-12 text-gray-300 mb-3" />
-                                <p className="text-sm">未找到匹配的模板</p>
-                            </div>
-                        ) : (
-                            <div className={`grid gap-3 ${showPreview && selectedTemplate ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                                {templates.map((template) => (
-                                    <button
-                                        key={template.id}
-                                        onClick={() => handleTemplateClick(template)}
-                                        className={`p-4 text-left rounded-lg border-2 transition-all ${
-                                            selectedTemplateId === template.id
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-                                        }`}
-                                    >
-                                        <div className="flex items-start gap-3">
-                                            {/* Thumbnail or Icon */}
-                                            <div className={`w-16 h-16 rounded-lg flex-shrink-0 flex items-center justify-center ${
-                                                selectedTemplateId === template.id ? 'bg-blue-100' : 'bg-gray-100'
-                                            }`}>
-                                                {template.thumbnail ? (
-                                                    <img
-                                                        src={template.thumbnail}
-                                                        alt={template.name}
-                                                        className="w-full h-full object-cover rounded-lg"
-                                                    />
-                                                ) : (
-                                                    <LayoutTemplate className={`w-8 h-8 ${
-                                                        selectedTemplateId === template.id ? 'text-blue-600' : 'text-gray-400'
-                                                    }`} />
-                                                )}
-                                            </div>
+                    <TemplateLibraryTemplateGrid
+                        templates={templates}
+                        isLoading={isLoading}
+                        isSplitView={isSplitView}
+                        selectedTemplateId={selectedTemplateId}
+                        enableDragDrop={enableDragDrop}
+                        onTemplateClick={handleTemplateClick}
+                        onDragStart={handleDragStart}
+                    />
 
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <h3 className="text-sm font-medium text-gray-900 truncate">
-                                                        {template.name}
-                                                    </h3>
-                                                    {selectedTemplateId === template.id && (
-                                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                                                    )}
-                                                </div>
-                                                <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                                                    {template.description}
-                                                </p>
-                                                <div className="flex items-center gap-2 mt-2">
-                                                    {template.categoryName && (
-                                                        <span className="px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-600 rounded flex items-center gap-1">
-                                                            {template.categoryIcon && <span>{template.categoryIcon}</span>}
-                                                            {template.categoryName}
-                                                        </span>
-                                                    )}
-                                                    <span className="text-[10px] text-gray-400">
-                                                        使用 {template.usageCount} 次
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Preview Panel (Right) */}
-                    {showPreview && selectedTemplate && (
-                        <div className="w-1/2 p-4 overflow-y-auto bg-gray-50">
-                            {isLoadingTemplate ? (
-                                <div className="flex items-center justify-center py-12">
-                                    <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
-                                    <span className="ml-2 text-sm text-gray-500">加载预览...</span>
-                                </div>
-                            ) : (
-                                <div>
-                                    <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                                        模板结构预览
-                                    </h3>
-                                    <div className="bg-white rounded-lg border border-gray-200 p-4">
-                                        <TemplateNodePreview node={selectedTemplate.structure.rootNode} depth={0} />
-                                    </div>
-
-                                    <div className="mt-4">
-                                        <h4 className="text-xs font-medium text-gray-600 mb-2">模板信息</h4>
-                                        <div className="text-xs text-gray-500 space-y-1">
-                                            <p>创建者: {selectedTemplate.creatorId ?? '系统预置'}</p>
-                                            <p>
-                                                更新时间:{' '}
-                                                {selectedTemplate.updatedAt
-                                                    ? new Date(selectedTemplate.updatedAt).toLocaleString('zh-CN')
-                                                    : '-'}
-                                            </p>
-                                            <p>使用次数: {selectedTemplate.usageCount}</p>
-                                            <p>版本: {selectedTemplate.version}</p>
-                                            <p>默认分类级别: {selectedTemplate.defaultClassification}</p>
-                                            {selectedTemplate.requiredFields && selectedTemplate.requiredFields.length > 0 && (
-                                                <p>必填字段: {selectedTemplate.requiredFields.join(', ')}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <TemplateLibraryPreviewPanel
+                        show={showPreview}
+                        template={selectedTemplate}
+                        isLoading={isLoadingTemplate}
+                    />
                 </div>
 
                 {/* Error Message */}
@@ -308,144 +279,21 @@ export function TemplateLibraryDialog({ open, onOpenChange, onSelect, userId }: 
                     </div>
                 )}
 
-                {/* Footer */}
-                <div className="flex items-center justify-between px-5 py-4 border-t border-gray-200 bg-gray-50">
-                    <div className="flex items-center gap-4">
-                        <div className="text-xs text-gray-500">
-                            {templates.length} 个模板
-                        </div>
-                        {selectedTemplateItem && (
-                            <button
-                                onClick={handlePreviewToggle}
-                                className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors ${
-                                    showPreview
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                                }`}
-                            >
-                                <Eye className="w-3 h-3" />
-                                {showPreview ? '隐藏预览' : '预览结构'}
-                            </button>
-                        )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        {/* Custom Graph Name Input */}
-                        {selectedTemplateItem && (
-                            <div className="flex items-center gap-2">
-                                <label className="text-xs text-gray-500">名称:</label>
-                                <input
-                                    type="text"
-                                    value={customGraphName}
-                                    onChange={(e) => setCustomGraphName(e.target.value)}
-                                    placeholder="图谱名称"
-                                    className="w-40 px-2 py-1 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                            </div>
-                        )}
-
-                        <button
-                            onClick={() => onOpenChange(false)}
-                            className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
-                        >
-                            取消
-                        </button>
-                        <button
-                            onClick={handleCreate}
-                            disabled={!selectedTemplateId || isInstantiating}
-                            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
-                                selectedTemplateId && !isInstantiating
-                                    ? 'bg-blue-500 text-white hover:bg-blue-600'
-                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                            }`}
-                        >
-                            {isInstantiating ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    创建中...
-                                </>
-                            ) : (
-                                <>
-                                    从模板创建
-                                    <ChevronRight className="w-4 h-4" />
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </div>
+                <TemplateLibraryFooter
+                    templateCount={templates.length}
+                    selectedTemplateId={selectedTemplateId}
+                    selectedTemplateItem={selectedTemplateItem}
+                    showPreview={showPreview}
+                    onTogglePreview={handlePreviewToggle}
+                    customGraphName={customGraphName}
+                    onCustomGraphNameChange={setCustomGraphName}
+                    isInstantiating={isInstantiating}
+                    onCancel={() => onOpenChange(false)}
+                    onCreate={handleCreate}
+                />
             </div>
         </div>
     );
-}
-
-/**
- * Template Node Preview Component
- * Renders template structure as a tree
- */
-interface TemplateNodePreviewProps {
-    node: {
-        label: string;
-        type?: string;
-        children?: TemplateNodePreviewProps['node'][];
-    };
-    depth: number;
-}
-
-function TemplateNodePreview({ node, depth }: TemplateNodePreviewProps) {
-    return (
-        <div className={`${depth > 0 ? 'ml-4 border-l border-gray-200 pl-3' : ''}`}>
-            <div className="flex items-center gap-2 py-1">
-                <span className={`w-2 h-2 rounded-full ${getNodeTypeColor(node.type)}`} />
-                <span className="text-sm text-gray-700">{node.label}</span>
-                {node.type && (
-                    <span className="text-[10px] text-gray-400 bg-gray-100 px-1 rounded">
-                        {getNodeTypeLabel(node.type)}
-                    </span>
-                )}
-            </div>
-            {node.children && node.children.length > 0 && (
-                <div className="mt-1">
-                    {node.children.map((child, index) => (
-                        <TemplateNodePreview key={index} node={child} depth={depth + 1} />
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-}
-
-function getNodeTypeColor(type?: string): string {
-    switch (type) {
-        case 'TASK':
-            return 'bg-green-500';
-        case 'REQUIREMENT':
-            return 'bg-purple-500';
-        case 'PBS':
-            return 'bg-blue-500';
-        case 'DATA':
-            return 'bg-yellow-500';
-        case 'APP':
-            return 'bg-cyan-500';
-        default:
-            return 'bg-gray-400';
-    }
-}
-
-function getNodeTypeLabel(type?: string): string {
-    switch (type) {
-        case 'TASK':
-            return '任务';
-        case 'REQUIREMENT':
-            return '需求';
-        case 'PBS':
-            return '产品';
-        case 'DATA':
-            return '数据';
-        case 'APP':
-            return '应用';
-        default:
-            return '普通';
-    }
 }
 
 export default TemplateLibraryDialog;

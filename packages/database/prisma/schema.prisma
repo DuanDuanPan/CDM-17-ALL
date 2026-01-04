@@ -365,12 +365,13 @@ model TemplateCategory {
 }
 
 // Template Model - stores reusable graph structures
+// Story 5.2: Added isPublic for visibility control
 model Template {
   id                    String         @id @default(cuid())
   name                  String
   description           String?        @db.Text
   thumbnail             String?        // URL or path to thumbnail image
-  structure             Json           // { rootNode: { label, type?, metadata?, children: [...] } }
+  structure             Json           // { rootNode: { label, type?, metadata?, children: [...] }, edges?: [...] }
   defaultClassification String         @default("internal") // public, internal, confidential, secret
   requiredFields        Json?          // Array of required field names
   status                TemplateStatus @default(DRAFT)
@@ -381,6 +382,7 @@ model Template {
 
   creatorId  String? // User ID of template creator
   usageCount Int     @default(0)
+  isPublic   Boolean @default(true) // Story 5.2: Visibility control (true=public, false=private)
 
   usageLogs TemplateUsageLog[]
 
@@ -389,6 +391,8 @@ model Template {
 
   @@index([status])
   @@index([categoryId])
+  @@index([isPublic]) // Story 5.2: Index for visibility filtering
+  @@index([creatorId, isPublic]) // Story 5.2: Index for "my templates" + visibility filtering
 }
 
 // Template Usage Log - tracks template instantiation
