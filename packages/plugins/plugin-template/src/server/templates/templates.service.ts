@@ -31,6 +31,7 @@ import type {
     CreateFromTemplateResponse,
     CreateTemplateRequest,
     CreateTemplateResponse,
+    DeleteTemplateResponse,
 } from '@cdm/types';
 
 /**
@@ -451,5 +452,42 @@ export class TemplatesService {
                 this.collectTempIdsWithDuplicateCheck(child, ids);
             }
         }
+    }
+
+    // ===========================
+    // Story 5.3: Delete Template
+    // ===========================
+
+    /**
+     * Delete a template by ID
+     * Authorization: Only the creator can delete their own templates.
+     * System templates (creatorId = null) cannot be deleted.
+     */
+    async deleteTemplate(id: string, userId: string): Promise<DeleteTemplateResponse> {
+        // 1. Find template (lightweight query for authorization check)
+        const template = await this.repository.findByIdForDelete(id);
+        if (!template) {
+            throw new NotFoundException(`Template ${id} not found`);
+        }
+
+        // 2. Authorization: System templates cannot be deleted
+        if (template.creatorId === null) {
+            throw new ForbiddenException('System templates cannot be deleted');
+        }
+
+        // 3. Authorization: Only the creator can delete
+        if (template.creatorId !== userId) {
+            throw new ForbiddenException('Only the creator can delete this template');
+        }
+
+        // 4. Execute deletion (TemplateUsageLog entries are cascade-deleted)
+        await this.repository.delete(id);
+
+        this.logger.log(`Deleted template ${id} by user ${userId}`);
+
+        return {
+            success: true,
+            deletedId: id,
+        };
     }
 }

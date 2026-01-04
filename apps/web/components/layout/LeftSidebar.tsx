@@ -65,6 +65,7 @@ export function LeftSidebar({
   const [templateTab, setTemplateTab] = useState<TemplateTab>('all');
 
   // Story 5.2: Load templates for sidebar display
+  // Story 5.3: Added deleteTemplate for template deletion
   const {
     templates,
     isLoading,
@@ -73,6 +74,8 @@ export function LeftSidebar({
     loadTemplate,
     selectedTemplate,
     isLoadingTemplate,
+    deleteTemplate,
+    isDeleting,
   } = useTemplates();
 
   // Load templates when templates nav is active or filter changes
@@ -89,7 +92,7 @@ export function LeftSidebar({
 
   // Handle template drag start
   const handleTemplateDragStart = useCallback(
-    (e: React.DragEvent, template: TemplateListItem) => {
+    (_e: React.DragEvent, _template: TemplateListItem) => {
       // Data is already set in TemplateCardMini
       // Close sidebar panel for better drag experience
       setIsExpanded(false);
@@ -103,6 +106,19 @@ export function LeftSidebar({
       loadTemplate(template.id, userId);
     },
     [loadTemplate, userId]
+  );
+
+  // Story 5.3: Handle template delete
+  const handleTemplateDelete = useCallback(
+    async (templateId: string) => {
+      try {
+        await deleteTemplate(templateId, userId);
+      } catch (err) {
+        // Error is already handled in hook and shown to user
+        console.error('[LeftSidebar] Delete template failed:', err);
+      }
+    },
+    [deleteTemplate, userId]
   );
 
   return (
@@ -259,6 +275,9 @@ export function LeftSidebar({
                         }
                         onDragStart={handleTemplateDragStart}
                         onClick={handleTemplateClick}
+                        currentUserId={userId}
+                        onDelete={handleTemplateDelete}
+                        isDeleting={isDeleting}
                       />
                     ))}
                     {templates.length > 5 && (

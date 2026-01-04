@@ -2,6 +2,7 @@
 /**
  * Story 5.1: Template Library Selection Dialog
  * Story 5.2: Enhanced with "My Templates" tab and drag-drop support
+ * Story 5.3: Added template deletion support
  *
  * Features:
  * - Search and filter templates
@@ -10,6 +11,7 @@
  * - Template preview with structure
  * - Create graph from template (instantiation)
  * - Drag templates to insert into graph (Story 5.2)
+ * - Delete user-created templates (Story 5.3)
  */
 import { useState, useEffect, useCallback } from 'react';
 import { Search, LayoutTemplate, X, User, Globe } from 'lucide-react';
@@ -58,11 +60,13 @@ export function TemplateLibraryDialog({
         isLoading,
         isLoadingTemplate,
         isInstantiating,
+        isDeleting, // Story 5.3
         error,
         loadTemplates,
         loadCategories,
         loadTemplate,
         instantiate,
+        deleteTemplate, // Story 5.3
         clearSelectedTemplate,
         clearError,
     } = useTemplates();
@@ -166,6 +170,21 @@ export function TemplateLibraryDialog({
             console.error('[TemplateLibraryDialog] Create failed:', err);
         }
     }, [selectedTemplateId, userId, customGraphName, instantiate, onSelect, onOpenChange, mode, onInsertTemplate, selectedTemplate]);
+
+    // Story 5.3: Handle template delete
+    const handleTemplateDelete = useCallback(async (templateId: string) => {
+        try {
+            await deleteTemplate(templateId, userId);
+            // Clear selection if deleted template was selected
+            if (selectedTemplateId === templateId) {
+                setSelectedTemplateId(null);
+                clearSelectedTemplate();
+            }
+        } catch (err) {
+            // Error is already handled in hook
+            console.error('[TemplateLibraryDialog] Delete failed:', err);
+        }
+    }, [deleteTemplate, userId, selectedTemplateId, clearSelectedTemplate]);
 
     if (!open) return null;
 
@@ -279,6 +298,9 @@ export function TemplateLibraryDialog({
                         show={showPreview}
                         template={selectedTemplate}
                         isLoading={isLoadingTemplate}
+                        currentUserId={userId}
+                        onDelete={handleTemplateDelete}
+                        isDeleting={isDeleting}
                     />
                 </div>
 

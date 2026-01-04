@@ -3,6 +3,7 @@
 /**
  * Story 5.1: Template Library Hook
  * Story 5.2: Subtree Template Save & Reuse
+ * Story 5.3: Delete Template
  * Encapsulates template library state and API calls
  * Pattern: Follows Story 7.5's useAppLibrary hook structure
  *
@@ -14,6 +15,7 @@
  * - Preview template structure
  * - Instantiate template to create new graph
  * - Save subtree as template (Story 5.2)
+ * - Delete template (Story 5.3)
  * - Loading states
  * - Error handling
  */
@@ -28,6 +30,7 @@ import type {
     CreateFromTemplateResponse,
     CreateTemplateRequest,
     CreateTemplateResponse,
+    DeleteTemplateResponse,
 } from '@cdm/types';
 import {
     fetchTemplates,
@@ -35,6 +38,7 @@ import {
     fetchTemplate,
     instantiateTemplate,
     createTemplate,
+    deleteTemplate as apiDeleteTemplate,
 } from '@/lib/api/templates';
 
 export interface UseTemplatesReturn {
@@ -46,6 +50,7 @@ export interface UseTemplatesReturn {
     isLoadingTemplate: boolean;
     isInstantiating: boolean;
     isSaving: boolean; // Story 5.2
+    isDeleting: boolean; // Story 5.3
     error: string | null;
 
     // Actions
@@ -62,6 +67,11 @@ export interface UseTemplatesReturn {
         request: CreateTemplateRequest,
         userId: string
     ) => Promise<CreateTemplateResponse>;
+    // Story 5.3: Delete template
+    deleteTemplate: (
+        templateId: string,
+        userId: string
+    ) => Promise<DeleteTemplateResponse>;
     clearSelectedTemplate: () => void;
     clearError: () => void;
 }
@@ -74,6 +84,7 @@ export function useTemplates(): UseTemplatesReturn {
     const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
     const [isInstantiating, setIsInstantiating] = useState(false);
     const [isSaving, setIsSaving] = useState(false); // Story 5.2
+    const [isDeleting, setIsDeleting] = useState(false); // Story 5.3
     const [error, setError] = useState<string | null>(null);
 
     // Load templates with optional filtering
@@ -162,6 +173,30 @@ export function useTemplates(): UseTemplatesReturn {
         }
     }, []);
 
+    // Story 5.3: Delete template
+    const deleteTemplate = useCallback(async (
+        templateId: string,
+        userId: string
+    ): Promise<DeleteTemplateResponse> => {
+        setIsDeleting(true);
+        setError(null);
+        try {
+            const result = await apiDeleteTemplate(templateId, userId);
+            // Remove from local list on success
+            setTemplates(prev => prev.filter(t => t.id !== templateId));
+            // Clear selected template if it was the deleted one
+            setSelectedTemplate(prev => prev?.id === templateId ? null : prev);
+            return result;
+        } catch (err) {
+            const message = err instanceof Error ? err.message : '删除模板失败';
+            console.error('[useTemplates] Delete template failed:', err);
+            setError(message);
+            throw err;
+        } finally {
+            setIsDeleting(false);
+        }
+    }, []);
+
     // Clear selected template
     const clearSelectedTemplate = useCallback(() => {
         setSelectedTemplate(null);
@@ -180,12 +215,14 @@ export function useTemplates(): UseTemplatesReturn {
         isLoadingTemplate,
         isInstantiating,
         isSaving, // Story 5.2
+        isDeleting, // Story 5.3
         error,
         loadTemplates,
         loadCategories,
         loadTemplate,
         instantiate,
         saveAsTemplate, // Story 5.2
+        deleteTemplate, // Story 5.3
         clearSelectedTemplate,
         clearError,
     };

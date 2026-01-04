@@ -138,3 +138,9 @@ export interface TemplatesListResponse {
 export interface CategoriesListResponse {
   categories: TemplateCategory[];
 }
+
+// Story 5.3: Delete template response
+export interface DeleteTemplateResponse {
+  success: boolean;
+  deletedId: string;
+}
