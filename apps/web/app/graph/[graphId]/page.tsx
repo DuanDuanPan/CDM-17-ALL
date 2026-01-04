@@ -19,6 +19,7 @@ import { useViewStore } from '@/features/views';
 import { ViewContainer } from '@/features/views';
 import { useCollaboration } from '@/hooks/useCollaboration';
 import { useCommentCount } from '@/hooks/useCommentCount';
+import { useTemplateInsert } from '@/hooks/useTemplateInsert';
 import { CommentPanel } from '@/components/Comments';
 import { TemplateLibraryDialog } from '@/components/TemplateLibrary';
 import { CommentCountContext } from '@/contexts/CommentCountContext';
@@ -111,6 +112,42 @@ function GraphPageContent() {
     const handleClosePanel = useCallback(() => {
         setSelectedNodeId(null);
     }, []);
+
+    // Story 5.2 Fix: Use template insert hook for inserting templates into current graph
+    const { insertTemplate } = useTemplateInsert({
+        graph,
+        graphId,
+        yDoc: collab.yDoc,
+    });
+
+    // Story 5.2 Fix: Handle inserting template into current graph (instead of creating new graph)
+    const handleInsertTemplate = useCallback(
+        (template: import('@cdm/types').Template) => {
+            if (!graph || !template.structure) return;
+
+            // Get canvas center as insert position, or use selected node's position
+            const selectedCells = graph.getSelectedCells();
+            let insertPosition = { x: 100, y: 100 };
+
+            if (selectedCells.length > 0) {
+                const firstNode = selectedCells[0];
+                const bbox = firstNode.getBBox();
+                // Position slightly to the right and below the selected node
+                insertPosition = { x: bbox.x + bbox.width + 100, y: bbox.y + 50 };
+            } else {
+                // Use canvas center
+                const contentRect = graph.getContentBBox();
+                insertPosition = {
+                    x: contentRect.x + contentRect.width + 200,
+                    y: contentRect.y
+                };
+            }
+
+            insertTemplate(template.structure, insertPosition);
+            setTemplateDialogOpen(false);
+        },
+        [graph, insertTemplate]
+    );
 
     const handleTemplateSelect = useCallback(
         (result: CreateFromTemplateResponse) => {
@@ -211,6 +248,7 @@ function GraphPageContent() {
                                 isDependencyMode={isDependencyMode}
                                 onDependencyModeToggle={handleDependencyModeToggle}
                                 onTemplatesOpen={() => setTemplateDialogOpen(true)}
+                                userId={userId}
                             />
 
                             <main className="flex-1 relative overflow-hidden">
@@ -251,7 +289,7 @@ function GraphPageContent() {
                             />
                         )}
 
-                        {/* Story 5.2: Template library (drag-drop to insert) */}
+                        {/* Story 5.2 Fix: Template library with insert mode for current graph */}
                         <TemplateLibraryDialog
                             open={templateDialogOpen}
                             onOpenChange={setTemplateDialogOpen}
@@ -259,6 +297,8 @@ function GraphPageContent() {
                             userId={userId}
                             enableDragDrop
                             onTemplateDragStart={() => setTemplateDialogOpen(false)}
+                            mode="insert"
+                            onInsertTemplate={handleInsertTemplate}
                         />
                     </div>
                 </GraphProvider>

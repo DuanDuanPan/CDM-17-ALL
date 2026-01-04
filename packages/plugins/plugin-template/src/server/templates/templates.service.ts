@@ -63,6 +63,7 @@ interface GeneratedNode {
     y: number;
     parentId: string | null;
     metadata: Prisma.InputJsonValue;
+    _tempId?: string; // Template _tempId for edge reference mapping
 }
 
 @Injectable()
@@ -74,7 +75,7 @@ export class TemplatesService {
         @Optional()
         @Inject(DEMO_SEED_SERVICE)
         private readonly demoSeedService?: IDemoSeedService
-    ) {}
+    ) { }
 
     /**
      * List templates with optional filtering
@@ -158,7 +159,15 @@ export class TemplatesService {
         // Generate all nodes from template structure
         const nodes = this.generateNodesFromStructure(template.structure.rootNode);
 
-        // Create graph with nodes in a transaction
+        // Build _tempId -> nodeId mapping for edge creation
+        const tempIdToNodeId = new Map<string, string>();
+        for (const node of nodes) {
+            if (node._tempId) {
+                tempIdToNodeId.set(node._tempId, node.id);
+            }
+        }
+
+        // Create graph with nodes and edges in a transaction
         const graph = await prisma.$transaction(async (tx) => {
             // Create graph
             const newGraph = await tx.graph.create({
@@ -211,6 +220,32 @@ export class TemplatesService {
                 }
             }
 
+            // Create dependency edges from template structure
+            const templateEdges = template.structure.edges || [];
+            for (const edge of templateEdges) {
+                const sourceId = tempIdToNodeId.get(edge.sourceRef);
+                const targetId = tempIdToNodeId.get(edge.targetRef);
+
+                if (sourceId && targetId) {
+                    await tx.edge.create({
+                        data: {
+                            graphId: newGraph.id,
+                            sourceId,
+                            targetId,
+                            type: 'dependency',
+                            metadata: {
+                                kind: 'dependency',
+                                dependencyType: edge.dependencyType || 'FS',
+                            },
+                        },
+                    });
+                } else {
+                    this.logger.warn(
+                        `Skipped edge: sourceRef=${edge.sourceRef} -> targetRef=${edge.targetRef} (missing node mapping)`
+                    );
+                }
+            }
+
             return newGraph;
         });
 
@@ -253,6 +288,7 @@ export class TemplatesService {
             y,
             parentId,
             metadata: (rootNode.metadata || {}) as Prisma.InputJsonValue,
+            _tempId: rootNode._tempId, // Capture _tempId for edge mapping
         });
 
         // Recursively process children

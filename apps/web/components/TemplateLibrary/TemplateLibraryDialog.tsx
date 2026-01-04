@@ -27,6 +27,10 @@ export interface TemplateLibraryDialogProps {
     enableDragDrop?: boolean;
     /** Story 5.2: Callback when a drag starts (typically to close the dialog) */
     onTemplateDragStart?: () => void;
+    /** Story 5.2 Fix: Mode for template usage - 'create' creates new graph, 'insert' inserts into current graph */
+    mode?: 'create' | 'insert';
+    /** Story 5.2 Fix: Callback when inserting template (mode='insert'). Receives full template with structure. */
+    onInsertTemplate?: (template: Template) => void;
 }
 
 export function TemplateLibraryDialog({
@@ -36,6 +40,8 @@ export function TemplateLibraryDialog({
     userId,
     enableDragDrop = false,
     onTemplateDragStart,
+    mode = 'create',
+    onInsertTemplate,
 }: TemplateLibraryDialogProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -135,11 +141,19 @@ export function TemplateLibraryDialog({
         setShowPreview((prev) => !prev);
     }, []);
 
-    // Handle create graph from template
+    // Handle create graph from template OR insert into existing graph
     const handleCreate = useCallback(async () => {
         if (!selectedTemplateId) return;
 
         try {
+            // Story 5.2 Fix: In insert mode, call onInsertTemplate with full template
+            if (mode === 'insert' && onInsertTemplate && selectedTemplate) {
+                onInsertTemplate(selectedTemplate);
+                onOpenChange(false);
+                return;
+            }
+
+            // Default: Create new graph from template
             const result = await instantiate(
                 selectedTemplateId,
                 userId,
@@ -151,7 +165,7 @@ export function TemplateLibraryDialog({
             // Error is already handled by the hook
             console.error('[TemplateLibraryDialog] Create failed:', err);
         }
-    }, [selectedTemplateId, userId, customGraphName, instantiate, onSelect, onOpenChange]);
+    }, [selectedTemplateId, userId, customGraphName, instantiate, onSelect, onOpenChange, mode, onInsertTemplate, selectedTemplate]);
 
     if (!open) return null;
 
@@ -186,22 +200,20 @@ export function TemplateLibraryDialog({
                 <div className="flex border-b border-gray-200">
                     <button
                         onClick={() => handleTabChange(false)}
-                        className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-                            !showMyTemplates
-                                ? 'text-blue-600 border-blue-500'
-                                : 'text-gray-500 border-transparent hover:text-gray-700'
-                        }`}
+                        className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${!showMyTemplates
+                            ? 'text-blue-600 border-blue-500'
+                            : 'text-gray-500 border-transparent hover:text-gray-700'
+                            }`}
                     >
                         <Globe className="w-4 h-4" />
                         全部模板
                     </button>
                     <button
                         onClick={() => handleTabChange(true)}
-                        className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-                            showMyTemplates
-                                ? 'text-blue-600 border-blue-500'
-                                : 'text-gray-500 border-transparent hover:text-gray-700'
-                        }`}
+                        className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${showMyTemplates
+                            ? 'text-blue-600 border-blue-500'
+                            : 'text-gray-500 border-transparent hover:text-gray-700'
+                            }`}
                     >
                         <User className="w-4 h-4" />
                         我的模板
@@ -227,11 +239,10 @@ export function TemplateLibraryDialog({
                         <div className="flex flex-wrap gap-2 mt-3">
                             <button
                                 onClick={() => handleCategoryChange(null)}
-                                className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${
-                                    selectedCategoryId === null
-                                        ? 'bg-blue-100 text-blue-700 font-medium'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
+                                className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${selectedCategoryId === null
+                                    ? 'bg-blue-100 text-blue-700 font-medium'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
                             >
                                 全部
                             </button>
@@ -239,11 +250,10 @@ export function TemplateLibraryDialog({
                                 <button
                                     key={category.id}
                                     onClick={() => handleCategoryChange(category.id)}
-                                    className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${
-                                        selectedCategoryId === category.id
-                                            ? 'bg-blue-100 text-blue-700 font-medium'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
+                                    className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${selectedCategoryId === category.id
+                                        ? 'bg-blue-100 text-blue-700 font-medium'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
                                 >
                                     {category.icon && <span>{category.icon}</span>}
                                     {category.name}
@@ -290,6 +300,7 @@ export function TemplateLibraryDialog({
                     isInstantiating={isInstantiating}
                     onCancel={() => onOpenChange(false)}
                     onCreate={handleCreate}
+                    mode={mode}
                 />
             </div>
         </div>
