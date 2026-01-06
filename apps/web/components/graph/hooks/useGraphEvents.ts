@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import type { Graph, Node, Edge } from '@antv/x6';
 import { isDependencyEdge, validateDependencyEdge } from '@/lib/edgeValidation';
+import { HIERARCHICAL_EDGE_ATTRS, HIERARCHICAL_EDGE_SELECTED_ATTRS } from '@/lib/edgeStyles';
 
 export interface UseGraphEventsOptions {
     graph: Graph | null;
@@ -141,14 +142,12 @@ export function useGraphEvents({
             setSelectedEdge(edge);
             onNodeSelect?.(null);
 
-            edge.attr('line/stroke', '#feb663');
-            edge.attr('line/strokeWidth', 3);
-
             if (!isDependencyEdge(edge)) {
-                edge.attr('line/filter', {
-                    name: 'dropShadow',
-                    args: { dx: 0, dy: 0, blur: 4, color: '#feb663' }
-                });
+                edge.setAttrs(HIERARCHICAL_EDGE_SELECTED_ATTRS);
+            } else {
+                edge.attr('line/stroke', '#feb663');
+                edge.attr('line/strokeWidth', 3);
+                edge.attr('line/filter', null);
             }
         };
 
@@ -159,11 +158,10 @@ export function useGraphEvents({
             if (isDependency) {
                 edge.attr('line/stroke', '#9ca3af');
                 edge.attr('line/strokeWidth', 1.5);
+                edge.attr('line/filter', null);
             } else {
-                edge.attr('line/stroke', '#3b82f6');
-                edge.attr('line/strokeWidth', 2);
+                edge.setAttrs(HIERARCHICAL_EDGE_ATTRS);
             }
-            edge.attr('line/filter', null);
         };
 
         // Edge context menu for dependency type change

@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import {
     sortNodesRightToLeftTopToBottom,
     sortPositionsRightToLeftTopToBottom,
+    sortNodesLeftToRightTopToBottom,
+    sortPositionsLeftToRightTopToBottom,
 } from '../utils/sortNodes';
 
 /**
@@ -165,5 +167,43 @@ describe('sortPositionsRightToLeftTopToBottom', () => {
 
             expect(sorted.map((p) => p.id)).toEqual(['a', 'b', 'c', 'd']);
         });
+    });
+});
+
+describe('sortNodesLeftToRightTopToBottom', () => {
+    const createMockNode = (id: string, x: number, y: number, data: Record<string, unknown> = {}) => ({
+        id,
+        getPosition: vi.fn(() => ({ x, y })),
+        getData: vi.fn(() => data),
+    });
+
+    it('should sort leftmost node first', () => {
+        const nodeA = createMockNode('a', 100, 50);
+        const nodeB = createMockNode('b', 200, 50);
+        expect(sortNodesLeftToRightTopToBottom(nodeA as any, nodeB as any)).toBeLessThan(0);
+        expect(sortNodesLeftToRightTopToBottom(nodeB as any, nodeA as any)).toBeGreaterThan(0);
+    });
+
+    it('should prioritize explicit order before position', () => {
+        const nodeA = createMockNode('a', 0, 0, { order: 2 });
+        const nodeB = createMockNode('b', 999, 999, { order: 1 });
+        expect(sortNodesLeftToRightTopToBottom(nodeA as any, nodeB as any)).toBeGreaterThan(0);
+        expect(sortNodesLeftToRightTopToBottom(nodeB as any, nodeA as any)).toBeLessThan(0);
+    });
+});
+
+describe('sortPositionsLeftToRightTopToBottom', () => {
+    it('should sort leftmost position first', () => {
+        const a = { x: 0, y: 0, id: 'a' };
+        const b = { x: 10, y: 0, id: 'b' };
+        expect(sortPositionsLeftToRightTopToBottom(a, b)).toBeLessThan(0);
+        expect(sortPositionsLeftToRightTopToBottom(b, a)).toBeGreaterThan(0);
+    });
+
+    it('should sort by Y when X is equal', () => {
+        const a = { x: 0, y: 0, id: 'a' };
+        const b = { x: 0, y: 10, id: 'b' };
+        expect(sortPositionsLeftToRightTopToBottom(a, b)).toBeLessThan(0);
+        expect(sortPositionsLeftToRightTopToBottom(b, a)).toBeGreaterThan(0);
     });
 });

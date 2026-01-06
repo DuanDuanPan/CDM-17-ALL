@@ -1,0 +1,88 @@
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg" style="font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <!-- Defined Tailwind Colors -->
+  <defs>
+    <filter id="shadow-md" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgb(0 0 0 / 0.1)" />
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="rgb(0 0 0 / 0.1)" />
+    </filter>
+  </defs>
+
+  <!-- Canvas Background (White/Gray-50) -->
+  <rect width="800" height="600" fill="#f8fafc" />
+
+  <!-- Grid Pattern (Optional, subtle dots) -->
+  <pattern id="grid" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+    <circle cx="1" cy="1" r="1" fill="#cbd5e1" opacity="0.5"/>
+  </pattern>
+  <rect width="800" height="600" fill="url(#grid)" />
+
+  <!-- Edges (Cubic Bezier - Gray-300 #d1d5db) -->
+  <!-- Root to Child 1 -->
+  <path d="M250,300 C325,300 325,180 400,180" stroke="#cbd5e1" stroke-width="2" fill="none"/>
+  <!-- Root to Child 2 -->
+  <path d="M250,300 C325,300 325,300 400,300" stroke="#cbd5e1" stroke-width="2" fill="none"/>
+  <!-- Root to Child 3 -->
+  <path d="M250,300 C325,300 325,420 400,420" stroke="#cbd5e1" stroke-width="2" fill="none"/>
+
+  <!-- ==================== NODES ==================== -->
+
+  <!-- NODE 1: ROOT (Normal) -->
+  <g transform="translate(130, 275)">
+    <!-- Shadow -->
+    <rect x="0" y="0" width="120" height="50" rx="8" fill="white" filter="url(#shadow-md)" />
+    <!-- Border (Gray-300) -->
+    <rect x="0" y="0" width="120" height="50" rx="8" fill="rgba(255,255,255,0.9)" stroke="#d1d5db" stroke-width="1" />
+    <!-- Text (Gray-900, Medium) -->
+    <text x="60" y="30" text-anchor="middle" font-size="14" font-weight="500" fill="#111827">Project Alpha</text>
+  </g>
+
+  <!-- NODE 2: Child 1 (Normal) -->
+  <g transform="translate(400, 155)">
+    <rect x="0" y="0" width="140" height="50" rx="8" fill="white" filter="url(#shadow-md)" />
+    <rect x="0" y="0" width="140" height="50" rx="8" fill="rgba(255,255,255,0.9)" stroke="#d1d5db" stroke-width="1" />
+    <text x="70" y="30" text-anchor="middle" font-size="14" font-weight="500" fill="#111827">Market Analysis</text>
+  </g>
+
+  <!-- NODE 3: Child 2 (Selected) -->
+  <!-- Style: border-2 border-blue-500 ring-2 ring-blue-200 -->
+  <g transform="translate(400, 275)">
+    <!-- Shadow -->
+    <rect x="0" y="0" width="140" height="50" rx="8" fill="white" filter="url(#shadow-md)" />
+    <!-- Ring (Blue-200 #bfdbfe) - Simulated by larger rect -->
+    <rect x="-3" y="-3" width="146" height="56" rx="10" fill="none" stroke="#bfdbfe" stroke-width="2" />
+    <!-- Main Box (Blue-500 #3b82f6) -->
+    <rect x="0" y="0" width="140" height="50" rx="8" fill="rgba(255,255,255,0.9)" stroke="#3b82f6" stroke-width="2" />
+    <text x="70" y="30" text-anchor="middle" font-size="14" font-weight="500" fill="#111827">Design System</text>
+    
+    <!-- State Label -->
+    <text x="70" y="-12" text-anchor="middle" font-size="10" fill="#3b82f6" font-weight="bold">SELECTED</text>
+  </g>
+
+  <!-- NODE 4: Child 3 (Editing) -->
+  <!-- Style: bg-white (solid), border-gray-300 (or default focus ring usually, but code says border-none on input) -->
+  <!-- The container has border-gray-300 unless selected. -->
+  <g transform="translate(400, 395)">
+    <!-- Shadow -->
+    <rect x="0" y="0" width="140" height="50" rx="8" fill="white" filter="url(#shadow-md)" />
+    <!-- Box (Solid White) -->
+    <rect x="0" y="0" width="140" height="50" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1" />
+    <!-- Input Text Simulation -->
+    <text x="70" y="30" text-anchor="middle" font-size="14" font-weight="500" fill="#111827">Architecture|</text>
+    
+    <!-- State Label -->
+    <text x="70" y="-12" text-anchor="middle" font-size="10" fill="#6b7280" font-weight="bold">EDITING</text>
+  </g>
+
+  <!-- ==================== UI ELEMENTS ==================== -->
+
+  <!-- Connection Status (Bottom Left) -->
+  <g transform="translate(20, 560)">
+    <!-- Pill: bg-green-100 (#dcfce7) -->
+    <rect width="130" height="24" rx="12" fill="#dcfce7" />
+    <!-- Dot: bg-green-500 (#22c55e) -->
+    <circle cx="16" cy="12" r="4" fill="#22c55e" />
+    <!-- Text: text-green-700 (#15803d) -->
+    <text x="30" y="16" font-size="12" font-weight="500" fill="#15803d">✓ 已与远程同步</text>
+  </g>
+
+</svg>

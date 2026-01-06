@@ -3,8 +3,8 @@ import { mindmap } from '@antv/hierarchy';
 import { BaseLayout, LayoutResult, TreeNode } from './BaseLayout';
 
 // Layout spacing constants
-const DEFAULT_HORIZONTAL_GAP = 30;
-const DEFAULT_VERTICAL_GAP = 10;
+const DEFAULT_HORIZONTAL_GAP = 20;
+const DEFAULT_VERTICAL_GAP = 6;
 const DEFAULT_NODE_WIDTH = 220;
 const DEFAULT_NODE_HEIGHT = 40;
 

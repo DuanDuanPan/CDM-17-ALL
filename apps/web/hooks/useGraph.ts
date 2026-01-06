@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Graph, Selection, History } from '@antv/x6';
+import { registerEdgeRouters } from '@/lib/edgeRouting';
+import { registerEdgeShapes } from '@/lib/edgeShapes';
 
 export interface UseGraphOptions {
   container: HTMLElement | null;
@@ -116,6 +118,10 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
         stackSize: 50, // Limit history stack to 50 operations
       })
     );
+
+    // Register custom edge routers once per app lifetime
+    registerEdgeRouters();
+    registerEdgeShapes(Graph);
 
     graphRef.current = graph;
     setIsReady(true);

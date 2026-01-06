@@ -82,7 +82,7 @@ export function LayoutSwitcher({
           ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
         `}
         data-testid="layout-logic"
-        title="逻辑图模式 - 水平层级结构（左到右）"
+        title="逻辑图模式 - 垂直树形结构（上到下）"
       >
         <AlignLeft className="w-4 h-4" />
         <span className="text-sm font-medium">逻辑图</span>

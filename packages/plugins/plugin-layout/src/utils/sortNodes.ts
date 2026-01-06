@@ -48,6 +48,44 @@ export function sortNodesRightToLeftTopToBottom(a: Node, b: Node): number {
 }
 
 /**
+ * Sort nodes: left-to-right (X ascending), top-to-bottom (Y ascending)
+ *
+ * Sorting priority:
+ * 1. X coordinate (ascending) - leftmost nodes come first
+ * 2. Y coordinate (ascending) - topmost nodes come first
+ * 3. Node ID (alphabetical) - stable sort fallback
+ */
+export function sortNodesLeftToRightTopToBottom(a: Node, b: Node): number {
+    const dataA = a.getData() || {};
+    const dataB = b.getData() || {};
+    const orderA = typeof dataA.order === 'number' ? dataA.order : null;
+    const orderB = typeof dataB.order === 'number' ? dataB.order : null;
+
+    // If explicit order is provided, prioritize it for stable sibling ordering
+    if (orderA !== null || orderB !== null) {
+        if (orderA === null) return 1;
+        if (orderB === null) return -1;
+        if (orderA !== orderB) return orderA - orderB;
+    }
+
+    const posA = a.getPosition();
+    const posB = b.getPosition();
+
+    // Primary: X ascending (left to right)
+    if (posA.x !== posB.x) {
+        return posA.x - posB.x;
+    }
+
+    // Secondary: Y ascending (top to bottom)
+    if (posA.y !== posB.y) {
+        return posA.y - posB.y;
+    }
+
+    // Tertiary: ID for stable sort
+    return a.id.localeCompare(b.id);
+}
+
+/**
  * Generic position-based comparator for objects with x, y coordinates
  * Useful for sorting data objects before they become X6 nodes
  *
@@ -62,6 +100,28 @@ export function sortPositionsRightToLeftTopToBottom(
     // Primary: X descending (right to left)
     if (a.x !== b.x) {
         return b.x - a.x;
+    }
+
+    // Secondary: Y ascending (top to bottom)
+    if (a.y !== b.y) {
+        return a.y - b.y;
+    }
+
+    // Tertiary: ID for stable sort (if available)
+    if (a.id && b.id) {
+        return a.id.localeCompare(b.id);
+    }
+
+    return 0;
+}
+
+export function sortPositionsLeftToRightTopToBottom(
+    a: { x: number; y: number; id?: string },
+    b: { x: number; y: number; id?: string }
+): number {
+    // Primary: X ascending (left to right)
+    if (a.x !== b.x) {
+        return a.x - b.x;
     }
 
     // Secondary: Y ascending (top to bottom)

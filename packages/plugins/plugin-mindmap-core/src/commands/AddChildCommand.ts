@@ -1,6 +1,8 @@
 import type { Graph, Node } from '@antv/x6';
 import { MindNodeData, NodeType } from '@cdm/types';
 
+const HIERARCHICAL_EDGE_SHAPE = 'cdm-hierarchical-edge';
+
 /**
  * AddChildCommand - Create a child node
  *
@@ -35,16 +37,10 @@ export class AddChildCommand {
 
     // Create edge from parent to child
     graph.addEdge({
+      shape: HIERARCHICAL_EDGE_SHAPE,
       source: selectedNode.id,
       target: newNode.id,
       connector: { name: 'smooth' },
-      attrs: {
-        line: {
-          stroke: '#3b82f6',
-          strokeWidth: 2,
-          targetMarker: null,
-        },
-      },
     });
 
     return newNode;

@@ -3,6 +3,9 @@ import { Graph, type Node } from '@antv/x6';
 import { LayoutMode } from '@cdm/types';
 import { layoutPlugin } from '@cdm/plugin-layout';
 import { useToast } from '@cdm/ui';
+import { isDependencyEdge } from '@/lib/edgeValidation';
+import { VERTICAL_SHARED_TRUNK_ROUTER } from '@/lib/edgeRoutingConstants';
+import { HIERARCHICAL_EDGE_SHAPE } from '@/lib/edgeShapes';
 
 /**
  * Hook to integrate layout plugin with the graph
@@ -55,7 +58,9 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     // (React-shape auto-resize doesn't run), which leads to incorrect auto-layout that
     // then gets synced to other clients. Avoid running layout while document is hidden.
     if (isDocumentVisible()) {
-      layoutPlugin.changeLayout(currentMode, false).catch((err) => {
+      layoutPlugin.changeLayout(currentMode, false).then(() => {
+        refreshHierarchicalEdges(graph, currentMode);
+      }).catch((err) => {
         console.error('Failed to apply initial layout:', err);
         addToast({
           type: 'error',
@@ -91,7 +96,9 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
       graph.disableSelectionMovable();
     }
     if (isDocumentVisible()) {
-      layoutPlugin.changeLayout(currentMode, true).catch((err) => {
+      layoutPlugin.changeLayout(currentMode, true).then(() => {
+        refreshHierarchicalEdges(graph, currentMode);
+      }).catch((err) => {
         console.error('Failed to change layout:', err);
         addToast({
           type: 'error',
@@ -152,16 +159,30 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     // a small default size, then auto-resized after render. If we layout too early,
     // siblings can overlap because the layout algorithm used outdated heights.
     let recalcTimer: ReturnType<typeof setTimeout> | null = null;
+    let pendingStructuralChanges = 0;
+    let pendingSizeChanges = 0;
 
-    const scheduleRecalculate = () => {
+    const scheduleRecalculate = (reason: 'structure' | 'size') => {
       if (!isDocumentVisible()) return;
+      if (reason === 'size') {
+        pendingSizeChanges += 1;
+      } else {
+        pendingStructuralChanges += 1;
+      }
       if (recalcTimer) clearTimeout(recalcTimer);
       recalcTimer = setTimeout(() => {
         recalcTimer = null;
         if (!isDocumentVisible()) return;
         const layoutManager = layoutPlugin.getLayoutManager();
         if (!layoutManager) return;
-        layoutManager.recalculate(true).catch((err) => {
+        const shouldAnimate = pendingStructuralChanges <= 1 && pendingSizeChanges <= 1;
+        pendingStructuralChanges = 0;
+        pendingSizeChanges = 0;
+
+        const recalcPromise = layoutManager?.recalculate(shouldAnimate);
+        Promise.resolve(recalcPromise).then(() => {
+          refreshHierarchicalEdges(graph, currentMode);
+        }).catch((err) => {
           console.error('Failed to recalculate layout:', err);
           addToast({
             type: 'error',
@@ -172,15 +193,20 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
       }, 120);
     };
 
+    const handleNodeAdded = () => scheduleRecalculate('structure');
+    const handleNodeRemoved = () => scheduleRecalculate('structure');
+    const handleNodeVisibilityChange = () => scheduleRecalculate('structure');
+    const handleNodeSizeChange = () => scheduleRecalculate('size');
+
     // Listen for node add/remove events
-    graph.on('node:added', scheduleRecalculate);
-    graph.on('node:removed', scheduleRecalculate);
+    graph.on('node:added', handleNodeAdded);
+    graph.on('node:removed', handleNodeRemoved);
 
     // Story 2.7: Listen for node visibility changes (archive/restore)
     // When a node is archived (hidden) or restored (shown), recalculate layout
-    graph.on('node:change:visible', scheduleRecalculate);
+    graph.on('node:change:visible', handleNodeVisibilityChange);
     // When a node auto-resizes after render (React shape), recalculate layout to prevent overlap
-    graph.on('node:change:size', scheduleRecalculate);
+    graph.on('node:change:size', handleNodeSizeChange);
 
     return () => {
       if (recalcTimer) {
@@ -188,10 +214,10 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
         recalcTimer = null;
       }
       if (graph && typeof graph.off === 'function') {
-        graph.off('node:added', scheduleRecalculate);
-        graph.off('node:removed', scheduleRecalculate);
-        graph.off('node:change:visible', scheduleRecalculate);
-        graph.off('node:change:size', scheduleRecalculate);
+        graph.off('node:added', handleNodeAdded);
+        graph.off('node:removed', handleNodeRemoved);
+        graph.off('node:change:visible', handleNodeVisibilityChange);
+        graph.off('node:change:size', handleNodeSizeChange);
       }
     };
   }, [graph, isReady, currentMode, addToast, isDocumentVisible]);
@@ -199,6 +225,19 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
   // In non-free mode, transform drag-drop into hierarchy/order changes
   useEffect(() => {
     if (!graph || !isReady) return;
+
+    // Debounce edge refresh to avoid O(n^2) updates during batch inserts (e.g. template import).
+    let edgeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleEdgeAdded = () => {
+      if (edgeRefreshTimer) clearTimeout(edgeRefreshTimer);
+      edgeRefreshTimer = setTimeout(() => {
+        edgeRefreshTimer = null;
+        refreshHierarchicalEdges(graph, currentMode);
+      }, 0);
+    };
+
+    graph.on('edge:added', handleEdgeAdded);
 
     const handleNodeMouseUp = ({ node, e }: { node: Node; e: MouseEvent }) => {
       if (currentMode === 'free') return;
@@ -216,7 +255,7 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
       const newOrder = (targetData.order ?? 0) + 0.5;
       node.setData({ ...currentData, parentId, order: newOrder });
 
-      normalizeSiblingOrder(graph, parentId);
+      normalizeSiblingOrder(graph, parentId, currentMode);
 
       const layoutManager = layoutPlugin.getLayoutManager();
       layoutManager?.recalculate(true);
@@ -224,6 +263,11 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
 
     graph.on('node:mouseup', handleNodeMouseUp);
     return () => {
+      if (edgeRefreshTimer) {
+        clearTimeout(edgeRefreshTimer);
+        edgeRefreshTimer = null;
+      }
+      graph.off('edge:added', handleEdgeAdded);
       graph.off('node:mouseup', handleNodeMouseUp);
     };
   }, [graph, isReady, currentMode]);
@@ -233,6 +277,57 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     handleLayoutChange,
     handleGridToggle,
   };
+}
+
+function refreshHierarchicalEdges(graph: Graph | null, mode: LayoutMode) {
+  if (!graph) return;
+  const edges = graph.getEdges?.() ?? [];
+  // Logic layout is a strict top-to-bottom tree, so we use a shared-trunk router and fixed anchors.
+  // Free mode keeps whatever spatial arrangement the user already has (often inherited from mindmap),
+  // so forcing a vertical router there will produce incorrect-looking routes.
+  const useVertical = mode === 'logic';
+  edges.forEach((edge) => {
+    if (isDependencyEdge(edge)) return;
+    edge.prop('shape', HIERARCHICAL_EDGE_SHAPE);
+    const sourceId = edge.getSourceCellId?.();
+    const targetId = edge.getTargetCellId?.();
+    if (sourceId && targetId) {
+      if (useVertical) {
+        edge.setSource({ cell: sourceId, anchor: { name: 'bottom' } });
+        edge.setTarget({ cell: targetId, anchor: { name: 'top' } });
+      } else {
+        edge.setSource({ cell: sourceId });
+        edge.setTarget({ cell: targetId });
+      }
+    }
+    if (useVertical) {
+      edge.setRouter({ name: VERTICAL_SHARED_TRUNK_ROUTER });
+      edge.setConnector({ name: 'rounded', args: { radius: 8 } });
+    } else {
+      edge.removeRouter();
+      edge.setConnector({ name: 'smooth' });
+    }
+  });
+
+  forceUpdateHierarchicalEdgeViews(graph, edges);
+}
+
+function forceUpdateHierarchicalEdgeViews(graph: Graph, edges: unknown[]) {
+  const updateNow = () => {
+    edges.forEach((edge: any) => {
+      if (!edge || isDependencyEdge(edge)) return;
+      const view = edge.findView?.(graph) as { update?: () => void } | null;
+      view?.update?.();
+    });
+  };
+
+  updateNow();
+
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(updateNow);
+  } else {
+    setTimeout(updateNow, 0);
+  }
 }
 
 // Helpers
@@ -248,29 +343,33 @@ function findTargetNode(graph: Graph, draggedId: string, x: number, y: number) {
  * Normalize sibling order based on position: right-to-left (X desc), top-to-bottom (Y asc)
  * This ensures consistent ordering after drag-drop operations
  */
-function normalizeSiblingOrder(graph: Graph, parentId?: string) {
+function normalizeSiblingOrder(graph: Graph, parentId: string | undefined, mode: LayoutMode) {
   const siblings = graph.getNodes().filter((n) => {
     const data = n.getData() || {};
     const pid = data.parentId ?? (data.type === 'root' ? undefined : undefined);
     return pid === parentId;
   });
 
-  // Sort by position: right-to-left (X descending), top-to-bottom (Y ascending)
-  siblings
-    .sort((a, b) => {
-      const posA = a.getPosition();
-      const posB = b.getPosition();
-      // Primary: X descending (right to left)
-      if (posA.x !== posB.x) {
-        return posB.x - posA.x;
-      }
-      // Secondary: Y ascending (top to bottom)
-      if (posA.y !== posB.y) {
-        return posA.y - posB.y;
-      }
-      // Tertiary: ID for stable sort
+  // Sort by position based on layout mode
+  const sortByPosition = (a: Node, b: Node) => {
+    const posA = a.getPosition();
+    const posB = b.getPosition();
+
+    if (mode === 'logic') {
+      // Vertical logic layout: left-to-right (X asc), then top-to-bottom (Y asc)
+      if (posA.x !== posB.x) return posA.x - posB.x;
+      if (posA.y !== posB.y) return posA.y - posB.y;
       return a.id.localeCompare(b.id);
-    })
+    }
+
+    // Default: right-to-left (X desc), top-to-bottom (Y asc)
+    if (posA.x !== posB.x) return posB.x - posA.x;
+    if (posA.y !== posB.y) return posA.y - posB.y;
+    return a.id.localeCompare(b.id);
+  };
+
+  siblings
+    .sort(sortByPosition)
     .forEach((n, idx) => {
       const data = n.getData() || {};
       n.setData({ ...data, order: idx });

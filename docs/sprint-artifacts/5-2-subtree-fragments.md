@@ -274,9 +274,9 @@ apps/web/
 
 | 设计图 | 文件路径 | 对应 AC |
 |--------|----------|---------|
-| 保存模板对话框 | `docs/sprint-artifacts/ui-designs/5-2-save-template-dialog.png` | AC1, AC2 |
-| 右键菜单 | `docs/sprint-artifacts/ui-designs/5-2-node-context-menu.png` | AC1 |
-| 模板库拖拽 | `docs/sprint-artifacts/ui-designs/5-2-template-library-drag.png` | AC4, AC5 |
+| 保存模板对话框 | `docs/prototypes/story-5-2/5-2-save-template-dialog.png` | AC1, AC2 |
+| 右键菜单 | `docs/prototypes/story-5-2/5-2-node-context-menu.png` | AC1 |
+| 模板库拖拽 | `docs/prototypes/story-5-2/5-2-template-library-drag.png` | AC4, AC5 |
 
 ### 1. SaveTemplateDialog (保存模板对话框)
 

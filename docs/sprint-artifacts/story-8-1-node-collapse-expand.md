@@ -1222,7 +1222,7 @@ N/A - 未保留额外 debug 日志；验证以单元测试 + Playwright E2E 为�
 - `docs/sprint-artifacts/story-8-1-node-collapse-expand.md`
 - `docs/sprint-artifacts/tech-spec-8-1-node-collapse-expand.md`
 - `docs/sprint-artifacts/validation-report-2026-01-04T20-50-03+0800.md`
-- `docs/sprint-artifacts/assets/story-8-1/*`
+- `docs/prototypes/story-8-1/*`
 
 **修改文件：**
 - `apps/web/components/graph/GraphComponent.tsx`

@@ -236,7 +236,7 @@ export function MindNode({ node }: MindNodeProps) {
     // 1. ORDINARY NODE
     if (nodeType === NodeType.ORDINARY) {
         return (
-            <div className="relative">
+            <div className="relative" data-testid="mind-node">
                 {/* Story 8.1: Collapse toggle for nodes with children */}
                 {hasChildren && (
                     <div className="absolute -left-7 top-1/2 -translate-y-1/2 z-10">
@@ -275,7 +275,7 @@ export function MindNode({ node }: MindNodeProps) {
     const renderer = getNodeRenderer(nodeType);
     if (renderer) {
         return (
-            <div className="relative">
+            <div className="relative" data-testid="mind-node">
                 {/* Story 8.1: Collapse toggle for nodes with children */}
                 {hasChildren && (
                     <div className="absolute -left-7 top-1/2 -translate-y-1/2 z-10">
@@ -323,7 +323,7 @@ export function MindNode({ node }: MindNodeProps) {
 
     // 3. LEGACY CARD NODE
     return (
-        <div className="relative">
+        <div className="relative" data-testid="mind-node">
             {/* Story 8.1: Collapse toggle for nodes with children */}
             {hasChildren && (
                 <div className="absolute -left-7 top-1/2 -translate-y-1/2 z-10">

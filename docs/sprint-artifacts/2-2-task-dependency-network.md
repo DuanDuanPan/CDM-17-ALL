@@ -201,8 +201,8 @@ To prevent breaking the Mind Map structure, we **MUST** rigorously distinguish t
 - `packages/plugins/plugin-layout/src/strategies/NetworkLayout.ts`
 - `packages/types/src/edge-types.ts`
 - `packages/database/prisma/migrations/20251218051058_add_edge_metadata_story_2_2/`
-- `docs/images/cycle_detection_error.png`
-- `docs/images/dependency_connection_flow.png`
+- `docs/prototypes/archive/cycle_detection_error.png`
+- `docs/prototypes/archive/dependency_connection_flow.png`
 
 #### 修改文件 (Story 2.2)
 - `apps/api/src/app.module.ts` - 导入 EdgesModule

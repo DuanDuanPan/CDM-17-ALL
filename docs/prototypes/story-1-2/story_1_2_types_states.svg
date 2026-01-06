@@ -1,0 +1,80 @@
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Styles -->
+  <defs>
+    <!-- Drop Shadow for Nodes -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.1"/>
+    </filter>
+    <!-- Inner Glow for Selected State -->
+    <filter id="selectedGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#3b82f6" flood-opacity="0.6"/>
+    </filter>
+    <!-- Gradient for Background -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0f9ff" />
+      <stop offset="100%" stop-color="#e0f2fe" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="url(#bgGradient)" />
+
+  <!-- Connections -->
+  <!-- Root to Children -->
+  <path d="M400,280 C400,280 200,320 200,380" stroke="#cbd5e1" stroke-width="3" fill="none"/>
+  <path d="M400,280 C400,280 600,320 600,380" stroke="#cbd5e1" stroke-width="3" fill="none"/>
+  <path d="M400,280 C400,280 400,450 400,480" stroke="#cbd5e1" stroke-width="3" fill="none"/>
+  <!-- Child to Grandchild -->
+  <path d="M600,430 C600,430 700,430 720,430" stroke="#cbd5e1" stroke-width="2" fill="none"/>
+
+  <!-- Legend -->
+  <g transform="translate(20, 20)">
+    <rect width="160" height="110" rx="8" fill="white" fill-opacity="0.8" stroke="#e2e8f0" />
+    <text x="10" y="25" font-family="Arial" font-size="12" font-weight="bold" fill="#64748b">STATE LEGEND</text>
+    <circle cx="20" cy="45" r="5" fill="#3b82f6" />
+    <text x="35" y="50" font-family="Arial" font-size="12" fill="#334155">Selected</text>
+    <rect x="15" y="65" width="10" height="10" stroke="#2563eb" fill="none" rx="2"/>
+    <text x="35" y="75" font-family="Arial" font-size="12" fill="#334155">Editing</text>
+    <circle cx="20" cy="95" r="5" fill="#f43f5e" />
+    <text x="35" y="100" font-family="Arial" font-size="12" fill="#334155">Root</text>
+  </g>
+
+  <!-- ROOT NODE -->
+  <g transform="translate(320, 230)">
+    <!-- Root Style: Larger, colorful border -->
+    <rect width="160" height="60" rx="30" fill="white" stroke="#f43f5e" stroke-width="2" filter="url(#shadow)"/>
+    <text x="80" y="35" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#1e293b">Project Alpha</text>
+    <text x="165" y="35" font-family="Arial" font-size="10" fill="#f43f5e" font-weight="bold">&lt;Root&gt;</text>
+  </g>
+
+  <!-- NODE 1: Normal Child -->
+  <g transform="translate(120, 380)">
+    <rect width="140" height="50" rx="10" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>
+    <text x="70" y="30" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#1e293b">Market Research</text>
+    <text x="70" y="65" font-family="Arial" font-size="10" text-anchor="middle" fill="#94a3b8">(Normal State)</text>
+  </g>
+
+  <!-- NODE 2: Selected Child -->
+  <g transform="translate(530, 380)">
+    <!-- Selected Style: Blue Border, Glow -->
+    <rect width="140" height="50" rx="10" fill="white" stroke="#3b82f6" stroke-width="3" filter="url(#selectedGlow)"/>
+    <text x="70" y="30" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#1e293b">Design System</text>
+    <text x="70" y="65" font-family="Arial" font-size="10" text-anchor="middle" fill="#3b82f6">(Selected State)</text>
+  </g>
+
+   <!-- NODE 3: Grandchild Node (Normal) -->
+  <g transform="translate(720, 405)">
+    <rect width="60" height="50" rx="10" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>
+    <text x="30" y="30" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#1e293b">Colors</text>
+  </g>
+
+  <!-- NODE 4: Editing Child -->
+  <g transform="translate(330, 480)">
+    <rect width="140" height="50" rx="10" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>
+    <!-- Input Field Simulation -->
+    <rect x="-5" y="-5" width="150" height="60" rx="8" fill="white" stroke="#2563eb" stroke-width="2" stroke-dasharray="4"/>
+    <text x="30" y="30" font-family="Arial, sans-serif" font-size="14" text-anchor="start" fill="#1e293b">Implement|</text>
+     <text x="70" y="70" font-family="Arial" font-size="10" text-anchor="middle" fill="#2563eb">(Editing State)</text>
+  </g>
+
+</svg>

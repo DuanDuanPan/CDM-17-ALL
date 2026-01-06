@@ -32,7 +32,7 @@ so that **我能定义产品的技术参数，并复用已有的标准化产品�
 
 ## UI Design (高保真交互设计)
 
-![PBS Node Property Panel & Product Search](docs/images/pbs_node_ui.png)
+![PBS Node Property Panel & Product Search](../prototypes/common/pbs_node_ui.png)
 
 > **Design Note:** Use Shadcn UI components with "Magic UI" aesthetics (subtle borders, clean typography). The property panel sits on the right sidebar. The Product Search is a modal dialog with a searchable command list.
 

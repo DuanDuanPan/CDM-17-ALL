@@ -1,17 +1,18 @@
-import { Graph } from '@antv/x6';
-import { mindmap } from '@antv/hierarchy';
+import { Graph, type Node } from '@antv/x6';
+import { compactBox } from '@antv/hierarchy';
 import { BaseLayout, LayoutResult, TreeNode } from './BaseLayout';
+import { sortNodesLeftToRightTopToBottom } from '../utils/sortNodes';
 
-// Layout spacing constants for Logic layout
-const DEFAULT_HORIZONTAL_GAP = 80;
-const DEFAULT_VERTICAL_GAP = 20;
+// Layout spacing constants for Logic layout (vertical tree)
+const DEFAULT_HORIZONTAL_GAP = 50;
+const DEFAULT_VERTICAL_GAP = 30;
 const DEFAULT_NODE_WIDTH = 120;
 const DEFAULT_NODE_HEIGHT = 40;
 
 /**
  * Logic layout strategy
- * Strict left-to-right horizontal hierarchy (like XMind "Logic Chart")
- * Uses @antv/hierarchy's mindmap algorithm with specific parameters
+ * Vertical tree layout (top-to-bottom) with siblings aligned horizontally
+ * Uses @antv/hierarchy's compactBox algorithm
  */
 export class LogicLayout extends BaseLayout {
   private hGap: number = DEFAULT_HORIZONTAL_GAP;
@@ -31,12 +32,11 @@ export class LogicLayout extends BaseLayout {
 
     const tree = this.buildHierarchy(rootNode);
 
-    // Use mindmap algorithm with H direction for strict left-to-right layout
-    const layoutTree = mindmap(tree, {
-      direction: 'H', // Horizontal: root on left, children on right
-      getHGap: () => this.hGap,
-      getVGap: () => this.vGap,
-      getSide: () => 'right', // All children to the right (not radial)
+    // Use compactBox algorithm for vertical tree layout
+    const layoutTree = compactBox(tree, {
+      direction: 'TB', // Top-to-Bottom
+      getHGap: () => this.hGap, // Horizontal spacing between siblings
+      getVGap: () => this.vGap, // Vertical spacing between levels
       getWidth: (node: TreeNode) => {
         const graphNode = this.graph.getCellById(node.id);
         if (graphNode && 'getSize' in graphNode && typeof graphNode.getSize === 'function') {
@@ -56,5 +56,9 @@ export class LogicLayout extends BaseLayout {
     return {
       nodes: this.flattenTree(layoutTree),
     };
+  }
+
+  protected override getChildSorter(): (a: Node, b: Node) => number {
+    return sortNodesLeftToRightTopToBottom;
   }
 }

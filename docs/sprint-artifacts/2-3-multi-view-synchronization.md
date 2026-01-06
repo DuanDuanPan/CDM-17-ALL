@@ -325,8 +325,8 @@ apps/web/
 - `.cursorrules` - 项目规则配置
 - `docs/sprint-artifacts/2-3-detailed-design.md` - 详细设计文档
 - `docs/sprint-artifacts/2-3-multi-view-synchronization-tech-spec.md` - 技术规格文档
-- `docs/images/gantt_view_mockup.png` - 甘特视图原型
-- `docs/images/kanban_view_mockup.png` - 看板视图原型
+- `docs/prototypes/archive/gantt_view_mockup.png` - 甘特视图原型
+- `docs/prototypes/archive/kanban_view_mockup.png` - 看板视图原型
 
 ### Deleted Files
 <!-- None expected -->

@@ -2,6 +2,9 @@ import { Graph, Node, Edge, Cell } from '@antv/x6';
 import * as Y from 'yjs';
 import { LayoutMode, NodeType, TaskProps, RequirementProps, PBSProps, DataProps, EdgeMetadata, type ApprovalPipeline, type Deliverable } from '@cdm/types';
 import { syncLogger as logger } from '@/lib/logger';
+import { VERTICAL_SHARED_TRUNK_ROUTER } from '@/lib/edgeRoutingConstants';
+import { HIERARCHICAL_EDGE_ATTRS } from '@/lib/edgeStyles';
+import { HIERARCHICAL_EDGE_SHAPE } from '@/lib/edgeShapes';
 
 /**
  * Node data structure stored in Yjs
@@ -652,13 +655,23 @@ export class GraphSyncManager {
                     },
                 },
             }
-            : {
-                line: {
-                    stroke: '#3b82f6', // Blue for hierarchical edges
-                    strokeWidth: 2,
-                    targetMarker: null,
-                },
-            };
+            : HIERARCHICAL_EDGE_ATTRS;
+
+        const layoutMode = this.getLayoutMode() ?? 'mindmap';
+        // Only Logic layout is a strict top-to-bottom tree that benefits from a shared-trunk router
+        // and fixed anchors. Free mode preserves the current spatial arrangement, so forcing a
+        // vertical router there will make edges look "wrong" when nodes are arranged horizontally.
+        const useVerticalRouter = layoutMode === 'logic';
+        const hierarchicalSource = useVerticalRouter
+            ? { cell: data.source, anchor: { name: 'bottom' } }
+            : { cell: data.source };
+        const hierarchicalTarget = useVerticalRouter
+            ? { cell: data.target, anchor: { name: 'top' } }
+            : { cell: data.target };
+        const hierarchicalRouter = useVerticalRouter ? { name: VERTICAL_SHARED_TRUNK_ROUTER } : undefined;
+        const hierarchicalConnector = useVerticalRouter
+            ? { name: 'rounded', args: { radius: 8 } }
+            : { name: 'smooth' };
 
         // Story 2.2: Labels for dependency edges showing type (FS/SS/FF/SF)
         const edgeLabels = isDependency
@@ -688,16 +701,17 @@ export class GraphSyncManager {
             // Add new edge with proper styling based on edge kind
             this.graph.addEdge({
                 id: data.id,
-                source: data.source,
-                target: data.target,
+                ...(isDependency ? {} : { shape: HIERARCHICAL_EDGE_SHAPE }),
+                source: isDependency ? data.source : hierarchicalSource,
+                target: isDependency ? data.target : hierarchicalTarget,
                 data: {
                     type: data.type,
                     // Story 2.2: Include metadata in edge data
                     metadata: data.metadata || { kind: 'hierarchical' },
                 },
                 // Story 2.2: Apply Router and Connector based on edge kind
-                // Dependency: Manhattan router + Rounded connector (Step 79)
-                // Hierarchical: Smooth connector (Step 105/117)
+                // Dependency: Manhattan router + Rounded connector
+                // Hierarchical: Shared-trunk router + Rounded connector
                 router: isDependency ? {
                     name: 'manhattan',
                     args: {
@@ -705,13 +719,11 @@ export class GraphSyncManager {
                         startDirections: ['right', 'left', 'top', 'bottom'],
                         endDirections: ['right', 'left', 'top', 'bottom'],
                     }
-                } : undefined,
+                } : hierarchicalRouter,
                 connector: isDependency ? {
                     name: 'rounded',
                     args: { radius: 10 }
-                } : {
-                    name: 'smooth'
-                },
+                } : hierarchicalConnector,
                 attrs: edgeAttrs,
                 labels: edgeLabels,
             });
@@ -719,6 +731,9 @@ export class GraphSyncManager {
         } else if (existingEdge.isEdge()) {
             // Story 2.2: Update existing edge metadata
             const edge = existingEdge as Edge;
+            if (!isDependency) {
+                edge.prop('shape', HIERARCHICAL_EDGE_SHAPE);
+            }
             edge.setData({
                 type: data.type,
                 metadata: data.metadata || { kind: 'hierarchical' },
@@ -740,18 +755,22 @@ export class GraphSyncManager {
                         endDirections: ['right', 'left', 'top', 'bottom'],
                     }
                 });
+                edge.setConnector({ name: 'rounded', args: { radius: 10 } });
             } else {
-                edge.removeRouter();
+                if (useVerticalRouter) {
+                    edge.setRouter({ name: VERTICAL_SHARED_TRUNK_ROUTER });
+                    edge.setConnector({ name: 'rounded', args: { radius: 8 } });
+                    edge.setSource(hierarchicalSource);
+                    edge.setTarget(hierarchicalTarget);
+                } else {
+                    edge.removeRouter();
+                    edge.setConnector({ name: 'smooth' });
+                    edge.setSource(hierarchicalSource);
+                    edge.setTarget(hierarchicalTarget);
+                }
                 // Clear labels for hierarchical edges if they had any
                 edge.setLabels([]);
             }
-
-            edge.setConnector(isDependency ? {
-                name: 'rounded',
-                args: { radius: 10 }
-            } : {
-                name: 'smooth'
-            });
 
             logger.debug('Updated edge', { id: data.id, kind: edgeKind });
         }

@@ -268,6 +268,43 @@ describe('GraphSyncManager', () => {
             // Check setPosition was called (without silent:true - loop prevention is handled by isRemoteUpdate flag)
             expect(existingNode.setPosition).toHaveBeenCalledWith(500, 600);
         });
+
+        it('should not force vertical routing for hierarchical edges in free mode', async () => {
+            syncManager.initialize(mockGraph as any, yDoc);
+
+            // Set layout mode to free (manual positioning). In this mode we should NOT apply the
+            // vertical shared-trunk router / fixed anchors, since nodes may still be arranged
+            // horizontally (e.g. inherited from mindmap).
+            yDoc.getMap('meta').set('layoutMode', 'free');
+
+            // Simulate a remote edge creation.
+            const remoteDoc = new Y.Doc();
+            const remoteEdges = remoteDoc.getMap('edges');
+            remoteDoc.transact(() => {
+                remoteEdges.set('edge-1', {
+                    id: 'edge-1',
+                    source: 'node-1',
+                    target: 'node-2',
+                    type: 'hierarchical',
+                    metadata: { kind: 'hierarchical' },
+                });
+            });
+            Y.applyUpdate(yDoc, Y.encodeStateAsUpdate(remoteDoc));
+
+            await waitForMicrotask();
+
+            expect(mockGraph.addEdge).toHaveBeenCalledTimes(1);
+            const config = mockGraph.addEdge.mock.calls[0]?.[0] as any;
+            expect(config).toEqual(expect.objectContaining({
+                id: 'edge-1',
+                router: undefined,
+                connector: expect.objectContaining({ name: 'smooth' }),
+            }));
+            expect(config.source).toEqual(expect.objectContaining({ cell: 'node-1' }));
+            expect(config.target).toEqual(expect.objectContaining({ cell: 'node-2' }));
+            expect(config.source?.anchor).toBeUndefined();
+            expect(config.target?.anchor).toBeUndefined();
+        });
     });
 
     describe('Layout mode sync', () => {
@@ -307,6 +344,37 @@ describe('GraphSyncManager', () => {
             });
 
             expect(syncManager.getLayoutMode()).toBe('mindmap');
+        });
+    });
+
+    describe('Edge styling (hierarchical)', () => {
+        it('should apply shared-trunk router and top/bottom anchors for hierarchical edges', async () => {
+            syncManager.initialize(mockGraph as any, yDoc);
+            syncManager.setLayoutMode('logic');
+
+            const remoteDoc = new Y.Doc();
+            const remoteEdges = remoteDoc.getMap('edges');
+            remoteDoc.transact(() => {
+                remoteEdges.set('edge-1', {
+                    id: 'edge-1',
+                    source: 'node-a',
+                    target: 'node-b',
+                    type: 'hierarchical',
+                    metadata: { kind: 'hierarchical' },
+                });
+            });
+            Y.applyUpdate(yDoc, Y.encodeStateAsUpdate(remoteDoc));
+
+            await new Promise(resolve => setTimeout(resolve, 0));
+
+            expect(mockGraph.addEdge).toHaveBeenCalled();
+            const edgeConfig = mockGraph.addEdge.mock.calls[0][0];
+            expect(edgeConfig.shape).toBe('cdm-hierarchical-edge');
+            expect(edgeConfig.router?.name).toBe('vertical-shared-trunk');
+            expect(edgeConfig.source?.anchor?.name).toBe('bottom');
+            expect(edgeConfig.target?.anchor?.name).toBe('top');
+            expect(edgeConfig.connector?.name).toBe('rounded');
+            expect(edgeConfig.attrs?.line?.stroke).toMatchObject({ type: 'linearGradient' });
         });
     });
 

@@ -129,6 +129,8 @@ export abstract class BaseLayout {
       // Story 2.7: Filter out archived nodes - they should not be included in layout
       let children = this.graph.getNodes().filter((n) => {
         const data = n.getData();
+        // Skip hidden nodes (collapsed/archived visibility already applied)
+        if (typeof n.isVisible === 'function' && !n.isVisible()) return false;
         // Skip archived nodes completely
         if (data?.isArchived) return false;
         return data?.parentId === id;
@@ -147,14 +149,17 @@ export abstract class BaseLayout {
           children = hierarchicalEdges
             .map((edge) => this.graph.getCellById(edge.getTargetCellId()) as Node)
             // Story 2.7: Also filter out archived nodes from edge-based children
-            .filter((child) => child != null && !child.getData()?.isArchived);
+            .filter((child) => {
+              if (!child) return false;
+              if (child.getData()?.isArchived) return false;
+              if (typeof child.isVisible === 'function' && !child.isVisible()) return false;
+              return true;
+            });
         }
       }
 
-
-
-      // Sort children: right-to-left (X descending), top-to-bottom (Y ascending)
-      children.sort(sortNodesRightToLeftTopToBottom);
+      // Sort children by layout-specific strategy
+      children.sort(this.getChildSorter());
 
       return {
         id,
@@ -217,6 +222,13 @@ export abstract class BaseLayout {
 
     // Default: treat as hierarchical for backward compatibility
     return true;
+  }
+
+  /**
+   * Child sorting strategy (override in layout subclasses)
+   */
+  protected getChildSorter(): (a: Node, b: Node) => number {
+    return sortNodesRightToLeftTopToBottom;
   }
 }
 
