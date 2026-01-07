@@ -32,6 +32,9 @@ export interface UseGraphEventsOptions {
         graphY: number;
         nodeId: string | null;
     }) => void;
+    // Story 8.3: Double-click to center node
+    /** Callback when node is double-clicked (AC4: center without zoom change) */
+    onNodeDoubleClick?: (nodeId: string) => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -59,6 +62,7 @@ export function useGraphEvents({
     connectionStartNode,
     setContextMenu,
     setNodeContextMenu,
+    onNodeDoubleClick,
 }: UseGraphEventsOptions): UseGraphEventsReturn {
     useEffect(() => {
         if (!graph || !isReady) return;
@@ -100,6 +104,17 @@ export function useGraphEvents({
             if (nodeData.isEditing) return;
 
             containerRef.current?.focus();
+        };
+
+        // Story 8.3 AC4: Double-click to center node (without changing zoom)
+        // Skip if node is in editing state to avoid conflict with text editing
+        const handleNodeDoubleClick = ({ node }: { node: Node }) => {
+            const nodeData = node.getData() || {};
+            if (nodeData.isEditing) return;
+
+            if (onNodeDoubleClick) {
+                onNodeDoubleClick(node.id);
+            }
         };
 
         // Hover feedback for dependency creation
@@ -219,6 +234,7 @@ export function useGraphEvents({
         graph.on('node:unselected', handleNodeUnselected);
         graph.on('blank:click', handleBlankClick);
         graph.on('node:click', handleNodeClick);
+        graph.on('node:dblclick', handleNodeDoubleClick);
         graph.on('node:mouseenter', handleNodeMouseEnter);
         graph.on('node:mouseleave', handleNodeMouseLeave);
         graph.on('edge:selected', handleEdgeSelected);
@@ -234,6 +250,7 @@ export function useGraphEvents({
                 graph.off('node:unselected', handleNodeUnselected);
                 graph.off('blank:click', handleBlankClick);
                 graph.off('node:click', handleNodeClick);
+                graph.off('node:dblclick', handleNodeDoubleClick);
                 graph.off('node:mouseenter', handleNodeMouseEnter);
                 graph.off('node:mouseleave', handleNodeMouseLeave);
                 graph.off('edge:selected', handleEdgeSelected);
@@ -243,7 +260,7 @@ export function useGraphEvents({
                 graph.off('node:contextmenu', handleNodeContextMenu);
             }
         };
-    }, [graph, isReady, onNodeSelect, connectionStartNode, isDependencyMode, setSelectedEdge, setContextMenu, setNodeContextMenu, containerRef]);
+    }, [graph, isReady, onNodeSelect, connectionStartNode, isDependencyMode, setSelectedEdge, setContextMenu, setNodeContextMenu, containerRef, onNodeDoubleClick]);
 
     return {};
 }

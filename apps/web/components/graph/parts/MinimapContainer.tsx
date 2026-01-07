@@ -14,7 +14,7 @@
 import { useRef, useEffect } from 'react';
 import type { Graph } from '@antv/x6';
 import { X, Map } from 'lucide-react';
-import { Button, Card } from '@cdm/ui';
+import { Button, Card, cn } from '@cdm/ui';
 import { useMinimap } from '../hooks/useMinimap';
 import { MinimapToggleButton } from './MinimapToggleButton';
 
@@ -27,6 +27,7 @@ export interface MinimapContainerProps {
     isVisible: boolean;
     /** Toggle callback (from useMinimapStorage in parent) */
     onToggle: () => void;
+    className?: string;
 }
 
 /**
@@ -40,6 +41,7 @@ export function MinimapContainer({
     searchMatchIds = [],
     isVisible,
     onToggle,
+    className,
 }: MinimapContainerProps) {
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -77,7 +79,7 @@ export function MinimapContainer({
     // Don't render if not visible
     if (!isVisible) {
         return (
-            <MinimapToggleButton onClick={onToggle} />
+            <MinimapToggleButton onClick={onToggle} className={className} />
         );
     }
 
@@ -86,11 +88,13 @@ export function MinimapContainer({
             role="region"
             aria-label="小地图导航"
             data-testid="minimap-container"
-            className="absolute bottom-4 right-4 z-50
-                bg-background/80 backdrop-blur-sm
-                border-border/50
-                shadow-lg overflow-hidden
-                transition-all duration-200"
+            className={cn(
+                "bg-background/80 backdrop-blur-sm",
+                "border-border/50",
+                "shadow-lg overflow-hidden",
+                "transition-all duration-200",
+                className
+            )}
         >
             {/* Header with close button */}
             <div className="flex items-center justify-between px-2 py-1.5 border-b border-border/30">

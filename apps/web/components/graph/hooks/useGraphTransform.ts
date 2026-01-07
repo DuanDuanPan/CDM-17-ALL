@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { Graph } from '@antv/x6';
 
 export interface GraphTransform {
@@ -29,16 +29,41 @@ export function useGraphTransform({
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
     const [scale, setScale] = useState(1);
 
-    const updateTransform = useCallback(() => {
+    const rafIdRef = useRef<number | null>(null);
+    const lastOffsetRef = useRef(canvasOffset);
+    const lastScaleRef = useRef(scale);
+
+    const applyTransform = useCallback(() => {
         if (!graph) return;
+
         const translate = graph.translate();
-        const currentScale = graph.zoom();
-        setCanvasOffset({ x: translate.tx, y: translate.ty });
-        setScale(currentScale);
+        const nextOffset = { x: translate.tx, y: translate.ty };
+        const nextScale = graph.zoom();
+
+        if (lastOffsetRef.current.x !== nextOffset.x || lastOffsetRef.current.y !== nextOffset.y) {
+            lastOffsetRef.current = nextOffset;
+            setCanvasOffset(nextOffset);
+        }
+
+        if (lastScaleRef.current !== nextScale) {
+            lastScaleRef.current = nextScale;
+            setScale(nextScale);
+        }
     }, [graph]);
+
+    const updateTransform = useCallback(() => {
+        if (rafIdRef.current !== null) return;
+        rafIdRef.current = window.requestAnimationFrame(() => {
+            rafIdRef.current = null;
+            applyTransform();
+        });
+    }, [applyTransform]);
 
     useEffect(() => {
         if (!graph || !isReady) return;
+
+        // Sync once after graph becomes ready.
+        applyTransform();
 
         graph.on('translate', updateTransform);
         graph.on('scale', updateTransform);
@@ -46,8 +71,13 @@ export function useGraphTransform({
         return () => {
             graph.off('translate', updateTransform);
             graph.off('scale', updateTransform);
+
+            if (rafIdRef.current !== null) {
+                window.cancelAnimationFrame(rafIdRef.current);
+                rafIdRef.current = null;
+            }
         };
-    }, [graph, isReady, updateTransform]);
+    }, [graph, isReady, applyTransform, updateTransform]);
 
     return {
         canvasOffset,

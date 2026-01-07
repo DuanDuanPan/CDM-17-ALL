@@ -21,3 +21,7 @@ export type { MinimapContainerProps } from './MinimapContainer';
 
 export { MinimapToggleButton } from './MinimapToggleButton';
 export type { MinimapToggleButtonProps } from './MinimapToggleButton';
+
+// Story 8.3: Zoom Shortcuts System
+export { ZoomIndicator } from './ZoomIndicator';
+export type { ZoomIndicatorProps } from './ZoomIndicator';

@@ -29,8 +29,8 @@ export function MinimapToggleButton({ onClick, className = '' }: MinimapToggleBu
             size="icon"
             onClick={onClick}
             data-testid="minimap-show-button"
+            // Absolute positioning removed to support Flex Stacking in parent
             className={cn(
-                "absolute bottom-4 right-4 z-50",
                 "h-10 w-10",
                 "bg-background/80 backdrop-blur-sm",
                 "border border-border/50",

@@ -40,3 +40,7 @@ export type { UseNodeCollapseOptions, UseNodeCollapseReturn } from './useNodeCol
 // Story 8.2: Minimap Navigation
 export { useMinimap } from './useMinimap';
 export type { UseMinimapOptions, UseMinimapReturn } from './useMinimap';
+
+// Story 8.3: Zoom Shortcuts System
+export { useZoomShortcuts } from './useZoomShortcuts';
+export type { UseZoomShortcutsOptions, UseZoomShortcutsReturn } from './useZoomShortcuts';

@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2026-01-05 - Story 8.1 Node Collapse & Expand: unit tests + story E2E passing; ready for review
+last_updated: 2026-01-07 - Story 8.3 Zoom Shortcuts: done (web unit + E2E passing); Story 8.4 Outline View: ready-for-dev
 
 development_status:
   epic-1: done
@@ -101,10 +101,10 @@ development_status:
   7-9-approval-status-panel-refactor: done
 
   epic-8: in-progress
-  8-1-node-collapse-expand: review
-  8-2-minimap-navigation: in-progress
-  8-3-zoom-shortcuts-system: backlog
-  8-4-outline-view: backlog
+  8-1-node-collapse-expand: done
+  8-2-minimap-navigation: done
+  8-3-zoom-shortcuts-system: done
+  8-4-outline-view: ready-for-dev
   8-5-focus-mode: backlog
   8-6-grouping-frame: backlog
   8-7-command-palette-enhancement: backlog

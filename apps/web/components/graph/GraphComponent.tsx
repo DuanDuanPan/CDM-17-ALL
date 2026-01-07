@@ -29,9 +29,9 @@ import { useToast } from '@cdm/ui';
 import { useMinimapStorage } from '@/hooks/useMinimapStorage';
 
 // Story 7.4: Extracted hooks and UI components
-import { useGraphTransform, useGraphHotkeys, useGraphEvents, useGraphSelection, useGraphDependencyMode, useGraphContextMenu, useGraphCursor, useGraphInitialization, useNodeCollapse } from './hooks';
+import { useGraphTransform, useGraphHotkeys, useGraphEvents, useGraphSelection, useGraphDependencyMode, useGraphContextMenu, useGraphCursor, useGraphInitialization, useNodeCollapse, useZoomShortcuts } from './hooks';
 import type { EdgeContextMenuState, NodeContextMenuState } from './hooks';
-import { EdgeContextMenu, NodeContextMenu, ConnectionStatus, DependencyModeIndicator, MinimapContainer } from './parts';
+import { EdgeContextMenu, NodeContextMenu, ConnectionStatus, DependencyModeIndicator, MinimapContainer, ZoomIndicator } from './parts';
 
 // Story 5.2: Template save functionality
 import { SaveTemplateDialog } from '@/components/TemplateLibrary/SaveTemplateDialog';
@@ -198,6 +198,9 @@ export function GraphComponent({
         hasChildren,
     } = useNodeCollapse({ graph, isReady });
 
+    // Story 8.3: Zoom Shortcuts System
+    const { zoomToFit, zoomTo100, centerNode } = useZoomShortcuts({ graph, isReady });
+
     const { handleKeyDown } = useGraphHotkeys({
         graph, isReady, selectedEdge, setSelectedEdge,
         connectionStartNode, setConnectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge,
@@ -207,10 +210,15 @@ export function GraphComponent({
         onCollapseDescendants: collapseDescendants,
         // Story 8.2: Minimap toggle
         onToggleMinimap: toggleMinimap,
+        // Story 8.3: Zoom shortcuts
+        onZoomToFit: zoomToFit,
+        onZoomTo100: zoomTo100,
     });
     useGraphEvents({
         graph, isReady, containerRef, onNodeSelect, setSelectedEdge,
         isDependencyMode, connectionStartNode, setContextMenu, setNodeContextMenu,
+        // Story 8.3: Double-click to center node
+        onNodeDoubleClick: centerNode,
     });
     useGraphInitialization({
         graph,
@@ -318,15 +326,29 @@ export function GraphComponent({
             {/* Connection Status */}
             <ConnectionStatus syncStatus={syncStatus} />
 
-            {/* Story 8.2: Minimap Navigation */}
-            <MinimapContainer
-                graph={graph}
-                isReady={isReady}
-                selectedNodeId={selectedNodeIds[0] || null}
-                searchMatchIds={searchMatchIds}
-                isVisible={isMinimapVisible}
-                onToggle={toggleMinimap}
-            />
+            {/* View Controls: Bottom-Right Stack */}
+            <div className="absolute bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
+                {/* Story 8.3: Zoom Level Indicator (AC6) */}
+                <div className="pointer-events-auto">
+                    <ZoomIndicator
+                        zoom={scale}
+                        onReset={zoomTo100}
+                        disabled={!isReady}
+                    />
+                </div>
+
+                {/* Story 8.2: Minimap Navigation */}
+                <div className="pointer-events-auto">
+                    <MinimapContainer
+                        graph={graph}
+                        isReady={isReady}
+                        selectedNodeId={selectedNodeIds[0] || null}
+                        searchMatchIds={searchMatchIds}
+                        isVisible={isMinimapVisible}
+                        onToggle={toggleMinimap}
+                    />
+                </div>
+            </div>
 
             {/* Clipboard Toolbar */}
             <div className="absolute top-4 right-4">

@@ -34,6 +34,11 @@ export interface UseGraphHotkeysOptions {
     // Story 8.2: Minimap toggle
     /** Toggle minimap visibility */
     onToggleMinimap?: () => void;
+    // Story 8.3: Zoom shortcuts
+    /** Fit all nodes to screen (Cmd/Ctrl + 0) */
+    onZoomToFit?: () => void;
+    /** Reset zoom to 100% (Cmd/Ctrl + 1) */
+    onZoomTo100?: () => void;
 }
 
 export interface UseGraphHotkeysReturn {
@@ -52,6 +57,8 @@ export interface UseGraphHotkeysReturn {
  * - Edge deletion (Delete/Backspace)
  * - Escape to exit modes
  * - Story 8.1: Collapse/expand (Cmd+[, Cmd+], Cmd+Alt+[)
+ * - Story 8.2: Minimap toggle (M)
+ * - Story 8.3: Zoom shortcuts (Cmd+0, Cmd+1, Alt+0, Alt+1)
  */
 export function useGraphHotkeys({
     graph,
@@ -69,6 +76,9 @@ export function useGraphHotkeys({
     onCollapseDescendants,
     // Story 8.2: Minimap toggle
     onToggleMinimap,
+    // Story 8.3: Zoom shortcuts
+    onZoomToFit,
+    onZoomTo100,
 }: UseGraphHotkeysOptions): UseGraphHotkeysReturn {
     // Global Space-to-edit: allow editing even when graph container isn't focused
     useEffect(() => {
@@ -128,6 +138,39 @@ export function useGraphHotkeys({
                 if (graph.canRedo()) {
                     graph.redo();
                 }
+                return;
+            }
+
+            // Story 8.3: Zoom shortcuts (must check before single-node selection)
+            // Input protection: don't trigger in input/textarea/select/contentEditable
+            const target = e.target as HTMLElement | null;
+            const isInputFocused = target && (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.tagName === 'SELECT' ||
+                target.isContentEditable
+            );
+
+            // Cmd/Ctrl + 0 OR Alt + 0 OR Numpad0 variants : Fit to screen (AC2)
+            // Use e.code for reliable detection across keyboard layouts
+            if (!isInputFocused && (
+                ((e.metaKey || e.ctrlKey) && !e.altKey && (e.code === 'Digit0' || e.code === 'Numpad0')) ||
+                (e.altKey && !e.metaKey && !e.ctrlKey && (e.code === 'Digit0' || e.code === 'Numpad0'))
+            )) {
+                e.preventDefault();
+                e.stopPropagation();
+                onZoomToFit?.();
+                return;
+            }
+
+            // Cmd/Ctrl + 1 OR Alt + 1 OR Numpad1 variants : Reset to 100% (AC3)
+            if (!isInputFocused && (
+                ((e.metaKey || e.ctrlKey) && !e.altKey && (e.code === 'Digit1' || e.code === 'Numpad1')) ||
+                (e.altKey && !e.metaKey && !e.ctrlKey && (e.code === 'Digit1' || e.code === 'Numpad1'))
+            )) {
+                e.preventDefault();
+                e.stopPropagation();
+                onZoomTo100?.();
                 return;
             }
 
@@ -263,7 +306,7 @@ export function useGraphHotkeys({
                     break;
             }
         },
-        [graph, isReady, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge, setSelectedEdge, setConnectionStartNode, onCollapseNode, onExpandNode, onCollapseDescendants, onToggleMinimap]
+        [graph, isReady, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge, setSelectedEdge, setConnectionStartNode, onCollapseNode, onExpandNode, onCollapseDescendants, onToggleMinimap, onZoomToFit, onZoomTo100]
     );
 
     return { handleKeyDown };

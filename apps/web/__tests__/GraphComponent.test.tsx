@@ -13,9 +13,9 @@
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { ConfirmDialogProvider, ToastProvider } from '@cdm/ui';
-import type { Graph, Node } from '@antv/x6';
+import type { Graph } from '@antv/x6';
 
 // Mock @antv/x6 to avoid ESM issues with NodeView
 vi.mock('@antv/x6', () => ({
@@ -162,6 +162,13 @@ vi.mock('@/components/graph/hooks', () => ({
     highlightNodes: vi.fn(),
     clearHighlights: vi.fn(),
     isDisabledForPerformance: false,
+  })),
+  // Story 8.3: Zoom shortcuts mock
+  useZoomShortcuts: vi.fn(() => ({
+    zoomToFit: vi.fn(),
+    zoomTo100: vi.fn(),
+    centerNode: vi.fn(),
+    prefersReducedMotion: false,
   })),
 }));
 
