@@ -25,10 +25,13 @@ import { useSubscription, useSubscriptionList } from '@/hooks/useSubscription';
 import { setSubscriptions } from '@/lib/subscriptionStore';
 import { useToast } from '@cdm/ui';
 
+// Story 8.2: Minimap storage
+import { useMinimapStorage } from '@/hooks/useMinimapStorage';
+
 // Story 7.4: Extracted hooks and UI components
 import { useGraphTransform, useGraphHotkeys, useGraphEvents, useGraphSelection, useGraphDependencyMode, useGraphContextMenu, useGraphCursor, useGraphInitialization, useNodeCollapse } from './hooks';
 import type { EdgeContextMenuState, NodeContextMenuState } from './hooks';
-import { EdgeContextMenu, NodeContextMenu, ConnectionStatus, DependencyModeIndicator } from './parts';
+import { EdgeContextMenu, NodeContextMenu, ConnectionStatus, DependencyModeIndicator, MinimapContainer } from './parts';
 
 // Story 5.2: Template save functionality
 import { SaveTemplateDialog } from '@/components/TemplateLibrary/SaveTemplateDialog';
@@ -90,6 +93,12 @@ export function GraphComponent({
     const [templateStructure, setTemplateStructure] = useState<TemplateStructure | null>(null);
     const [templateExtractStats, setTemplateExtractStats] = useState<ExtractSubtreeResult['stats'] | null>(null);
 
+    // Story 8.2: Search match highlighting for minimap
+    const [searchMatchIds, setSearchMatchIds] = useState<string[]>([]);
+
+    // Story 8.2: Minimap visibility persistence
+    const { isVisible: isMinimapVisible, toggle: toggleMinimap } = useMinimapStorage(true);
+
     // Story 4.4: Watch & Subscription
     const { isSubscribed, isLoading: isSubscriptionLoading, subscribe, unsubscribe } = useSubscription({
         nodeId: nodeContextMenu.nodeId,
@@ -141,6 +150,20 @@ export function GraphComponent({
     const { subscriptions } = useSubscriptionList(user.id);
     useEffect(() => { setSubscriptions(subscriptions.map((s) => s.nodeId)); }, [subscriptions]);
 
+    // Story 8.2: Listen for search results to highlight in minimap (AC: #6)
+    useEffect(() => {
+        const handleSearchResults = (e: Event) => {
+            const { graphId: searchGraphId, nodeIds } = (e as CustomEvent<{ graphId: string | null; nodeIds: string[] }>).detail;
+            // Only apply highlights if search is for this graph or global (null)
+            if (searchGraphId === null || searchGraphId === graphId) {
+                setSearchMatchIds(nodeIds);
+            }
+        };
+
+        window.addEventListener('mindmap:search-results', handleSearchResults);
+        return () => window.removeEventListener('mindmap:search-results', handleSearchResults);
+    }, [graphId]);
+
     // Story 1.4 MED-12: Report remote users to context
     const prevRemoteUsersRef = useRef<typeof remoteUsers>([]);
     useEffect(() => {
@@ -182,6 +205,8 @@ export function GraphComponent({
         onCollapseNode: collapseNode,
         onExpandNode: expandNode,
         onCollapseDescendants: collapseDescendants,
+        // Story 8.2: Minimap toggle
+        onToggleMinimap: toggleMinimap,
     });
     useGraphEvents({
         graph, isReady, containerRef, onNodeSelect, setSelectedEdge,
@@ -271,6 +296,7 @@ export function GraphComponent({
             {/* Graph Canvas */}
             <div
                 id="graph-container"
+                data-testid="graph-canvas"
                 ref={containerRef}
                 className="w-full h-full"
                 style={{ minHeight: '100%', outline: 'none' }}
@@ -291,6 +317,16 @@ export function GraphComponent({
 
             {/* Connection Status */}
             <ConnectionStatus syncStatus={syncStatus} />
+
+            {/* Story 8.2: Minimap Navigation */}
+            <MinimapContainer
+                graph={graph}
+                isReady={isReady}
+                selectedNodeId={selectedNodeIds[0] || null}
+                searchMatchIds={searchMatchIds}
+                isVisible={isMinimapVisible}
+                onToggle={toggleMinimap}
+            />
 
             {/* Clipboard Toolbar */}
             <div className="absolute top-4 right-4">

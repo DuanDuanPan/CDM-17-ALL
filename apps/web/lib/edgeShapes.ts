@@ -12,7 +12,7 @@ export const HIERARCHICAL_EDGE_SHAPE = 'cdm-hierarchical-edge';
 let edgeShapesRegistered = false;
 
 type GraphRegistrationAPI = {
-  registerEdge: (name: string, entity: unknown, force?: boolean) => unknown;
+  registerEdge: typeof import('@antv/x6').Graph.registerEdge;
 };
 
 /**

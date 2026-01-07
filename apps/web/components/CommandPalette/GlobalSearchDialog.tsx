@@ -110,6 +110,27 @@ export function GlobalSearchDialog({
         }
     }, [open]);
 
+    // Story 8.2: Dispatch search results for minimap highlighting (AC: #6)
+    useEffect(() => {
+        if (!open) {
+            // Clear highlights when search closes
+            window.dispatchEvent(
+                new CustomEvent('mindmap:search-results', {
+                    detail: { graphId: graphId || null, nodeIds: [] },
+                })
+            );
+            return;
+        }
+
+        // Dispatch current results for highlighting
+        const nodeIds = results.map((r) => r.id);
+        window.dispatchEvent(
+            new CustomEvent('mindmap:search-results', {
+                detail: { graphId: graphId || null, nodeIds },
+            })
+        );
+    }, [open, results, graphId]);
+
     // Open search programmatically (e.g., tag click, toolbar button)
     useEffect(() => {
         const handleOpenSearch = (e: Event) => {
@@ -167,10 +188,11 @@ export function GlobalSearchDialog({
                         )}
                         <Command.Input
                             ref={inputRef}
+                            data-testid="global-search-input"
                             value={query}
                             onValueChange={setQuery}
                             placeholder={isTagSearch ? '搜索标签...' : '搜索节点...'}
-                            className="flex-1 bg-transparent text-base outline-none 
+                            className="flex-1 bg-transparent text-base outline-none
                          placeholder:text-gray-400 dark:text-white"
                         />
                         <div className="flex items-center gap-2">

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import '@antv/x6-plugin-minimap/es/index.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {

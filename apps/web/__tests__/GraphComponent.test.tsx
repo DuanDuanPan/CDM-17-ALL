@@ -17,6 +17,15 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ConfirmDialogProvider, ToastProvider } from '@cdm/ui';
 import type { Graph, Node } from '@antv/x6';
 
+// Mock @antv/x6 to avoid ESM issues with NodeView
+vi.mock('@antv/x6', () => ({
+  NodeView: class { },
+  Graph: class { },
+  MiniMap: vi.fn().mockImplementation(() => ({
+    dispose: vi.fn(),
+  })),
+}));
+
 // ============================================================
 // Mock Setup
 // ============================================================
@@ -30,6 +39,8 @@ const mockGraph = {
   off: vi.fn(),
   zoom: vi.fn(() => 1),
   translate: vi.fn(() => ({ tx: 0, ty: 0 })),
+  getPlugin: vi.fn(() => null),
+  use: vi.fn(),
 } as unknown as Graph;
 
 // Mock useGraph hook
@@ -141,6 +152,16 @@ vi.mock('@/components/graph/hooks', () => ({
     getHiddenDescendantCount: vi.fn(() => 0),
     getChildCount: vi.fn(() => 0),
     hasChildren: vi.fn(() => false),
+  })),
+  // Story 8.2: Minimap mock
+  useMinimap: vi.fn(() => ({
+    isEnabled: false,
+    toggle: vi.fn(),
+    show: vi.fn(),
+    hide: vi.fn(),
+    highlightNodes: vi.fn(),
+    clearHighlights: vi.fn(),
+    isDisabledForPerformance: false,
   })),
 }));
 

@@ -98,7 +98,7 @@ export class GraphSyncManager {
         cellRemoved?: (args: { cell: Cell }) => void;
         nodePositionChange?: (args: { node: Node }) => void;
         nodePositionChangeContinuous?: (args: { node: Node }) => void;
-        nodeDataChange?: (args: { node: Node }) => void;
+        nodeDataChange?: (args: { node: Node; current?: unknown; previous?: unknown }) => void;
         edgeAdded?: (args: { edge: Edge }) => void;
         edgeRemoved?: (args: { edge: Edge }) => void;
         edgeDataChange?: (args: { edge: Edge }) => void;
@@ -194,8 +194,33 @@ export class GraphSyncManager {
         this.graph.on('node:change:position', this.boundHandlers.nodePositionChangeContinuous);
 
         // Node data change (label, metadata, etc.)
-        this.boundHandlers.nodeDataChange = ({ node }) => {
+        this.boundHandlers.nodeDataChange = ({ node, current, previous }) => {
             if (this.isRemoteUpdate) return;
+
+            // Ignore purely local/UI-only data changes (avoid unnecessary Yjs traffic).
+            // This keeps ephemeral UI flags local and prevents O(n) highlight updates from spamming Yjs.
+            const currentData = (current ?? node.getData() ?? {}) as Record<string, unknown>;
+            const previousData = (previous ?? {}) as Record<string, unknown>;
+            const keys = new Set([...Object.keys(currentData), ...Object.keys(previousData)]);
+            const changedKeys: string[] = [];
+            keys.forEach((key) => {
+                if (currentData[key] !== previousData[key]) {
+                    changedKeys.push(key);
+                }
+            });
+
+            if (changedKeys.length > 0) {
+                const uiOnlyKeys = new Set([
+                    'isEditing',
+                    'isSelected',
+                    'isConnectionSource',
+                    '_batchId',
+                    '_minimapHighlight',
+                ]);
+                const isUiOnlyChange = changedKeys.every((key) => uiOnlyKeys.has(key));
+                if (isUiOnlyChange) return;
+            }
+
             this.syncNodeToYjs(node);
         };
         this.graph.on('node:change:data', this.boundHandlers.nodeDataChange);
@@ -514,6 +539,7 @@ export class GraphSyncManager {
                 isSelected: existingData.isSelected,
                 isConnectionSource: existingData.isConnectionSource,
                 _batchId: existingData._batchId,
+                _minimapHighlight: existingData._minimapHighlight,
             };
             // Update position and data; isRemoteUpdate guard prevents echo loops.
             existingNode.setPosition(data.x, data.y);

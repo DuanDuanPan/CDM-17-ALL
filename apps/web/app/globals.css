@@ -106,3 +106,20 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/* X6 Minimap viewport styling - Story 8.2 */
+.x6-widget-minimap-viewport {
+  border: 2px solid hsl(var(--primary)) !important;
+  background: hsl(var(--primary) / 0.1) !important;
+  border-radius: 4px;
+}
+
+/* Minimap node highlights */
+.minimap-node.selected-node-highlight {
+  filter: drop-shadow(0 0 2px hsl(var(--primary)));
+}
+
+.minimap-node.search-match-highlight {
+  filter: drop-shadow(0 0 2px #facc15);
+}
+

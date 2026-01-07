@@ -141,9 +141,12 @@ importers:
       '@antv/x6':
         specifier: ^3.1.2
         version: 3.1.2
+      '@antv/x6-plugin-minimap':
+        specifier: ^3.0.0
+        version: 3.0.0(@antv/x6@3.1.2)
       '@antv/x6-plugin-scroller':
-        specifier: ^2.0.10
-        version: 2.0.10(@antv/x6@3.1.2)
+        specifier: ^3.0.0
+        version: 3.0.0(@antv/x6@3.1.2)
       '@antv/x6-react-shape':
         specifier: ^3.0.1
         version: 3.0.1(@antv/x6@3.1.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -675,10 +678,17 @@ packages:
   '@antv/hierarchy@0.6.14':
     resolution: {integrity: sha512-V3uknf7bhynOqQDw2sg+9r9DwZ9pc6k/EcqyTFdfXB1+ydr7urisP0MipIuimucvQKN+Qkd+d6w601r1UIroqQ==}
 
-  '@antv/x6-plugin-scroller@2.0.10':
-    resolution: {integrity: sha512-CrC5zCbtPe7LJEKK8ucLcDN+9lMtTJNApFmFObAiR/y2LO1QFCHz8GGLVeNOZaIEmJbR/Z/etpJkvc1LE7WhTg==}
+  '@antv/x6-plugin-minimap@3.0.0':
+    resolution: {integrity: sha512-YYNFhN7xZLn7rFWDvAhsDj4QSsjeC3TyP27hHwSqJfFHmppa/xc/IETxphILb9CUHS2trDy/2uaD2ojYN4gZBA==}
+    deprecated: this package has been deprecated
     peerDependencies:
-      '@antv/x6': ^2.x
+      '@antv/x6': ^3.x
+
+  '@antv/x6-plugin-scroller@3.0.0':
+    resolution: {integrity: sha512-Vn58k6s27yUMU3r/GE3OZ1lag3+mbYLQNDx8vhPzRU1zIk2ELSI7RrUymBfI82Nx5Gm1pUwaYbO6J6i4RgZ+ZQ==}
+    deprecated: this package has been deprecated
+    peerDependencies:
+      '@antv/x6': ^3.x
 
   '@antv/x6-react-shape@3.0.1':
     resolution: {integrity: sha512-zLIJ0NMO6R3sXZGKQJKMUEZmaVwNDBxx3jYUMSXE9cZhKsvWV+P8WuiUCtJYNSVTezBLbxYLzrukA/QdQa/sKg==}
@@ -5314,6 +5324,7 @@ packages:
   whatwg-encoding@3.1.1:
     resolution: {integrity: sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ==}
     engines: {node: '>=18'}
+    deprecated: Use @exodus/bytes instead for a more spec-conformant and faster implementation
 
   whatwg-mimetype@4.0.0:
     resolution: {integrity: sha512-QaKxh0eNIi2mE9p2vEdzfagOKHCcj1pJ56EEHGQOVxp8r9/iszLUUV7v89x9O1p/T+NlTM5W7jW6+cz4Fq1YVg==}
@@ -5516,7 +5527,11 @@ snapshots:
 
   '@antv/hierarchy@0.6.14': {}
 
-  '@antv/x6-plugin-scroller@2.0.10(@antv/x6@3.1.2)':
+  '@antv/x6-plugin-minimap@3.0.0(@antv/x6@3.1.2)':
+    dependencies:
+      '@antv/x6': 3.1.2
+
+  '@antv/x6-plugin-scroller@3.0.0(@antv/x6@3.1.2)':
     dependencies:
       '@antv/x6': 3.1.2
 

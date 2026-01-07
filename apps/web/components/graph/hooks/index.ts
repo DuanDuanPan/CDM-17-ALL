@@ -36,3 +36,7 @@ export type { UseGraphCursorOptions, UseGraphCursorReturn } from './useGraphCurs
 // Story 8.1: Node Collapse & Expand
 export { useNodeCollapse } from './useNodeCollapse';
 export type { UseNodeCollapseOptions, UseNodeCollapseReturn } from './useNodeCollapse';
+
+// Story 8.2: Minimap Navigation
+export { useMinimap } from './useMinimap';
+export type { UseMinimapOptions, UseMinimapReturn } from './useMinimap';

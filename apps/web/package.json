@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@antv/x6": "^3.1.2",
-    "@antv/x6-plugin-scroller": "^2.0.10",
+    "@antv/x6-plugin-minimap": "^3.0.0",
+    "@antv/x6-plugin-scroller": "^3.0.0",
     "@antv/x6-react-shape": "^3.0.1",
     "@cdm/plugin-layout": "workspace:*",
     "@cdm/plugin-mindmap-core": "workspace:*",

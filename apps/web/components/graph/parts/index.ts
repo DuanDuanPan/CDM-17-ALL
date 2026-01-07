@@ -14,3 +14,10 @@ export type { ConnectionStatusProps, SyncStatus } from './ConnectionStatus';
 
 export { DependencyModeIndicator } from './DependencyModeIndicator';
 export type { DependencyModeIndicatorProps } from './DependencyModeIndicator';
+
+// Story 8.2: Minimap Navigation
+export { MinimapContainer } from './MinimapContainer';
+export type { MinimapContainerProps } from './MinimapContainer';
+
+export { MinimapToggleButton } from './MinimapToggleButton';
+export type { MinimapToggleButtonProps } from './MinimapToggleButton';

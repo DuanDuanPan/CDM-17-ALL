@@ -47,9 +47,10 @@ Status: ready-for-dev
 To handle 1000+ nodes while maintaining 60fps, we will transition from a basic Graph container to using the **X6 Scroller Plugin** with Virtual Rendering enabled.
 
 *   **Rationale:** The default graph renders all nodes into the DOM. With React Portals (`@antv/x6-react-shape`), this means 1000+ React Hierarchies + Portals, causing massive Style Recalculation overhead.
-*   **Implementation:**
+    *   **Implementation:**
     ```typescript
-    import { Scroller } from '@antv/x6-plugin-scroller'
+    import { Scroller } from '@antv/x6'
+    import '@antv/x6-plugin-scroller/es/index.css'
 
     // In useGraph.ts
     graph.use(

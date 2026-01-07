@@ -31,6 +31,9 @@ export interface UseGraphHotkeysOptions {
     onExpandNode?: (nodeId: string) => void;
     /** Recursively collapse all descendants */
     onCollapseDescendants?: (nodeId: string) => void;
+    // Story 8.2: Minimap toggle
+    /** Toggle minimap visibility */
+    onToggleMinimap?: () => void;
 }
 
 export interface UseGraphHotkeysReturn {
@@ -64,6 +67,8 @@ export function useGraphHotkeys({
     onCollapseNode,
     onExpandNode,
     onCollapseDescendants,
+    // Story 8.2: Minimap toggle
+    onToggleMinimap,
 }: UseGraphHotkeysOptions): UseGraphHotkeysReturn {
     // Global Space-to-edit: allow editing even when graph container isn't focused
     useEffect(() => {
@@ -175,6 +180,18 @@ export function useGraphHotkeys({
                 }
             }
 
+            // Story 8.2: M key to toggle minimap (AC: #1)
+            if (e.key === 'm' && !e.ctrlKey && !e.metaKey && !e.altKey && onToggleMinimap) {
+                const target = e.target as HTMLElement | null;
+                // Don't trigger when typing in inputs or contentEditable
+                if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')) {
+                    return;
+                }
+                e.preventDefault();
+                onToggleMinimap();
+                return;
+            }
+
             // Handle edge deletion with Delete/Backspace
             if (selectedEdge && (e.key === 'Delete' || e.key === 'Backspace')) {
                 e.preventDefault();
@@ -246,7 +263,7 @@ export function useGraphHotkeys({
                     break;
             }
         },
-        [graph, isReady, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge, setSelectedEdge, setConnectionStartNode, onCollapseNode, onExpandNode, onCollapseDescendants]
+        [graph, isReady, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge, setSelectedEdge, setConnectionStartNode, onCollapseNode, onExpandNode, onCollapseDescendants, onToggleMinimap]
     );
 
     return { handleKeyDown };

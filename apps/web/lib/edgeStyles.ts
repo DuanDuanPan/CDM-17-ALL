@@ -13,7 +13,7 @@ export const HIERARCHICAL_EDGE_GRADIENT = {
         { offset: '55%', color: '#6366F1' }, // Indigo
         { offset: '100%', color: '#4B8DFF' }, // Blue
     ],
-} as const;
+};
 
 export const HIERARCHICAL_EDGE_ATTRS = {
     glow: {
