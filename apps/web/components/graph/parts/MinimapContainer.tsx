@@ -7,11 +7,14 @@
  * Provides a glassmorphism-styled container for the minimap in the bottom-right corner.
  * Integrates with useMinimap hook for functionality.
  * Visibility is controlled by parent via isVisible/onToggle props (persisted via useMinimapStorage).
+ *
+ * Refactoring Compliance: Uses Button and Card from @cdm/ui (ref: refactoring-proposal §1.3)
  */
 
 import { useRef, useEffect } from 'react';
 import type { Graph } from '@antv/x6';
 import { X, Map } from 'lucide-react';
+import { Button, Card } from '@cdm/ui';
 import { useMinimap } from '../hooks/useMinimap';
 import { MinimapToggleButton } from './MinimapToggleButton';
 
@@ -79,13 +82,13 @@ export function MinimapContainer({
     }
 
     return (
-        <div
+        <Card
             role="region"
             aria-label="小地图导航"
             data-testid="minimap-container"
             className="absolute bottom-4 right-4 z-50
                 bg-background/80 backdrop-blur-sm
-                border border-border/50 rounded-lg
+                border-border/50
                 shadow-lg overflow-hidden
                 transition-all duration-200"
         >
@@ -95,15 +98,16 @@ export function MinimapContainer({
                     <Map className="w-3.5 h-3.5" />
                     <span>小地图</span>
                 </div>
-                <button
-                    type="button"
+                <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={onToggle}
                     data-testid="minimap-toggle"
-                    className="p-0.5 rounded hover:bg-muted/50 transition-colors"
+                    className="h-6 w-6 p-0.5"
                     aria-label="隐藏小地图"
                 >
                     <X className="w-3.5 h-3.5 text-muted-foreground" />
-                </button>
+                </Button>
             </div>
 
             {isDisabledForPerformance ? (
@@ -121,7 +125,7 @@ export function MinimapContainer({
                     }}
                 />
             )}
-        </div>
+        </Card>
     );
 }
 

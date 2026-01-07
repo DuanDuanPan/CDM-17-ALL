@@ -6,9 +6,12 @@
  *
  * Standalone button shown when minimap is hidden.
  * Positioned in bottom-right corner of the graph canvas.
+ *
+ * Refactoring Compliance: Uses Button from @cdm/ui (ref: refactoring-proposal §1.3)
  */
 
 import { Map } from 'lucide-react';
+import { Button, cn } from '@cdm/ui';
 
 export interface MinimapToggleButtonProps {
     onClick: () => void;
@@ -21,22 +24,24 @@ export interface MinimapToggleButtonProps {
  */
 export function MinimapToggleButton({ onClick, className = '' }: MinimapToggleButtonProps) {
     return (
-        <button
-            type="button"
+        <Button
+            variant="ghost"
+            size="icon"
             onClick={onClick}
             data-testid="minimap-show-button"
-            className={`absolute bottom-4 right-4 z-50
-                p-2 rounded-lg
-                bg-background/80 backdrop-blur-sm
-                border border-border/50
-                shadow-lg
-                hover:bg-muted/50
-                transition-all duration-200
-                ${className}`}
+            className={cn(
+                "absolute bottom-4 right-4 z-50",
+                "h-10 w-10",
+                "bg-background/80 backdrop-blur-sm",
+                "border border-border/50",
+                "shadow-lg",
+                "hover:bg-muted/50",
+                className
+            )}
             aria-label="显示小地图"
         >
             <Map className="w-4 h-4 text-muted-foreground" />
-        </button>
+        </Button>
     );
 }
 
