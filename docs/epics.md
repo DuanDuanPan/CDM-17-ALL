@@ -862,23 +862,35 @@ So that **我能专注编辑而不被其他内容干扰。**
 **And** 聚焦模式应有视觉指示器（如工具栏中的开关状态）
 **And** 聚焦区域应支持配置（1层、2层、3层等）
 
-### Story 8.6: 分组 Frame (Grouping Frame)
+### Story 8.6: 兄弟节点顺序持久化 (Sibling Node Order Persistence)
 
-As a **架构师**,
-I want **将相关节点组织到一个可折叠的 Frame 分组中**,
-So that **我能对大型图谱进行逻辑分区管理。**
+As a **脑图用户**,
+I want **兄弟节点的顺序能够被正确保存和还原**,
+So that **我在任何场景下（新建、模板导入、大纲拖拽、刷新/重开）都能看到一致且可控的节点顺序。**
 
 **Acceptance Criteria:**
 
-**Given** 画布上选中了多个节点
-**When** 右键选择"创建分组"或使用快捷键
-**Then** 应创建一个包含这些节点的 Frame 容器
-**And** Frame 应有标题栏（可编辑名称）和背景色（可选择）
-**When** 拖动 Frame 标题栏
-**Then** Frame 及其内部所有节点应整体移动
-**When** 点击 Frame 的折叠按钮
-**Then** Frame 内容折叠为一个紧凑图标，只显示标题
-**And** Frame 应支持嵌套（Frame 中包含 Frame）
+**Given** 父节点已有 2 个子节点（order=0, order=1）
+**When** 用户按 Tab 键添加新子节点
+**Then** 新子节点的 order 应为 2
+**And** 大纲视图中显示在最后位置
+
+**Given** 父节点有 3 个子节点（A:0, B:1, C:2），当前选中 B
+**When** 用户按 Enter 键添加兄弟节点
+**Then** 新节点应插入到 B 之后（order=2）
+**And** C 的 order 应更新为 3
+
+**Given** 兄弟节点的 Y 坐标不按顺序排列
+**When** 用户在子节点上按 ↑↓ 键导航
+**Then** 应按 order 跳转，而非按 Y 坐标
+
+**Given** 用户保存子树为模板并再次导入/实例化
+**When** 模板结构中包含 order 信息
+**Then** 导入后子节点顺序必须与模板定义一致
+
+**Given** 用户在大纲中拖拽调整兄弟顺序
+**When** 刷新页面或重新打开图谱
+**Then** 顺序应保持不变（order 持久化）
 
 ### Story 8.7: 快捷键面板 (Command Palette Enhancement)
 
@@ -979,3 +991,21 @@ So that **我能流畅地向观众讲解复杂的结构。**
 **Then** 退出演示模式，恢复正常编辑视图
 **And** 演示路径可通过拖拽节点顺序配置
 **And** 支持导出为自动播放动画
+
+### Story 8.13: 分组 Frame (Grouping Frame)
+
+As a **架构师**,
+I want **将相关节点组织到一个可折叠的 Frame 分组中**,
+So that **我能对大型图谱进行逻辑分区管理。**
+
+**Acceptance Criteria:**
+
+**Given** 画布上选中了多个节点
+**When** 右键选择"创建分组"或使用快捷键
+**Then** 应创建一个包含这些节点的 Frame 容器
+**And** Frame 应有标题栏（可编辑名称）和背景色（可选择）
+**When** 拖动 Frame 标题栏
+**Then** Frame 及其内部所有节点应整体移动
+**When** 点击 Frame 的折叠按钮
+**Then** Frame 内容折叠为一个紧凑图标，只显示标题
+**And** Frame 应支持嵌套（Frame 中包含 Frame）

@@ -170,6 +170,14 @@ vi.mock('@/components/graph/hooks', () => ({
     centerNode: vi.fn(),
     prefersReducedMotion: false,
   })),
+  // Story 8.5: Focus mode mock
+  useFocusMode: vi.fn(() => ({
+    isFocusMode: false,
+    focusLevel: 1,
+    toggleFocusMode: vi.fn(),
+    exitFocusMode: vi.fn(),
+    setFocusLevel: vi.fn(),
+  })),
 }));
 
 // Mock context

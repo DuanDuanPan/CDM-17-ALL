@@ -29,9 +29,9 @@ import { useToast } from '@cdm/ui';
 import { useMinimapStorage } from '@/hooks/useMinimapStorage';
 
 // Story 7.4: Extracted hooks and UI components
-import { useGraphTransform, useGraphHotkeys, useGraphEvents, useGraphSelection, useGraphDependencyMode, useGraphContextMenu, useGraphCursor, useGraphInitialization, useNodeCollapse, useZoomShortcuts } from './hooks';
+import { useGraphTransform, useGraphHotkeys, useGraphEvents, useGraphSelection, useGraphDependencyMode, useGraphContextMenu, useGraphCursor, useGraphInitialization, useNodeCollapse, useZoomShortcuts, useFocusMode } from './hooks';
 import type { EdgeContextMenuState, NodeContextMenuState } from './hooks';
-import { EdgeContextMenu, NodeContextMenu, ConnectionStatus, DependencyModeIndicator, MinimapContainer, ZoomIndicator } from './parts';
+import { EdgeContextMenu, NodeContextMenu, ConnectionStatus, DependencyModeIndicator, MinimapContainer, ZoomIndicator, FocusModeButton } from './parts';
 
 // Story 5.2: Template save functionality
 import { SaveTemplateDialog } from '@/components/TemplateLibrary/SaveTemplateDialog';
@@ -201,6 +201,19 @@ export function GraphComponent({
     // Story 8.3: Zoom Shortcuts System
     const { zoomToFit, zoomTo100, centerNode } = useZoomShortcuts({ graph, isReady });
 
+    // Story 8.5: Focus Mode
+    const {
+        isFocusMode,
+        focusLevel,
+        toggleFocusMode,
+        exitFocusMode,
+        setFocusLevel,
+    } = useFocusMode({
+        graph,
+        isReady,
+        selectedNodeId: selectedNodeIds[0] || null,
+    });
+
     const { handleKeyDown } = useGraphHotkeys({
         graph, isReady, selectedEdge, setSelectedEdge,
         connectionStartNode, setConnectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge,
@@ -213,12 +226,16 @@ export function GraphComponent({
         // Story 8.3: Zoom shortcuts
         onZoomToFit: zoomToFit,
         onZoomTo100: zoomTo100,
+        // Story 8.5: Focus mode toggle
+        onToggleFocusMode: toggleFocusMode,
     });
     useGraphEvents({
         graph, isReady, containerRef, onNodeSelect, setSelectedEdge,
         isDependencyMode, connectionStartNode, setContextMenu, setNodeContextMenu,
         // Story 8.3: Double-click to center node
         onNodeDoubleClick: centerNode,
+        // Story 8.5: Blank click to exit focus mode
+        onBlankClick: exitFocusMode,
     });
     useGraphInitialization({
         graph,
@@ -328,6 +345,18 @@ export function GraphComponent({
 
             {/* View Controls: Bottom-Right Stack */}
             <div className="absolute bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
+                {/* Story 8.5: Focus Mode Button */}
+                <div className="pointer-events-auto">
+                    <FocusModeButton
+                        isFocusMode={isFocusMode}
+                        focusLevel={focusLevel}
+                        onToggle={toggleFocusMode}
+                        onSetLevel={setFocusLevel}
+                        disabled={!isReady}
+                        hasSelection={hasSelection}
+                    />
+                </div>
+
                 {/* Story 8.3: Zoom Level Indicator (AC6) */}
                 <div className="pointer-events-auto">
                     <ZoomIndicator

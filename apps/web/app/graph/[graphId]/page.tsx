@@ -24,7 +24,7 @@ import { CommentPanel } from '@/components/Comments';
 import { TemplateLibraryDialog } from '@/components/TemplateLibrary';
 import { CommentCountContext } from '@/contexts/CommentCountContext';
 // Story 8.4: Outline View hooks
-import { useOutlineData, useZoomShortcuts, useNodeCollapse } from '@/components/graph/hooks';
+import { useOutlineData, useZoomShortcuts } from '@/components/graph/hooks';
 import {
     STORAGE_KEY_LAYOUT_MODE,
     STORAGE_KEY_GRID_ENABLED,
@@ -100,7 +100,6 @@ function GraphPageContent() {
     // Story 8.4: Outline View hooks
     const { outlineData, reorderNode } = useOutlineData({ graph, isReady: isGraphReady });
     const { centerNode } = useZoomShortcuts({ graph, isReady: isGraphReady });
-    const { expandPathToNode } = useNodeCollapse({ graph, isReady: isGraphReady });
 
     // Restore state from localStorage on client mount
     useEffect(() => {
@@ -197,7 +196,9 @@ function GraphPageContent() {
     // Story 8.4: Handle outline node click - expand path + center + select
     const handleOutlineNodeClick = useCallback((nodeId: string) => {
         // 1. Expand collapsed ancestors (Story 8.1)
-        expandPathToNode(nodeId);
+        window.dispatchEvent(
+            new CustomEvent('mindmap:expand-path-to-node', { detail: { nodeId } })
+        );
         // 2. Center node in view (Story 8.3)
         centerNode(nodeId);
         // 3. Select node in X6 graph (properly trigger onNodeSelect)
@@ -213,7 +214,7 @@ function GraphPageContent() {
         }
         // 4. Update state for UI sync
         setSelectedNodeId(nodeId);
-    }, [expandPathToNode, centerNode, graph]);
+    }, [centerNode, graph]);
 
     // Story 8.4 Enhancement: Handle outline reorder with auto-layout + center
     const handleOutlineReorder = useCallback((nodeId: string, newParentId: string | null, index: number) => {

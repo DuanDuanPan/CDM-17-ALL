@@ -35,6 +35,9 @@ export interface UseGraphEventsOptions {
     // Story 8.3: Double-click to center node
     /** Callback when node is double-clicked (AC4: center without zoom change) */
     onNodeDoubleClick?: (nodeId: string) => void;
+    // Story 8.5: Focus mode blank click handler
+    /** Callback when blank area is clicked (for exiting focus mode) */
+    onBlankClick?: () => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -63,6 +66,7 @@ export function useGraphEvents({
     setContextMenu,
     setNodeContextMenu,
     onNodeDoubleClick,
+    onBlankClick,
 }: UseGraphEventsOptions): UseGraphEventsReturn {
     useEffect(() => {
         if (!graph || !isReady) return;
@@ -86,6 +90,8 @@ export function useGraphEvents({
         const handleBlankClick = ({ e }: { e: MouseEvent }) => {
             if (e?.button !== 0) return;
             onNodeSelect?.(null);
+            // Story 8.5: Call blank click handler for focus mode exit
+            onBlankClick?.();
             containerRef.current?.focus();
         };
 
@@ -260,7 +266,7 @@ export function useGraphEvents({
                 graph.off('node:contextmenu', handleNodeContextMenu);
             }
         };
-    }, [graph, isReady, onNodeSelect, connectionStartNode, isDependencyMode, setSelectedEdge, setContextMenu, setNodeContextMenu, containerRef, onNodeDoubleClick]);
+    }, [graph, isReady, onNodeSelect, connectionStartNode, isDependencyMode, setSelectedEdge, setContextMenu, setNodeContextMenu, containerRef, onNodeDoubleClick, onBlankClick]);
 
     return {};
 }

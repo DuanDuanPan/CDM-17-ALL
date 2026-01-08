@@ -10,4 +10,5 @@ communication_language: Mandarin
 document_output_language: Mandarin
 agent_sidecar_folder: "{project-root}/.bmad-user-memory"
 output_folder: "{project-root}/docs"
+sprint_artifacts: "{project-root}/docs/sprint-artifacts"
 install_user_docs: true

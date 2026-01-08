@@ -48,3 +48,7 @@ export type { UseZoomShortcutsOptions, UseZoomShortcutsReturn } from './useZoomS
 // Story 8.4: Outline View
 export { useOutlineData } from './useOutlineData';
 export type { OutlineNode, UseOutlineDataOptions, UseOutlineDataReturn } from './useOutlineData';
+
+// Story 8.5: Focus Mode
+export { useFocusMode } from './useFocusMode';
+export type { UseFocusModeOptions, UseFocusModeReturn } from './useFocusMode';

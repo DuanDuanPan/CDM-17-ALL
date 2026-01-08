@@ -29,3 +29,7 @@ export type { ZoomIndicatorProps } from './ZoomIndicator';
 // Story 8.4: Outline View
 export { OutlinePanel } from './OutlinePanel';
 export { OutlineItem } from './OutlineItem';
+
+// Story 8.5: Focus Mode
+export { FocusModeButton } from './FocusModeButton';
+export type { FocusModeButtonProps } from './FocusModeButton';

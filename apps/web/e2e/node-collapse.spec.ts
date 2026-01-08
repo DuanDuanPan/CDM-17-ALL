@@ -123,8 +123,8 @@ test.describe('Node Collapse & Expand (Story 8.1)', () => {
       ensureEdge('child-1', 'grandchild-1');
     });
 
-    const child = page.locator('.x6-node[data-cell-id="child-1"]');
-    const grandchild = page.locator('.x6-node[data-cell-id="grandchild-1"]');
+    const child = page.locator('.x6-node[data-cell-id="child-1"]').first();
+    const grandchild = page.locator('.x6-node[data-cell-id="grandchild-1"]').first();
     await expect(child).toBeVisible();
     await expect(grandchild).toBeVisible();
 
@@ -145,7 +145,7 @@ test.describe('Node Collapse & Expand (Story 8.1)', () => {
   }
 
   test('should collapse/expand subtree via hotkeys and keep positions', async ({ page }) => {
-    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
+    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]').first();
     await expect(centerNode).toBeVisible();
 
     const { child, grandchild } = await seedTree(page);
@@ -185,8 +185,30 @@ test.describe('Node Collapse & Expand (Story 8.1)', () => {
     expect(Math.abs(grandchildBoxAfter!.y - grandchildBoxBefore!.y)).toBeLessThan(6);
   });
 
+  test('should collapse/expand subtree via collapse toggle button', async ({ page }) => {
+    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]').first();
+    await expect(centerNode).toBeVisible();
+
+    await seedTree(page);
+
+    const toggle = centerNode.getByTestId('collapse-toggle');
+    await expect(toggle).toBeVisible();
+
+    // Collapse via UI toggle
+    await toggle.click();
+    await expectGraphNodeCollapsed(page, 'center-node', true);
+    await expectGraphNodeVisible(page, 'child-1', false);
+    await expectGraphNodeVisible(page, 'grandchild-1', false);
+
+    // Expand via UI toggle
+    await toggle.click();
+    await expectGraphNodeCollapsed(page, 'center-node', false);
+    await expectGraphNodeVisible(page, 'child-1', true);
+    await expectGraphNodeVisible(page, 'grandchild-1', true);
+  });
+
 	  test('should recursively collapse descendants via context menu', async ({ page }) => {
-	    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
+	    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]').first();
 	    await expect(centerNode).toBeVisible();
 
 	    await seedTree(page);
@@ -224,7 +246,7 @@ test.describe('Node Collapse & Expand (Story 8.1)', () => {
   });
 
   test('should persist collapsed state after reload', async ({ page }) => {
-    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
+    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]').first();
     await expect(centerNode).toBeVisible();
 
     await seedTree(page);
@@ -241,7 +263,7 @@ test.describe('Node Collapse & Expand (Story 8.1)', () => {
     await waitForGraphCell(page, 'child-1');
     await expectGraphNodeCollapsed(page, 'center-node', true);
 
-    const centerAfterReload = page.locator('.x6-node[data-cell-id="center-node"]');
+    const centerAfterReload = page.locator('.x6-node[data-cell-id="center-node"]').first();
     await expect(centerAfterReload).toBeVisible();
 
     await expectGraphNodeVisible(page, 'child-1', false);
@@ -249,7 +271,7 @@ test.describe('Node Collapse & Expand (Story 8.1)', () => {
   });
 
   test('should auto-expand ancestor path when navigating to a hidden node', async ({ page }) => {
-    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]');
+    const centerNode = page.locator('.x6-node[data-cell-id="center-node"]').first();
     await expect(centerNode).toBeVisible();
 
     const { grandchild } = await seedTree(page);

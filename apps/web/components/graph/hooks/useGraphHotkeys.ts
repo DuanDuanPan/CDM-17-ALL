@@ -39,6 +39,9 @@ export interface UseGraphHotkeysOptions {
     onZoomToFit?: () => void;
     /** Reset zoom to 100% (Cmd/Ctrl + 1) */
     onZoomTo100?: () => void;
+    // Story 8.5: Focus Mode
+    /** Toggle focus mode */
+    onToggleFocusMode?: () => void;
 }
 
 export interface UseGraphHotkeysReturn {
@@ -59,6 +62,7 @@ export interface UseGraphHotkeysReturn {
  * - Story 8.1: Collapse/expand (Cmd+[, Cmd+], Cmd+Alt+[)
  * - Story 8.2: Minimap toggle (M)
  * - Story 8.3: Zoom shortcuts (Cmd+0, Cmd+1, Alt+0, Alt+1)
+ * - Story 8.5: Focus mode (F)
  */
 export function useGraphHotkeys({
     graph,
@@ -79,6 +83,8 @@ export function useGraphHotkeys({
     // Story 8.3: Zoom shortcuts
     onZoomToFit,
     onZoomTo100,
+    // Story 8.5: Focus Mode
+    onToggleFocusMode,
 }: UseGraphHotkeysOptions): UseGraphHotkeysReturn {
     // Global Space-to-edit: allow editing even when graph container isn't focused
     useEffect(() => {
@@ -235,6 +241,18 @@ export function useGraphHotkeys({
                 return;
             }
 
+            // Story 8.5: F key to toggle focus mode (AC1)
+            if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey && onToggleFocusMode) {
+                // Don't trigger when typing in inputs or contentEditable
+                if (isInputFocused) {
+                    return;
+                }
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleFocusMode();
+                return;
+            }
+
             // Handle edge deletion with Delete/Backspace
             if (selectedEdge && (e.key === 'Delete' || e.key === 'Backspace')) {
                 e.preventDefault();
@@ -306,7 +324,7 @@ export function useGraphHotkeys({
                     break;
             }
         },
-        [graph, isReady, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge, setSelectedEdge, setConnectionStartNode, onCollapseNode, onExpandNode, onCollapseDescendants, onToggleMinimap, onZoomToFit, onZoomTo100]
+        [graph, isReady, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge, setSelectedEdge, setConnectionStartNode, onCollapseNode, onExpandNode, onCollapseDescendants, onToggleMinimap, onZoomToFit, onZoomTo100, onToggleFocusMode]
     );
 
     return { handleKeyDown };
