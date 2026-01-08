@@ -26,17 +26,23 @@ export interface UseMinimapStorageReturn {
 export function useMinimapStorage(defaultVisible = true): UseMinimapStorageReturn {
     const isMobile = useIsMobile();
 
-    const [isVisible, setIsVisibleState] = useState<boolean>(() => {
-        // SSR safety check
-        if (typeof window === 'undefined') {
-            return defaultVisible;
-        }
+    // Track whether we've completed client-side hydration
+    const [isHydrated, setIsHydrated] = useState(false);
+
+    // Always start with defaultVisible to prevent hydration mismatch
+    // Server and client both render with the same initial value
+    const [isVisible, setIsVisibleState] = useState<boolean>(defaultVisible);
+
+    // After hydration, sync with localStorage (client-only effect)
+    useEffect(() => {
+        setIsHydrated(true);
 
         try {
             const stored = localStorage.getItem(STORAGE_KEY);
             if (stored !== null) {
                 // User has explicit preference - respect it
-                return stored === 'true';
+                setIsVisibleState(stored === 'true');
+                return;
             }
         } catch {
             // localStorage may not be available
@@ -45,19 +51,22 @@ export function useMinimapStorage(defaultVisible = true): UseMinimapStorageRetur
         // No stored preference - use responsive default
         // On mobile, default to hidden; on desktop, use defaultVisible
         const isMobileViewport = window.matchMedia('(max-width: 767px)').matches;
-        return isMobileViewport ? false : defaultVisible;
-    });
+        if (isMobileViewport) {
+            setIsVisibleState(false);
+        }
+        // If not mobile, keep the defaultVisible value
+    }, []); // Empty deps - only run once on mount
 
-    // Sync to localStorage when state changes
+    // Sync to localStorage when state changes (only after hydration)
     useEffect(() => {
-        if (typeof window === 'undefined') return;
+        if (!isHydrated) return;
 
         try {
             localStorage.setItem(STORAGE_KEY, String(isVisible));
         } catch {
             // localStorage may not be available
         }
-    }, [isVisible]);
+    }, [isVisible, isHydrated]);
 
     const setIsVisible = useCallback((visible: boolean) => {
         setIsVisibleState(visible);

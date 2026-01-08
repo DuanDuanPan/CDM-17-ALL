@@ -23,6 +23,8 @@ import { useTemplateInsert } from '@/hooks/useTemplateInsert';
 import { CommentPanel } from '@/components/Comments';
 import { TemplateLibraryDialog } from '@/components/TemplateLibrary';
 import { CommentCountContext } from '@/contexts/CommentCountContext';
+// Story 8.4: Outline View hooks
+import { useOutlineData, useZoomShortcuts, useNodeCollapse } from '@/components/graph/hooks';
 import {
     STORAGE_KEY_LAYOUT_MODE,
     STORAGE_KEY_GRID_ENABLED,
@@ -91,6 +93,14 @@ function GraphPageContent() {
         userId,
         pollInterval: 30000, // Refresh every 30 seconds
     });
+
+    // Story 8.4: Outline View - graph readiness flag
+    const isGraphReady = graph !== null;
+
+    // Story 8.4: Outline View hooks
+    const { outlineData, reorderNode } = useOutlineData({ graph, isReady: isGraphReady });
+    const { centerNode } = useZoomShortcuts({ graph, isReady: isGraphReady });
+    const { expandPathToNode } = useNodeCollapse({ graph, isReady: isGraphReady });
 
     // Restore state from localStorage on client mount
     useEffect(() => {
@@ -184,6 +194,58 @@ function GraphPageContent() {
         logger.debug('Find user', { userId: clickedUserId });
     }, []);
 
+    // Story 8.4: Handle outline node click - expand path + center + select
+    const handleOutlineNodeClick = useCallback((nodeId: string) => {
+        // 1. Expand collapsed ancestors (Story 8.1)
+        expandPathToNode(nodeId);
+        // 2. Center node in view (Story 8.3)
+        centerNode(nodeId);
+        // 3. Select node in X6 graph (properly trigger onNodeSelect)
+        if (graph) {
+            const cell = graph.getCellById(nodeId);
+            if (cell?.isNode()) {
+                graph.cleanSelection();
+                graph.select(cell);
+                // Set isSelected in node data for styling
+                const data = cell.getData() || {};
+                cell.setData({ ...data, isSelected: true });
+            }
+        }
+        // 4. Update state for UI sync
+        setSelectedNodeId(nodeId);
+    }, [expandPathToNode, centerNode, graph]);
+
+    // Story 8.4 Enhancement: Handle outline reorder with auto-layout + center
+    const handleOutlineReorder = useCallback((nodeId: string, newParentId: string | null, index: number) => {
+        // 1. Execute the reorder operation
+        reorderNode(nodeId, newParentId, index);
+
+        // 2. In non-free layout mode, trigger layout recalculation
+        if (layoutMode !== 'free') {
+            // Dynamic import to avoid circular dependency
+            import('@cdm/plugin-layout').then(({ layoutPlugin }) => {
+                const layoutManager = layoutPlugin.getLayoutManager();
+                if (layoutManager) {
+                    layoutManager.recalculate(true).then(() => {
+                        // 3. After layout animation, center on moved node and select it
+                        setTimeout(() => {
+                            centerNode(nodeId);
+                            handleNodeSelect(nodeId);
+                        }, 350); // Wait for layout animation to complete
+                    }).catch((err) => {
+                        console.error('[handleOutlineReorder] Layout recalculate failed:', err);
+                    });
+                }
+            });
+        } else {
+            // Free mode: just center on the moved node
+            setTimeout(() => {
+                centerNode(nodeId);
+                handleNodeSelect(nodeId);
+            }, 100);
+        }
+    }, [reorderNode, layoutMode, centerNode, handleNodeSelect]);
+
     // Story 4.3: Handle opening comments for a node
     const handleOpenComments = useCallback((nodeId: string, nodeLabel: string) => {
         setCommentNodeId(nodeId);
@@ -249,6 +311,11 @@ function GraphPageContent() {
                                 onDependencyModeToggle={handleDependencyModeToggle}
                                 onTemplatesOpen={() => setTemplateDialogOpen(true)}
                                 userId={userId}
+                                isOutlineReady={isGraphReady}
+                                outlineData={outlineData}
+                                selectedNodeId={selectedNodeId}
+                                onOutlineNodeClick={handleOutlineNodeClick}
+                                onOutlineReorder={handleOutlineReorder}
                             />
 
                             <main className="flex-1 relative overflow-hidden">

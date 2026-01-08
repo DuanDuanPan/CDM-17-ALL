@@ -16,10 +16,13 @@ import {
   Globe,
   User,
   Clock,
+  ListTree,
 } from 'lucide-react';
 import { useTemplates } from '@/hooks/useTemplates';
 import { TemplateCardMini } from '@/components/TemplateLibrary/TemplateCardMini';
+import { OutlinePanel } from '@/components/graph/parts/OutlinePanel';
 import type { TemplateListItem } from '@cdm/types';
+import type { OutlineNode } from '@/components/graph/hooks/useOutlineData';
 
 /** Template filter tab type */
 type TemplateTab = 'all' | 'mine' | 'recent';
@@ -33,12 +36,13 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: 'components', icon: <Shapes className="w-5 h-5" />, label: '组件' },
   { id: 'templates', icon: <LayoutGrid className="w-5 h-5" />, label: '模板' },
+  { id: 'outline', icon: <ListTree className="w-5 h-5" />, label: '大纲' },
   { id: 'text', icon: <Type className="w-5 h-5" />, label: '文本' },
   { id: 'media', icon: <Image className="w-5 h-5" />, label: '媒体' },
   { id: 'links', icon: <Link2 className="w-5 h-5" />, label: '链接' },
 ];
 
-// Story 2.2 + Story 5.2: Props
+// Story 2.2 + Story 5.2 + Story 8.4: Props
 export interface LeftSidebarProps {
   /** Whether dependency mode is active */
   isDependencyMode?: boolean;
@@ -48,6 +52,17 @@ export interface LeftSidebarProps {
   onTemplatesOpen?: () => void;
   /** Story 5.2: Current user ID for template loading */
   userId?: string;
+  // Story 8.4: Outline View
+  /** Whether graph is ready for outline operations */
+  isOutlineReady?: boolean;
+  /** Outline tree data from useOutlineData hook */
+  outlineData?: OutlineNode[];
+  /** Currently selected node ID */
+  selectedNodeId?: string | null;
+  /** Callback when outline node is clicked */
+  onOutlineNodeClick?: (nodeId: string) => void;
+  /** Callback when node is reordered via drag */
+  onOutlineReorder?: (nodeId: string, newParentId: string | null, index: number) => void;
 }
 
 export function LeftSidebar({
@@ -55,6 +70,12 @@ export function LeftSidebar({
   onDependencyModeToggle,
   onTemplatesOpen,
   userId = 'anonymous',
+  // Story 8.4: Outline View props
+  isOutlineReady = false,
+  outlineData,
+  selectedNodeId,
+  onOutlineNodeClick,
+  onOutlineReorder,
 }: LeftSidebarProps = {}) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeNav, setActiveNav] = useState('components');
@@ -132,6 +153,7 @@ export function LeftSidebar({
               setActiveNav(item.id);
               if (!isExpanded) setIsExpanded(true);
             }}
+            data-nav-id={item.id}
             className={`w-10 h-10 flex items-center justify-center rounded-lg mb-2 transition-colors ${activeNav === item.id
               ? 'bg-blue-50 text-blue-600'
               : 'text-gray-500 hover:bg-gray-100'
@@ -295,6 +317,25 @@ export function LeftSidebar({
                   提示：拖拽模板到画布，挂载为选中节点的子节点
                 </p>
               </div>
+            ) : activeNav === 'outline' ? (
+              // Story 8.4: Outline View
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 mb-2">
+                  点击节点跳转，拖拽重排层级
+                </p>
+                {isOutlineReady && onOutlineNodeClick && onOutlineReorder ? (
+                  <OutlinePanel
+                    data={outlineData ?? []}
+                    selectedNodeId={selectedNodeId ?? null}
+                    onNodeClick={onOutlineNodeClick}
+                    onReorder={onOutlineReorder}
+                  />
+                ) : (
+                  <p className="text-xs text-gray-400 text-center py-4">
+                    请打开图谱以查看大纲
+                  </p>
+                )}
+              </div>
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-gray-400 mb-3">拖拽组件到画布</p>
@@ -327,4 +368,3 @@ export function LeftSidebar({
     </aside>
   );
 }
-

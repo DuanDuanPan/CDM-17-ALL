@@ -44,3 +44,7 @@ export type { UseMinimapOptions, UseMinimapReturn } from './useMinimap';
 // Story 8.3: Zoom Shortcuts System
 export { useZoomShortcuts } from './useZoomShortcuts';
 export type { UseZoomShortcutsOptions, UseZoomShortcutsReturn } from './useZoomShortcuts';
+
+// Story 8.4: Outline View
+export { useOutlineData } from './useOutlineData';
+export type { OutlineNode, UseOutlineDataOptions, UseOutlineDataReturn } from './useOutlineData';

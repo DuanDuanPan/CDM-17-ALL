@@ -25,3 +25,7 @@ export type { MinimapToggleButtonProps } from './MinimapToggleButton';
 // Story 8.3: Zoom Shortcuts System
 export { ZoomIndicator } from './ZoomIndicator';
 export type { ZoomIndicatorProps } from './ZoomIndicator';
+
+// Story 8.4: Outline View
+export { OutlinePanel } from './OutlinePanel';
+export { OutlineItem } from './OutlineItem';
