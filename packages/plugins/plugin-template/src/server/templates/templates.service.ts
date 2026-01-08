@@ -65,6 +65,7 @@ interface GeneratedNode {
     parentId: string | null;
     metadata: Prisma.InputJsonValue;
     _tempId?: string; // Template _tempId for edge reference mapping
+    order: number; // Story 8.6: Sibling order for stable layout
 }
 
 @Injectable()
@@ -194,6 +195,7 @@ export class TemplatesService {
                         y: node.y,
                         parentId: node.parentId,
                         metadata: node.metadata,
+                        order: node.order, // Story 8.6
                     },
                 });
 
@@ -258,8 +260,9 @@ export class TemplatesService {
     }
 
     /**
-     * Generate flat node list from recursive template structure
-     */
+ * Generate flat node list from recursive template structure
+ * Story 8.6: Includes order from template or siblingIndex
+ */
     private generateNodesFromStructure(
         rootNode: TemplateNode,
         parentId: string | null = null,
@@ -280,6 +283,9 @@ export class TemplatesService {
             ? NODE_TYPE_MAP[rootNode.type]
             : NodeType.ORDINARY;
 
+        // Story 8.6: Use template order if present, otherwise use siblingIndex
+        const order = rootNode.order ?? siblingIndex;
+
         // Create node data
         nodes.push({
             id: nodeId,
@@ -290,11 +296,25 @@ export class TemplatesService {
             parentId,
             metadata: (rootNode.metadata || {}) as Prisma.InputJsonValue,
             _tempId: rootNode._tempId, // Capture _tempId for edge mapping
+            order, // Story 8.6
         });
 
-        // Recursively process children
+        // Recursively process children (sorted by order if present)
         if (rootNode.children && rootNode.children.length > 0) {
-            rootNode.children.forEach((child, index) => {
+            // Story 8.6: Sort children by (order ?? originalIndex) for stability
+            const sortedChildren = rootNode.children
+                .map((child, originalIndex) => ({
+                    child,
+                    sortKey: child.order ?? originalIndex,
+                    originalIndex,
+                }))
+                .sort((a, b) => {
+                    if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
+                    return a.originalIndex - b.originalIndex;
+                })
+                .map((item) => item.child);
+
+            sortedChildren.forEach((child, index) => {
                 const childNodes = this.generateNodesFromStructure(
                     child,
                     nodeId,

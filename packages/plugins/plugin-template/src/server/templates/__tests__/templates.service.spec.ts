@@ -12,16 +12,20 @@ import { NodeType, type Template, type TemplateStructure, type TemplateNode, typ
 
 // Mock prisma at module level
 jest.mock('@cdm/database', () => ({
+    __tx: {
+        graph: { create: jest.fn().mockResolvedValue({ id: 'graph-123', name: 'Test Graph' }) },
+        node: { create: jest.fn().mockImplementation(async ({ data }) => ({ id: data.id })) },
+        nodeTask: { create: jest.fn() },
+        nodeRequirement: { create: jest.fn() },
+        nodePBS: { create: jest.fn() },
+        nodeData: { create: jest.fn() },
+        nodeApp: { create: jest.fn() },
+    },
     prisma: {
-        $transaction: jest.fn((callback) => callback({
-            graph: { create: jest.fn().mockResolvedValue({ id: 'graph-123', name: 'Test Graph' }) },
-            node: { create: jest.fn().mockResolvedValue({ id: 'node-123' }) },
-            nodeTask: { create: jest.fn() },
-            nodeRequirement: { create: jest.fn() },
-            nodePBS: { create: jest.fn() },
-            nodeData: { create: jest.fn() },
-            nodeApp: { create: jest.fn() },
-        })),
+        $transaction: jest.fn((callback) => {
+            const { __tx } = jest.requireMock('@cdm/database') as { __tx: any };
+            return callback(__tx);
+        }),
     },
     NodeType: {
         ORDINARY: 'ORDINARY',
@@ -168,8 +172,8 @@ describe('TemplatesService', () => {
                 rootNode: {
                     label: 'Root',
                     children: [
-                        { label: 'Child 1', type: NodeType.TASK },
-                        { label: 'Child 2' },
+                        { label: 'Child 1', type: NodeType.TASK, order: 2 },
+                        { label: 'Child 2', order: 0 },
                     ],
                 },
             },
@@ -226,6 +230,16 @@ describe('TemplatesService', () => {
             expect(result).toHaveProperty('graphName');
             expect(result).toHaveProperty('nodeCount');
             expect(result.nodeCount).toBeGreaterThan(0);
+
+            // Story 8.6: Assert order is written to Node.create from template
+            const { __tx } = jest.requireMock('@cdm/database') as { __tx: any };
+            const nodeCreates = __tx.node.create.mock.calls.map((c: any[]) => c[0].data);
+
+            const child1 = nodeCreates.find((d: any) => d.label === 'Child 1');
+            const child2 = nodeCreates.find((d: any) => d.label === 'Child 2');
+
+            expect(child1?.order).toBe(2);
+            expect(child2?.order).toBe(0);
         });
 
         // TC-SVC-6: instantiate calls logUsage
@@ -324,6 +338,44 @@ describe('TemplatesService', () => {
 
             // Should have 4 nodes (root + 3 children)
             expect(result.nodeCount).toBe(4);
+        });
+
+        it('sorts children stably by (order ?? originalIndex) when instantiating (Story 8.6)', async () => {
+            const template: Partial<Template> = {
+                id: 'tpl-order-sort',
+                name: 'Order Sort Template',
+                status: 'PUBLISHED',
+                defaultClassification: 'internal',
+                structure: {
+                    rootNode: {
+                        label: 'Root',
+                        children: [
+                            { label: 'A' }, // originalIndex=0 -> sortKey=0
+                            { label: 'B', order: 2 }, // sortKey=2
+                            { label: 'C' }, // originalIndex=2 -> sortKey=2 (ties with B, keep original order)
+                            { label: 'D', order: 1 }, // sortKey=1
+                        ],
+                    },
+                },
+            };
+
+            mockRepository.findById.mockResolvedValue(template as Template);
+
+            await service.instantiate('tpl-order-sort', 'user-1');
+
+            const { __tx } = jest.requireMock('@cdm/database') as { __tx: any };
+            const nodeCreates = __tx.node.create.mock.calls.map((c: any[]) => c[0].data);
+
+            // First created node is the root (parentId=null)
+            const rootCreate = nodeCreates.find((d: any) => d.parentId === null);
+            expect(rootCreate).toBeTruthy();
+
+            const rootId = rootCreate.id;
+            const childrenCreates = nodeCreates.filter((d: any) => d.parentId === rootId);
+            const childLabels = childrenCreates.map((d: any) => d.label);
+
+            // Expected order: A (0), D (1), B (2), C (2; stable after B)
+            expect(childLabels).toEqual(['A', 'D', 'B', 'C']);
         });
     });
 

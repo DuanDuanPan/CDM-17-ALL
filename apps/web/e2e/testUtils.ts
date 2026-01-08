@@ -7,7 +7,7 @@ function toSafeId(value: string): string {
 }
 
 export function makeTestGraphUrl(graphId: string, userId: string = DEFAULT_E2E_USER_ID): string {
-  return `/graph/${graphId}?userId=${encodeURIComponent(userId)}`;
+  return `/graph/${graphId}?userId=${encodeURIComponent(userId)}&e2e=1`;
 }
 
 export async function createTestGraph(page: Page, testInfo: TestInfo, userId: string = DEFAULT_E2E_USER_ID) {

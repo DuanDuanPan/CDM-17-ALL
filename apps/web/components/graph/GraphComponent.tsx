@@ -118,6 +118,57 @@ export function GraphComponent({
         return () => { onGraphReady(null); };
     }, [graph, onGraphReady]);
 
+    // E2E-only helpers: expose minimal graph inspection APIs for Playwright assertions.
+    useEffect(() => {
+        if (!graph || !isReady) return;
+        if (typeof window === 'undefined') return;
+
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('e2e') !== '1') return;
+
+        const e2eHelpers = {
+            version: 1,
+            getSelectedNode: () => {
+                const selected = graph.getSelectedCells().find((cell) => cell.isNode()) as Node | undefined;
+                if (!selected) return null;
+                return { id: selected.id, data: selected.getData?.() ?? null };
+            },
+            getSelectedNodeLabel: () => {
+                const selected = graph.getSelectedCells().find((cell) => cell.isNode()) as Node | undefined;
+                const data = selected?.getData?.() as Record<string, unknown> | undefined;
+                return (data?.label as string | undefined) ?? null;
+            },
+            findNodeIdByLabel: (label: string) => {
+                const node = graph.getNodes().find((n) => {
+                    const data = n.getData?.() as Record<string, unknown> | undefined;
+                    return data?.label === label;
+                });
+                return node?.id ?? null;
+            },
+            getNodeDataById: (id: string) => {
+                const cell = graph.getCellById(id);
+                if (!cell || !cell.isNode()) return null;
+                return (cell as Node).getData?.() ?? null;
+            },
+            getNodeOrderByLabel: (label: string) => {
+                const node = graph.getNodes().find((n) => {
+                    const data = n.getData?.() as Record<string, unknown> | undefined;
+                    return data?.label === label;
+                });
+                const data = node?.getData?.() as Record<string, unknown> | undefined;
+                return (data?.order as number | undefined) ?? null;
+            },
+        };
+
+        (window as any).__CDM_E2E__ = e2eHelpers;
+
+        return () => {
+            if ((window as any).__CDM_E2E__ === e2eHelpers) {
+                delete (window as any).__CDM_E2E__;
+            }
+        };
+    }, [graph, isReady]);
+
     useMindmapPlugin(graph, isReady);
     const { gridEnabled } = useLayoutPlugin(graph, isReady, currentLayout ?? 'mindmap');
 

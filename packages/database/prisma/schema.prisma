@@ -90,6 +90,9 @@ model Node {
   height      Float    @default(40)
   metadata    Json     @default("{}")
 
+  // Story 8.6: Sibling node order persistence
+  order       Int      @default(0)
+
   // Story 4.1: Approval Workflow
   approval    Json?    // Stores ApprovalPipeline: { status, currentStepIndex, steps[], history[] }
 

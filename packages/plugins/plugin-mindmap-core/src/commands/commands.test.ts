@@ -91,6 +91,11 @@ class FakeGraph {
       (e) => e.getSourceCellId() !== node.id && e.getTargetCellId() !== node.id
     );
   }
+
+  // Story 8.6: batchUpdate for atomic operations
+  batchUpdate(callback: () => void): void {
+    callback();
+  }
 }
 
 function createGraph() {
@@ -133,6 +138,50 @@ describe('Mindmap Commands', () => {
       expect(child2.getPosition().x).toBe(300);
       expect(child2.getPosition().y).toBe(child1.getPosition().y + 80);
     });
+
+    it('assigns order incrementally when appending children (Story 8.6)', () => {
+      const { graph } = createGraph();
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
+
+      const cmd = new AddChildCommand();
+      const child1 = cmd.execute(graph as any, root as any)!;
+      const child2 = cmd.execute(graph as any, root as any)!;
+      const child3 = cmd.execute(graph as any, root as any)!;
+
+      expect((child1.getData() as any).order).toBe(0);
+      expect((child2.getData() as any).order).toBe(1);
+      expect((child3.getData() as any).order).toBe(2);
+    });
+
+    it('normalizes legacy children missing order before appending (Story 8.6)', () => {
+      const { graph } = createGraph();
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
+
+      // Legacy child without order
+      const legacy = graph.addNode({ id: 'legacy', x: 300, y: 100, data: { label: 'Legacy' } });
+      graph.addEdge({ source: root.id, target: legacy.id });
+
+      const cmd = new AddChildCommand();
+      const newChild = cmd.execute(graph as any, root as any)!;
+
+      expect((legacy.getData() as any).order).toBe(0);
+      expect((newChild.getData() as any).order).toBe(1);
+    });
+
+    it('ignores dependency edges when calculating child position (Story 2.2)', () => {
+      const { graph } = createGraph();
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
+
+      const cmd = new AddChildCommand();
+      const child1 = cmd.execute(graph as any, root as any)!;
+
+      // Add a dependency edge to a far-away node that should not affect child positioning
+      const depNode = graph.addNode({ id: 'dep', x: 500, y: 1000, data: { label: 'Dep' } });
+      graph.addEdge({ source: root.id, target: depNode.id, data: { kind: 'dependency' } });
+
+      const child2 = cmd.execute(graph as any, root as any)!;
+      expect(child2.getPosition().y).toBe(child1.getPosition().y + 80);
+    });
   });
 
   describe('AddSiblingCommand', () => {
@@ -166,6 +215,47 @@ describe('Mindmap Commands', () => {
       expect(rootEdges.length).toBe(2);
       const targets = rootEdges.map((e) => e.getTargetCellId()).sort();
       expect(targets).toEqual([first.id, sibling.id].sort());
+    });
+
+    it('inserts sibling after selected and shifts subsequent orders (Story 8.6)', () => {
+      const { graph } = createGraph();
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
+
+      const a = graph.addNode({ id: 'A', x: 300, y: 100, data: { order: 0 } });
+      const b = graph.addNode({ id: 'B', x: 300, y: 180, data: { order: 1 } });
+      const c = graph.addNode({ id: 'C', x: 300, y: 260, data: { order: 2 } });
+
+      graph.addEdge({ source: root.id, target: a.id });
+      graph.addEdge({ source: root.id, target: b.id });
+      graph.addEdge({ source: root.id, target: c.id });
+
+      const cmd = new AddSiblingCommand();
+      const inserted = cmd.execute(graph as any, b as any)!;
+
+      expect((inserted.getData() as any).order).toBe(2);
+      expect((c.getData() as any).order).toBe(3);
+      expect((a.getData() as any).order).toBe(0);
+      expect((b.getData() as any).order).toBe(1);
+    });
+
+    it('backfills legacy sibling order before insertion (Story 8.6)', () => {
+      const { graph } = createGraph();
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
+
+      const a = graph.addNode({ id: 'A', x: 300, y: 100, data: { order: 0 } });
+      const b = graph.addNode({ id: 'B', x: 300, y: 180, data: { order: 1 } });
+      const legacy = graph.addNode({ id: 'LEGACY', x: 300, y: 260, data: {} }); // missing order
+
+      graph.addEdge({ source: root.id, target: a.id });
+      graph.addEdge({ source: root.id, target: b.id });
+      graph.addEdge({ source: root.id, target: legacy.id });
+
+      const cmd = new AddSiblingCommand();
+      const inserted = cmd.execute(graph as any, b as any)!;
+
+      // Inserted node should take order=2, legacy sibling should be shifted to 3
+      expect((inserted.getData() as any).order).toBe(2);
+      expect((legacy.getData() as any).order).toBe(3);
     });
 
     it('inherits nodeType from selected sibling node (TASK)', () => {
@@ -225,6 +315,22 @@ describe('Mindmap Commands', () => {
       const second = addSibling.execute(graph as any, root as any)!;
 
       expect((second.getData() as any).nodeType).toBe(NodeType.PBS);
+    });
+
+    it('ignores dependency edges when inheriting nodeType (Story 2.2)', () => {
+      const { graph } = createGraph();
+      const root = graph.addNode({ id: 'root', x: 100, y: 100 });
+
+      const hierarchical = graph.addNode({ id: 'child', x: 300, y: 100, data: { nodeType: NodeType.PBS } });
+      graph.addEdge({ source: root.id, target: hierarchical.id });
+
+      const dep = graph.addNode({ id: 'dep', x: 500, y: 1000, data: { nodeType: NodeType.REQUIREMENT } });
+      graph.addEdge({ source: root.id, target: dep.id, data: { kind: 'dependency' } });
+
+      const cmd = new AddSiblingCommand();
+      const newChild = cmd.execute(graph as any, root as any)!;
+
+      expect((newChild.getData() as any).nodeType).toBe(NodeType.PBS);
     });
   });
 

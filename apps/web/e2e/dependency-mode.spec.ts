@@ -24,7 +24,7 @@ const waitForNodeReady = (page: Page) =>
       { timeout: 5000 }
     ),
     page.locator('aside:has-text("属性")').waitFor({ state: 'visible', timeout: 5000 }),
-  ]).catch(() => {});
+  ]).catch(() => { });
 
 test.describe('Task Dependency Network', () => {
   test.beforeEach(async ({ page }, testInfo) => {
@@ -108,8 +108,8 @@ test.describe('Task Dependency Network', () => {
       await firstNode.click();
       await page.waitForTimeout(100);
 
-      // When: User presses arrow key
-      await page.keyboard.press('ArrowRight');
+      // When: User presses arrow key (ArrowDown for vertical layout = navigate to child)
+      await page.keyboard.press('ArrowDown');
       await page.waitForTimeout(100);
 
       // Then: Selection should move to hierarchical child, not dependency target

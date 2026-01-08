@@ -106,6 +106,7 @@ function expandSelectionWithDescendants(
 
 /**
  * Build a TemplateNode from an X6 Node
+ * Story 8.6: Writes order to template and sorts children by order
  */
 function buildTemplateNode(
   node: Node,
@@ -119,12 +120,22 @@ function buildTemplateNode(
   const nodeType = (data.nodeType || data.type || NodeType.ORDINARY) as NodeType;
 
   // Find children that are also in the selection
-  const children = allNodes
+  // Story 8.6: Sort children by order (fallback to id for stability)
+  const childNodes = allNodes
     .filter((n) => {
       const nodeData = n.getData() || {};
       return nodeData.parentId === node.id && selectedIds.has(n.id);
     })
-    .map((child) => buildTemplateNode(child, allNodes, selectedIds, tempIdMap));
+    .sort((a, b) => {
+      const orderA = (a.getData()?.order as number | undefined) ?? Infinity;
+      const orderB = (b.getData()?.order as number | undefined) ?? Infinity;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.id.localeCompare(b.id);
+    });
+
+  const children = childNodes.map((child) =>
+    buildTemplateNode(child, allNodes, selectedIds, tempIdMap)
+  );
 
   // Build template node
   const templateNode: TemplateNode = {
@@ -143,6 +154,11 @@ function buildTemplateNode(
 
   if (data.tags && Array.isArray(data.tags) && data.tags.length > 0) {
     templateNode.tags = data.tags;
+  }
+
+  // Story 8.6: Write order to template
+  if (typeof data.order === 'number') {
+    templateNode.order = data.order;
   }
 
   const rawProps = (data.props || data.metadata || {}) as Record<string, unknown>;

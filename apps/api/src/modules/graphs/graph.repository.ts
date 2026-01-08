@@ -26,6 +26,7 @@ export interface NodeUpsertBatchData {
   description: string | null;
   tags: string[];
   isArchived: boolean;
+  order: number; // Story 8.6: Sibling node order
 }
 
 
@@ -131,6 +132,7 @@ export class GraphRepository {
           description: node.description,
           tags: node.tags,
           isArchived: node.isArchived,
+          order: node.order, // Story 8.6
         },
         update: {
           label: node.label,
@@ -144,6 +146,7 @@ export class GraphRepository {
           description: node.description,
           tags: node.tags,
           isArchived: node.isArchived,
+          order: node.order, // Story 8.6
         },
       }),
     );

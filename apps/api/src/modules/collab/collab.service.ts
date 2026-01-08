@@ -156,6 +156,8 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                                         updatedAt: node.updatedAt.toISOString(),
                                         metadata: (node.metadata as Record<string, unknown>) || {},
                                         mindmapType: 'topic', // Default to topic
+                                        // Story 8.6: Include order for sibling node ordering
+                                        order: node.order,
                                     };
                                     yNodes.set(node.id, yNode);
                                 }
@@ -340,6 +342,8 @@ export class CollabService implements OnModuleInit, OnModuleDestroy {
                                 description: (nodeData as { description?: string | null }).description || null,
                                 tags: (nodeData as { tags?: string[] }).tags || [],
                                 isArchived: (nodeData as { isArchived?: boolean }).isArchived || false,
+                                // Story 8.6: Sync order to Node table for persistence
+                                order: (nodeData as { order?: number }).order ?? 0,
                             });
                         }
                     });

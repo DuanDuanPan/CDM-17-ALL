@@ -27,6 +27,7 @@ export interface TemplateNode {
   description?: string; // Story 5.2: Node description (optional)
   tags?: string[]; // Story 5.2: Node tags (optional)
   metadata?: Record<string, unknown>;
+  order?: number; // Story 8.6: Sibling order for stable layout/serialization
   children?: TemplateNode[];
   _tempId?: string; // Story 5.2: Temporary ID for edge references during instantiation
 }

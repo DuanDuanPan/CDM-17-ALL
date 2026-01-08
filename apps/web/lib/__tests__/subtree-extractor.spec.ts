@@ -72,6 +72,27 @@ describe('extractSubtreeAsTemplate', () => {
     expect(result.structure.rootNode.children?.[1].label).toBe('Child 2');
   });
 
+  it('Story 8.6: writes TemplateNode.order and sorts children by order (stable)', () => {
+    const parent = createMockNode('parent', { label: 'Parent' });
+    const childA = createMockNode('child-a', { label: 'A', parentId: 'parent', order: 2 });
+    const childB = createMockNode('child-b', { label: 'B', parentId: 'parent', order: 0 });
+    const childC = createMockNode('child-c', { label: 'C', parentId: 'parent', order: 0 });
+
+    const allNodes = [parent, childA, childB, childC];
+    const selectedCells = [parent, childA, childB, childC] as Cell[];
+
+    const result = extractSubtreeAsTemplate(selectedCells, allNodes, []);
+
+    expect(result.structure.rootNode.label).toBe('Parent');
+    expect(result.structure.rootNode.children).toHaveLength(3);
+
+    const labels = result.structure.rootNode.children!.map((n) => n.label);
+    expect(labels).toEqual(['B', 'C', 'A']); // order 0 (B,C), then order 2 (A)
+
+    const orders = result.structure.rootNode.children!.map((n) => n.order);
+    expect(orders).toEqual([0, 0, 2]);
+  });
+
   // TC-5.2-FE-3: Dependency edge preservation
   it('TC-5.2-FE-3: preserves dependency edges between selected nodes', () => {
     const node1 = createMockNode('node-1', { label: 'Node 1' });

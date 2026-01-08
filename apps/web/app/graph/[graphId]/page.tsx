@@ -199,21 +199,30 @@ function GraphPageContent() {
         window.dispatchEvent(
             new CustomEvent('mindmap:expand-path-to-node', { detail: { nodeId } })
         );
-        // 2. Center node in view (Story 8.3)
-        centerNode(nodeId);
-        // 3. Select node in X6 graph (properly trigger onNodeSelect)
-        if (graph) {
-            const cell = graph.getCellById(nodeId);
-            if (cell?.isNode()) {
-                graph.cleanSelection();
-                graph.select(cell);
-                // Set isSelected in node data for styling
-                const data = cell.getData() || {};
-                cell.setData({ ...data, isSelected: true });
-            }
-        }
-        // 4. Update state for UI sync
-        setSelectedNodeId(nodeId);
+        
+        // 2. Use requestAnimationFrame to ensure centering happens after DOM updates from expansion
+        // This fixes the issue where clicking outline items doesn't center the node in view
+        requestAnimationFrame(() => {
+            // Double RAF ensures browser has painted the expanded nodes
+            requestAnimationFrame(() => {
+                // Center node in view (Story 8.3)
+                centerNode(nodeId);
+                
+                // 3. Select node in X6 graph (properly trigger onNodeSelect)
+                if (graph) {
+                    const cell = graph.getCellById(nodeId);
+                    if (cell?.isNode()) {
+                        graph.cleanSelection();
+                        graph.select(cell);
+                        // Set isSelected in node data for styling
+                        const data = cell.getData() || {};
+                        cell.setData({ ...data, isSelected: true });
+                    }
+                }
+                // 4. Update state for UI sync
+                setSelectedNodeId(nodeId);
+            });
+        });
     }, [centerNode, graph]);
 
     // Story 8.4 Enhancement: Handle outline reorder with auto-layout + center

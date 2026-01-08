@@ -310,29 +310,32 @@ export function useGraphHotkeys({
                     node.setData({ ...nodeData, isEditing: true });
                     break;
 
-                // Arrow key navigation
+                // Arrow key navigation (VERTICAL LAYOUT)
+                // - ArrowUp: parent
+                // - ArrowDown: first child
+                // - ArrowLeft/Right: prev/next sibling
                 case 'ArrowUp':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    navigateToPrevSibling(graph, node);
-                    break;
-
-                case 'ArrowDown':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    navigateToNextSibling(graph, node);
-                    break;
-
-                case 'ArrowLeft':
                     e.preventDefault();
                     e.stopPropagation();
                     navigateToParent(graph, node);
                     break;
 
-                case 'ArrowRight':
+                case 'ArrowDown':
                     e.preventDefault();
                     e.stopPropagation();
                     navigateToFirstChild(graph, node);
+                    break;
+
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigateToPrevSibling(graph, node);
+                    break;
+
+                case 'ArrowRight':
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigateToNextSibling(graph, node);
                     break;
             }
         },
@@ -344,6 +347,55 @@ export function useGraphHotkeys({
 
 // Helper functions (local to module)
 
+/**
+ * Story 8.6: Check if a node is within the visible viewport.
+ * Returns true if the node's bounding box is fully or mostly visible.
+ */
+function isNodeInViewport(graph: Graph, node: Node): boolean {
+    const graphBBox = graph.getGraphArea();
+    const nodeBBox = node.getBBox();
+
+    if (!graphBBox || !nodeBBox) return false;
+
+    // Get the visible area (client viewport)
+    const clientRect = graph.container?.getBoundingClientRect();
+    if (!clientRect) return false;
+
+    // Transform node position to client coordinates
+    const zoom = graph.zoom() || 1;
+    const translate = graph.translate();
+
+    const nodeClientX = nodeBBox.x * zoom + translate.tx;
+    const nodeClientY = nodeBBox.y * zoom + translate.ty;
+    const nodeClientWidth = nodeBBox.width * zoom;
+    const nodeClientHeight = nodeBBox.height * zoom;
+
+    // Check if node center is visible (not just any part)
+    const nodeCenterX = nodeClientX + nodeClientWidth / 2;
+    const nodeCenterY = nodeClientY + nodeClientHeight / 2;
+
+    // Add padding to ensure node is comfortably visible
+    const padding = 50;
+
+    return (
+        nodeCenterX >= padding &&
+        nodeCenterX <= clientRect.width - padding &&
+        nodeCenterY >= padding &&
+        nodeCenterY <= clientRect.height - padding
+    );
+}
+
+/**
+ * Story 8.6: Ensure a node is visible in the viewport.
+ * If the node is not visible, scroll to center it.
+ */
+function ensureNodeVisible(graph: Graph, node: Node): void {
+    if (!isNodeInViewport(graph, node)) {
+        // Use centerCell to scroll the node into view
+        graph.centerCell(node);
+    }
+}
+
 function createChildNode(graph: Graph, parentNode: Node): void {
     const batchId = `create-node-${Date.now()}`;
     graph.startBatch(batchId);
@@ -354,6 +406,8 @@ function createChildNode(graph: Graph, parentNode: Node): void {
         newNode.setData({ ...newNode.getData(), _batchId: batchId });
         graph.unselect(graph.getSelectedCells());
         graph.select(newNode);
+        // Story 8.6: Ensure newly created node is visible
+        ensureNodeVisible(graph, newNode);
     } else {
         graph.stopBatch(batchId);
     }
@@ -369,6 +423,8 @@ function createSiblingOrChildNode(graph: Graph, selectedNode: Node): void {
         newNode.setData({ ...newNode.getData(), _batchId: batchId });
         graph.unselect(graph.getSelectedCells());
         graph.select(newNode);
+        // Story 8.6: Ensure newly created node is visible
+        ensureNodeVisible(graph, newNode);
     } else {
         graph.stopBatch(batchId);
     }
@@ -384,34 +440,42 @@ function ensureNodeTimestamps(node: Node): void {
     node.setData({ ...data, createdAt, updatedAt });
 }
 
-function navigateToPrevSibling(graph: Graph, currentNode: Node): void {
-    const prevSibling = navigationCommand.navigateUp(graph, currentNode);
-    if (prevSibling) {
-        graph.unselect(graph.getSelectedCells());
-        graph.select(prevSibling);
-    }
-}
+	function navigateToParent(graph: Graph, currentNode: Node): void {
+	    const parent = navigationCommand.navigateUp(graph, currentNode);
+	    if (parent) {
+	        graph.unselect(graph.getSelectedCells());
+	        graph.select(parent);
+	        // Story 8.6: Smart scroll - only if not visible
+	        ensureNodeVisible(graph, parent);
+	    }
+	}
 
-function navigateToNextSibling(graph: Graph, currentNode: Node): void {
-    const nextSibling = navigationCommand.navigateDown(graph, currentNode);
-    if (nextSibling) {
-        graph.unselect(graph.getSelectedCells());
-        graph.select(nextSibling);
-    }
-}
+	function navigateToFirstChild(graph: Graph, currentNode: Node): void {
+	    const firstChild = navigationCommand.navigateDown(graph, currentNode);
+	    if (firstChild) {
+	        graph.unselect(graph.getSelectedCells());
+	        graph.select(firstChild);
+	        // Story 8.6: Smart scroll - only if not visible
+	        ensureNodeVisible(graph, firstChild);
+	    }
+	}
 
-function navigateToParent(graph: Graph, currentNode: Node): void {
-    const parent = navigationCommand.navigateLeft(graph, currentNode);
-    if (parent) {
-        graph.unselect(graph.getSelectedCells());
-        graph.select(parent);
-    }
-}
+	function navigateToPrevSibling(graph: Graph, currentNode: Node): void {
+	    const prevSibling = navigationCommand.navigateLeft(graph, currentNode);
+	    if (prevSibling) {
+	        graph.unselect(graph.getSelectedCells());
+	        graph.select(prevSibling);
+	        // Story 8.6: Smart scroll - only if not visible
+	        ensureNodeVisible(graph, prevSibling);
+	    }
+	}
 
-function navigateToFirstChild(graph: Graph, currentNode: Node): void {
-    const firstChild = navigationCommand.navigateRight(graph, currentNode);
-    if (firstChild) {
-        graph.unselect(graph.getSelectedCells());
-        graph.select(firstChild);
-    }
-}
+	function navigateToNextSibling(graph: Graph, currentNode: Node): void {
+	    const nextSibling = navigationCommand.navigateRight(graph, currentNode);
+	    if (nextSibling) {
+	        graph.unselect(graph.getSelectedCells());
+	        graph.select(nextSibling);
+	        // Story 8.6: Smart scroll - only if not visible
+	        ensureNodeVisible(graph, nextSibling);
+	    }
+	}
