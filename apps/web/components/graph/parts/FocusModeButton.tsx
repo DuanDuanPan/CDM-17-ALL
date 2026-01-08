@@ -54,6 +54,13 @@ export function FocusModeButton({
     // Disable toggle button when no node is selected (AC5: 无选中时不操作)
     const canToggle = !disabled && hasSelection;
 
+    // Close dropdown when exiting focus mode (prevents menu lingering)
+    useEffect(() => {
+        if (!isFocusMode) {
+            setIsDropdownOpen(false);
+        }
+    }, [isFocusMode]);
+
     // Close dropdown when clicking outside
     useEffect(() => {
         if (!isDropdownOpen) return;
@@ -163,7 +170,7 @@ export function FocusModeButton({
             )}
 
             {/* Dropdown menu */}
-            {isDropdownOpen && (
+            {isFocusMode && isDropdownOpen && (
                 <div
                     className={cn(
                         "absolute right-0 bottom-full mb-1",

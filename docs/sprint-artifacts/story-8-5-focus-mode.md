@@ -323,12 +323,18 @@ so that **我能专注编辑而不被其他内容干扰。**
 
 ### Review Follow-ups (AI) - Round 2
 
-- [ ] [AI-Review][MEDIUM] FocusModeButton：退出聚焦模式后应自动关闭层级下拉菜单（当前仅依赖 `isDropdownOpen`，当 `isFocusMode=false` 时菜单仍可能残留） [apps/web/components/graph/parts/FocusModeButton.tsx:165]
-- [ ] [AI-Review][MEDIUM] Hotkey：`F` 键需在编辑态完全失效（目前仅做 input/contentEditable 保护；若容器获得焦点仍可能触发），与 Tech-Spec TD-4 不一致 [apps/web/components/graph/hooks/useGraphHotkeys.ts:244]
-- [ ] [AI-Review][MEDIUM] Focus Mode × Edge Selection：退出聚焦时不应覆盖已选中层级边的选中高亮（`glow/strokeOpacity` 被恢复到 `0.35`，可能弱化选中态） [apps/web/components/graph/hooks/useFocusMode.ts:292]
-- [ ] [AI-Review][MEDIUM] Tests：强化 AC4 “边随节点淡化”覆盖——当前用例未真正断言 out-of-range 边的 opacity（建议添加一条自定义边连接 focused↔unrelated，并断言 attr 变为 `0.2`；同时补覆盖非 glow / dependency edge 路径） [apps/web/__tests__/hooks/useFocusMode.test.ts:501]
-- [ ] [AI-Review][MEDIUM] Story/File List：当前工作区存在额外变更（例如 `docs/epics.md`、`docs/sprint-artifacts/sprint-status.yaml`、`_bmad/bmm/config.yaml`）；合并前要么拆分/回滚这些无关改动，要么补充到本 Story 的 File List/Change Log [docs/sprint-artifacts/story-8-5-focus-mode.md:631]
-- [ ] [AI-Review][LOW] File size guideline：`useFocusMode.ts` 目前 403 行，超过 300 行护栏；建议拆分 traversal/helpers 或抽 utils（不改变公开 API） [apps/web/components/graph/hooks/useFocusMode.ts:50]
+- [x] [AI-Review][MEDIUM] FocusModeButton：退出聚焦模式后应自动关闭层级下拉菜单（当前仅依赖 `isDropdownOpen`，当 `isFocusMode=false` 时菜单仍可能残留） [apps/web/components/graph/parts/FocusModeButton.tsx:165]
+  - **Fix**: 退出聚焦模式时强制关闭下拉菜单，并将菜单渲染条件收敛为 `{isFocusMode && isDropdownOpen}`
+- [x] [AI-Review][MEDIUM] Hotkey：`F` 键需在编辑态完全失效（目前仅做 input/contentEditable 保护；若容器获得焦点仍可能触发），与 Tech-Spec TD-4 不一致 [apps/web/components/graph/hooks/useGraphHotkeys.ts:244]
+  - **Fix**: 在触发聚焦热键前检查选中节点 `data.isEditing`，编辑态直接 return
+- [x] [AI-Review][MEDIUM] Focus Mode × Edge Selection：退出聚焦时不应覆盖已选中层级边的选中高亮（`glow/strokeOpacity` 被恢复到 `0.35`，可能弱化选中态） [apps/web/components/graph/hooks/useFocusMode.ts:292]
+  - **Fix**: 清理聚焦时若层级边处于 selected，恢复 glow 透明度为 `HIERARCHICAL_EDGE_SELECTED_ATTRS` 对应值（否则恢复默认 `0.35`）
+- [x] [AI-Review][MEDIUM] Tests：强化 AC4 “边随节点淡化”覆盖——当前用例未真正断言 out-of-range 边的 opacity（建议添加一条自定义边连接 focused↔unrelated，并断言 attr 变为 `0.2`；同时补覆盖非 glow / dependency edge 路径） [apps/web/__tests__/hooks/useFocusMode.test.ts:501]
+  - **Fix**: 新增用例覆盖 out-of-range 层级边 dim（`0.2`）、非 glow 依赖边 dim（`line/opacity=0.2`）、选中层级边退出聚焦恢复选中 glow
+- [x] [AI-Review][MEDIUM] Story/File List：当前工作区存在额外变更（例如 `docs/epics.md`、`docs/sprint-artifacts/sprint-status.yaml`、`_bmad/bmm/config.yaml`）；合并前要么拆分/回滚这些无关改动，要么补充到本 Story 的 File List/Change Log [docs/sprint-artifacts/story-8-5-focus-mode.md:631]
+  - **Fix**: 已核对 `git status`，当前本 Story 仅涉及 Focus Mode 相关文件；本地存在未追踪的 Story 8.6 文档（请勿在本 Story 提交中 stage）
+- [x] [AI-Review][LOW] File size guideline：`useFocusMode.ts` 目前 403 行，超过 300 行护栏；建议拆分 traversal/helpers 或抽 utils（不改变公开 API） [apps/web/components/graph/hooks/useFocusMode.ts:50]
+  - **Fix**: 抽取 traversal/opacity 到 `focusModeUtils.ts`，`useFocusMode.ts` 已降至 < 300 LOC 且不影响公开 API
 
 ---
 
@@ -641,15 +647,17 @@ pnpm --filter @cdm/web test:e2e
 
 | File | Type | Description |
 |------|------|-------------|
-| `apps/web/components/graph/hooks/useFocusMode.ts` | NEW | Core focus mode hook with BFS traversal, opacity management, and performance guards |
+| `apps/web/components/graph/hooks/useFocusMode.ts` | NEW | Core focus mode hook (BFS traversal + apply/clear opacity), kept < 300 LOC |
+| `apps/web/components/graph/hooks/focusModeUtils.ts` | NEW | Extracted traversal/opacity helpers for focus mode |
 | `apps/web/components/graph/parts/FocusModeButton.tsx` | NEW | Focus mode toggle button with level dropdown |
-| `apps/web/__tests__/hooks/useFocusMode.test.ts` | NEW | Unit tests covering 18 test cases for focus mode logic |
+| `apps/web/__tests__/hooks/useFocusMode.test.ts` | NEW | Unit tests for focus mode traversal + node/edge opacity behaviors |
 | `apps/web/components/graph/hooks/index.ts` | MODIFY | Export useFocusMode hook |
 | `apps/web/components/graph/parts/index.ts` | MODIFY | Export FocusModeButton component |
-| `apps/web/components/graph/hooks/useGraphHotkeys.ts` | MODIFY | Add F key binding for focus mode toggle |
+| `apps/web/components/graph/hooks/useGraphHotkeys.ts` | MODIFY | Add F key binding for focus mode toggle + editing guard |
 | `apps/web/components/graph/hooks/useGraphEvents.ts` | MODIFY | Add onBlankClick callback for exit focus mode |
 | `apps/web/components/graph/GraphComponent.tsx` | MODIFY | Integrate useFocusMode hook and FocusModeButton |
 | `apps/web/__tests__/GraphComponent.test.tsx` | MODIFY | Update tests for focus mode integration |
+| `docs/sprint-artifacts/story-8-5-focus-mode.md` | MODIFY | Review follow-ups, file list, and change log updates |
 
 ### Change Log
 
@@ -657,3 +665,4 @@ pnpm --filter @cdm/web test:e2e
 |------|--------|--------|
 | 2026-01-08 | Initial implementation of Story 8.5 Focus Mode | AI Agent |
 | 2026-01-08 | Review Follow-ups fixes: Level 2/3 semantics, glow opacity, performance guard, UI alignment | AI Agent |
+| 2026-01-08 | Review Follow-ups Round 2: dropdown close, hotkey edit guard, selected-edge restore, AC4 tests, file split | AI Agent |

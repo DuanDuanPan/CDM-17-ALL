@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useFocusMode } from '../../components/graph/hooks/useFocusMode';
+import { isDependencyEdge } from '@/lib/edgeValidation';
 import type { Graph } from '@antv/x6';
 
 // Mock X6 NodeView (runtime import) for Vitest environment
@@ -39,10 +40,12 @@ type MockEdge = {
 
 function createMockGraph(structure: {
     nodes: Array<{ id: string; parentId?: string }>;
-    edges?: Array<{ source: string; target: string }>;
+    edges?: Array<{ source: string; target: string; hasGlow?: boolean }>;
+    selectedCellIds?: string[];
 }) {
     const nodeMap = new Map<string, MockNode>();
     const edgeList: MockEdge[] = [];
+    const selectedIds = new Set<string>(structure.selectedCellIds ?? []);
 
     // Create mock nodes
     structure.nodes.forEach(({ id, parentId }) => {
@@ -62,26 +65,27 @@ function createMockGraph(structure: {
     // Create mock edges (hierarchical edges based on parentId)
     structure.nodes.forEach(({ id, parentId }) => {
         if (parentId) {
+            const hasGlow = true;
             edgeList.push({
                 id: `edge-${parentId}-${id}`,
                 isEdge: () => true,
                 getSourceCellId: () => parentId,
                 getTargetCellId: () => id,
                 attr: vi.fn(),
-                getAttrByPath: vi.fn(() => true),
+                getAttrByPath: vi.fn((path: string) => (path === 'glow' ? (hasGlow ? true : undefined) : true)),
             });
         }
     });
 
     // Add any additional custom edges
-    structure.edges?.forEach(({ source, target }) => {
+    structure.edges?.forEach(({ source, target, hasGlow = true }) => {
         edgeList.push({
             id: `edge-${source}-${target}`,
             isEdge: () => true,
             getSourceCellId: () => source,
             getTargetCellId: () => target,
             attr: vi.fn(),
-            getAttrByPath: vi.fn(() => true),
+            getAttrByPath: vi.fn((path: string) => (path === 'glow' ? (hasGlow ? true : undefined) : true)),
         });
     });
 
@@ -101,6 +105,7 @@ function createMockGraph(structure: {
             edgeList.filter((e) => e.getTargetCellId() === node.id)
         ),
         batchUpdate: vi.fn((fn: () => void) => fn()),
+        isSelected: vi.fn((cell: { id: string }) => selectedIds.has(cell.id)),
     };
 
     return {
@@ -113,6 +118,7 @@ function createMockGraph(structure: {
 describe('useFocusMode', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(isDependencyEdge).mockReturnValue(false);
     });
 
     afterEach(() => {
@@ -498,38 +504,62 @@ describe('useFocusMode', () => {
             expect(strokeOpacityCall![1]).toBe(1); // FOCUSED_OPACITY
         });
 
-        it('should set edges to dimmed opacity when one endpoint is out of range', () => {
-            // Test by verifying that node outside range gets dimmed opacity
-            // which implies edges to that node would also be dimmed
-            const { graph, nodeMap, edgeList } = createMockGraph({
+        it('should dim hierarchical edges when one endpoint is out of range', () => {
+            // Tree: root -> child1 -> grandchild1
+            // Focus on root at level 1, grandchild1 is out of range, so edge(child1->grandchild1) should be dimmed.
+            const { graph, edgeList } = createMockGraph({
                 nodes: [
                     { id: 'root' },
                     { id: 'child1', parentId: 'root' },
-                    { id: 'unrelated' }, // Not connected to child1's tree
+                    { id: 'grandchild1', parentId: 'child1' },
                 ],
             });
             const { result } = renderHook(() =>
-                useFocusMode({ graph, isReady: true, selectedNodeId: 'child1' })
+                useFocusMode({ graph, isReady: true, selectedNodeId: 'root' })
             );
 
             act(() => {
                 result.current.toggleFocusMode();
             });
 
-            // Verify unrelated node is dimmed (proves edge calculation would work)
-            const unrelatedCalls = nodeMap.get('unrelated')!.attr.mock.calls;
-            const lastUnrelatedCall = unrelatedCalls[unrelatedCalls.length - 1];
-            expect(lastUnrelatedCall).toEqual(['fo/opacity', 0.2]); // DIMMED
-
-            // Also verify the hierarchical edge (root→child1) is focused
-            const hierarchicalEdge = edgeList.find(
-                (e) => e.getSourceCellId() === 'root' && e.getTargetCellId() === 'child1'
+            const outOfRangeEdge = edgeList.find(
+                (e) => e.getSourceCellId() === 'child1' && e.getTargetCellId() === 'grandchild1'
             );
-            expect(hierarchicalEdge).toBeDefined();
-            const edgeCalls = hierarchicalEdge!.attr.mock.calls;
-            const strokeOpacityCalls = edgeCalls.filter((call: unknown[]) => call[0] === 'line/strokeOpacity');
-            const lastCall = strokeOpacityCalls[strokeOpacityCalls.length - 1];
-            expect(lastCall![1]).toBe(1); // FOCUSED - both endpoints in range
+            expect(outOfRangeEdge).toBeDefined();
+
+            const edgeCalls = outOfRangeEdge!.attr.mock.calls;
+            const lineOpacityCalls = edgeCalls.filter((call: unknown[]) => call[0] === 'line/strokeOpacity');
+            const glowOpacityCalls = edgeCalls.filter((call: unknown[]) => call[0] === 'glow/strokeOpacity');
+
+            expect(lineOpacityCalls[lineOpacityCalls.length - 1]?.[1]).toBe(0.2);
+            expect(glowOpacityCalls[glowOpacityCalls.length - 1]?.[1]).toBe(0.2);
+        });
+
+        it('should dim non-glow dependency edges via line/opacity', () => {
+            const { graph, edgeList } = createMockGraph({
+                nodes: [{ id: 'root' }, { id: 'child1', parentId: 'root' }, { id: 'unrelated' }],
+                edges: [{ source: 'child1', target: 'unrelated', hasGlow: false }],
+            });
+            const { result } = renderHook(() =>
+                useFocusMode({ graph, isReady: true, selectedNodeId: 'root' })
+            );
+
+            vi.mocked(isDependencyEdge).mockImplementation((edge) => {
+                return Boolean((edge as { id?: string }).id?.includes('edge-child1-unrelated'));
+            });
+
+            act(() => {
+                result.current.toggleFocusMode();
+            });
+
+            const dependencyEdge = edgeList.find(
+                (e) => e.getSourceCellId() === 'child1' && e.getTargetCellId() === 'unrelated'
+            );
+            expect(dependencyEdge).toBeDefined();
+
+            const edgeCalls = dependencyEdge!.attr.mock.calls;
+            const opacityCalls = edgeCalls.filter((call: unknown[]) => call[0] === 'line/opacity');
+            expect(opacityCalls[opacityCalls.length - 1]?.[1]).toBe(0.2);
         });
 
         it('should restore glow opacity to original value on exit', () => {
@@ -561,6 +591,35 @@ describe('useFocusMode', () => {
             const lastGlowCall = glowCalls[glowCalls.length - 1];
             expect(lastGlowCall).toBeDefined();
             expect(lastGlowCall![1]).toBe(0.35); // HIERARCHICAL_EDGE_GLOW_OPACITY
+        });
+
+        it('should preserve selected hierarchical edge glow opacity on exit', () => {
+            const { graph, edgeList } = createMockGraph({
+                nodes: [
+                    { id: 'root' },
+                    { id: 'child1', parentId: 'root' },
+                ],
+                selectedCellIds: ['edge-root-child1'],
+            });
+            const { result } = renderHook(() =>
+                useFocusMode({ graph, isReady: true, selectedNodeId: 'child1' })
+            );
+
+            act(() => {
+                result.current.toggleFocusMode();
+            });
+            act(() => {
+                result.current.exitFocusMode();
+            });
+
+            const edge = edgeList.find((e) => e.id === 'edge-root-child1');
+            expect(edge).toBeDefined();
+
+            const edgeCalls = edge!.attr.mock.calls;
+            const glowCalls = edgeCalls.filter((call: unknown[]) => call[0] === 'glow/strokeOpacity');
+            const lastGlowCall = glowCalls[glowCalls.length - 1];
+            expect(lastGlowCall).toBeDefined();
+            expect(lastGlowCall![1]).toBe(0.55);
         });
     });
 });

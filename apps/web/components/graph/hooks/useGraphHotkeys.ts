@@ -247,6 +247,18 @@ export function useGraphHotkeys({
                 if (isInputFocused) {
                     return;
                 }
+
+                // TD-4: Disable focus hotkey entirely while editing node text
+                const selectedCells = graph.getSelectedCells();
+                const isEditing = selectedCells.some((cell) => {
+                    if (!cell.isNode()) return false;
+                    const data = (cell as Node).getData() || {};
+                    return Boolean(data.isEditing);
+                });
+                if (isEditing) {
+                    return;
+                }
+
                 e.preventDefault();
                 e.stopPropagation();
                 onToggleFocusMode();
