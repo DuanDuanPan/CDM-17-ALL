@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2026-01-08 - Story 8.5 Focus Mode: in-progress (AI review follow-ups added)
+last_updated: 2026-01-09 - Story 8.8 Semantic Zoom LOD: done
 
 development_status:
   epic-1: done
@@ -106,9 +106,9 @@ development_status:
   8-3-zoom-shortcuts-system: done
   8-4-outline-view: done
   8-5-focus-mode: in-progress
-  8-6-grouping-frame: backlog
+  8-6-grouping-frame: done  # Node Order Persistence implemented
   8-7-command-palette-enhancement: backlog
-  8-8-semantic-zoom-lod: backlog
+  8-8-semantic-zoom-lod: done
   8-9-smart-collapse: backlog
   8-10-minimap-heatmap: backlog
   8-11-view-bookmarks: backlog

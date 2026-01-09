@@ -30,6 +30,9 @@ import { getNodeRenderer } from './rich';
 // Story 8.1: Child count badge
 import { ChildCountBadge } from './ChildCountBadge';
 
+// Story 8.8: Semantic Zoom LOD
+import { useLODLevel } from '@/lib/semanticZoomLOD';
+
 export interface MindNodeProps {
     node: Node;
 }
@@ -38,6 +41,9 @@ export function MindNode({ node }: MindNodeProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const titleMeasureRef = useRef<HTMLDivElement>(null);
     const descMeasureRef = useRef<HTMLDivElement>(null);
+
+    // Story 8.8: Get current LOD level from global store (works outside React Context)
+    const lod = useLODLevel();
 
     // Story 7.4: Use extracted hooks
     const {
@@ -236,7 +242,7 @@ export function MindNode({ node }: MindNodeProps) {
     // 1. ORDINARY NODE
     if (nodeType === NodeType.ORDINARY) {
         return (
-            <div className="relative" data-testid="mind-node">
+            <div className="relative" data-testid="mind-node" data-lod={lod}>
                 {/* Story 8.1: Collapse toggle for nodes with children */}
                 {hasChildren && (
                     <div className="absolute -left-7 top-1/2 -translate-y-1/2 z-10">
@@ -266,6 +272,7 @@ export function MindNode({ node }: MindNodeProps) {
                     commit={commit}
                     handleKeyDown={handleKeyDown}
                     startEditing={startEditing}
+                    lod={lod}
                 />
             </div>
         );
@@ -275,7 +282,7 @@ export function MindNode({ node }: MindNodeProps) {
     const renderer = getNodeRenderer(nodeType);
     if (renderer) {
         return (
-            <div className="relative" data-testid="mind-node">
+            <div className="relative" data-testid="mind-node" data-lod={lod}>
                 {/* Story 8.1: Collapse toggle for nodes with children */}
                 {hasChildren && (
                     <div className="absolute -left-7 top-1/2 -translate-y-1/2 z-10">
@@ -316,6 +323,7 @@ export function MindNode({ node }: MindNodeProps) {
                     handleAppExecute={handleAppExecute}
                     handleOpenComments={handleOpenComments}
                     startEditing={startEditing}
+                    lod={lod}
                 />
             </div>
         );
@@ -323,7 +331,7 @@ export function MindNode({ node }: MindNodeProps) {
 
     // 3. LEGACY CARD NODE
     return (
-        <div className="relative" data-testid="mind-node">
+        <div className="relative" data-testid="mind-node" data-lod={lod}>
             {/* Story 8.1: Collapse toggle for nodes with children */}
             {hasChildren && (
                 <div className="absolute -left-7 top-1/2 -translate-y-1/2 z-10">
@@ -368,6 +376,7 @@ export function MindNode({ node }: MindNodeProps) {
                 handleAppExecute={handleAppExecute}
                 handleOpenComments={handleOpenComments}
                 startEditing={startEditing}
+                lod={lod}
             />
         </div>
     );

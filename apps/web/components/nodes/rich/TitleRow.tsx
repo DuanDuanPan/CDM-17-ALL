@@ -43,6 +43,7 @@ export const TitleRow = memo(
                 {isEditing ? (
                     <input
                         ref={inputRef}
+                        data-testid="mind-node-title"
                         value={title}
                         onChange={(e) => onTitleChange?.(e.target.value)}
                         onKeyDown={onKeyDown}
@@ -51,6 +52,7 @@ export const TitleRow = memo(
                     />
                 ) : (
                     <div
+                        data-testid="mind-node-title"
                         className={`flex-1 text-sm font-bold truncate ${isDone ? 'text-gray-400 line-through' : 'text-gray-800'
                             }`}
                     >

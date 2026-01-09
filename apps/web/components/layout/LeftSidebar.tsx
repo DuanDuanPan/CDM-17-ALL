@@ -3,10 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   LayoutGrid,
-  Shapes,
-  Type,
-  Image,
-  Link2,
+  // 暂时隐藏的图标: Shapes, Type, Image, Link2
   ChevronLeft,
   ChevronRight,
   GitBranch,
@@ -34,12 +31,9 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { id: 'components', icon: <Shapes className="w-5 h-5" />, label: '组件' },
+  // 暂时隐藏: components, text, media, links
   { id: 'templates', icon: <LayoutGrid className="w-5 h-5" />, label: '模板' },
   { id: 'outline', icon: <ListTree className="w-5 h-5" />, label: '大纲' },
-  { id: 'text', icon: <Type className="w-5 h-5" />, label: '文本' },
-  { id: 'media', icon: <Image className="w-5 h-5" />, label: '媒体' },
-  { id: 'links', icon: <Link2 className="w-5 h-5" />, label: '链接' },
 ];
 
 // Story 2.2 + Story 5.2 + Story 8.4: Props
@@ -78,7 +72,7 @@ export function LeftSidebar({
   onOutlineReorder,
 }: LeftSidebarProps = {}) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [activeNav, setActiveNav] = useState('components');
+  const [activeNav, setActiveNav] = useState('templates');
   const activeNavItem = navItems.find((item) => item.id === activeNav);
 
   // Story 5.2: Template filter states

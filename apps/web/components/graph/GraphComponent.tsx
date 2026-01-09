@@ -28,6 +28,9 @@ import { useToast } from '@cdm/ui';
 // Story 8.2: Minimap storage
 import { useMinimapStorage } from '@/hooks/useMinimapStorage';
 
+// Story 8.8: Semantic Zoom LOD
+import { setGraphScale } from '@/lib/semanticZoomLOD';
+
 // Story 7.4: Extracted hooks and UI components
 import { useGraphTransform, useGraphHotkeys, useGraphEvents, useGraphSelection, useGraphDependencyMode, useGraphContextMenu, useGraphCursor, useGraphInitialization, useNodeCollapse, useZoomShortcuts, useFocusMode } from './hooks';
 import type { EdgeContextMenuState, NodeContextMenuState } from './hooks';
@@ -233,6 +236,12 @@ export function GraphComponent({
 
     // Story 7.4: Extracted hooks
     const { canvasOffset, scale } = useGraphTransform({ graph, isReady });
+
+    // Story 8.8: Update LOD store when scale changes
+    // Note: LOD is pure UI state, NOT persisted to Yjs
+    useEffect(() => {
+        setGraphScale(scale);
+    }, [scale]);
     const { handleMouseMove } = useGraphCursor({ graph, isConnected, updateCursor });
     useGraphSelection({ graph, isReady, isConnected, updateSelectedNode });
     useGraphDependencyMode({ graph, isReady, isDependencyMode, connectionStartNode, setConnectionStartNode });
