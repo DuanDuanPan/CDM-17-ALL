@@ -268,6 +268,7 @@ export function GraphComponent({
     const { handleKeyDown } = useGraphHotkeys({
         graph, isReady, selectedEdge, setSelectedEdge,
         connectionStartNode, setConnectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge,
+        currentLayout,
         // Story 8.1: Collapse handlers
         onCollapseNode: collapseNode,
         onExpandNode: expandNode,

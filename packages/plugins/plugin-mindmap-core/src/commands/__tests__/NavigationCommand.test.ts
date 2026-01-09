@@ -27,6 +27,7 @@ const createMockGraph = () => {
 
     return {
         getCellById: vi.fn((id: string) => nodes.get(id) || null),
+        getNodes: vi.fn(() => Array.from(nodes.values())),
         getIncomingEdges: vi.fn((node: ReturnType<typeof createMockNode>) => {
             const incoming = edges.filter((e) => e.target === node.id);
             return incoming.map((e) => ({
@@ -108,6 +109,24 @@ describe('NavigationCommand', () => {
 
             // Should be sorted by X: child2 (x=50), child3 (x=100), child1 (x=200)
             expect(children.map((c: any) => c.id)).toEqual(['child2', 'child3', 'child1']);
+        });
+
+        it('should return children sorted by Y position in mindmap layout when order is missing', () => {
+            const parentNode = createMockNode('parent', { x: 0, y: 0 });
+            const childTop = createMockNode('childTop', { x: 200, y: 0 });
+            const childMiddle = createMockNode('childMiddle', { x: 200, y: 50 });
+            const childBottom = createMockNode('childBottom', { x: 200, y: 100 });
+
+            graph._addNode(parentNode);
+            graph._addNode(childTop);
+            graph._addNode(childMiddle);
+            graph._addNode(childBottom);
+            graph._addEdge('parent', 'childMiddle');
+            graph._addEdge('parent', 'childBottom');
+            graph._addEdge('parent', 'childTop');
+
+            const children = command.getChildren(graph as unknown as Graph, parentNode as unknown as Node, { layoutMode: 'mindmap' });
+            expect(children.map((c: any) => c.id)).toEqual(['childTop', 'childMiddle', 'childBottom']);
         });
 
         it('should prioritize explicit order over X position (Story 8.6)', () => {
@@ -268,6 +287,73 @@ describe('NavigationCommand', () => {
 
             const result = command.navigateRight(graph as unknown as Graph, sibling2 as unknown as Node);
             expect(result).toBeNull();
+        });
+    });
+
+    describe('navigateByArrowKey', () => {
+        it('should use mindmap mapping (← parent, → child, ↑/↓ siblings)', () => {
+            const parentNode = createMockNode('parent', { x: 0, y: 0 });
+            const sibling1 = createMockNode('sibling1', { x: 200, y: 0 });
+            const sibling2 = createMockNode('sibling2', { x: 200, y: 100 });
+            const childOfSibling2 = createMockNode('childOfSibling2', { x: 400, y: 100 });
+
+            graph._addNode(parentNode);
+            graph._addNode(sibling1);
+            graph._addNode(sibling2);
+            graph._addNode(childOfSibling2);
+            graph._addEdge('parent', 'sibling1');
+            graph._addEdge('parent', 'sibling2');
+            graph._addEdge('sibling2', 'childOfSibling2');
+
+            expect(command.navigateByArrowKey(graph as unknown as Graph, sibling2 as unknown as Node, 'ArrowLeft', 'mindmap')).toBe(parentNode);
+            expect(command.navigateByArrowKey(graph as unknown as Graph, sibling2 as unknown as Node, 'ArrowUp', 'mindmap')).toBe(sibling1);
+            expect(command.navigateByArrowKey(graph as unknown as Graph, sibling1 as unknown as Node, 'ArrowDown', 'mindmap')).toBe(sibling2);
+            expect(command.navigateByArrowKey(graph as unknown as Graph, sibling2 as unknown as Node, 'ArrowRight', 'mindmap')).toBe(childOfSibling2);
+        });
+
+        it('should navigate spatially in free layout', () => {
+            const current = createMockNode('current', { x: 0, y: 0 });
+            const right = createMockNode('right', { x: 100, y: 0 });
+            const up = createMockNode('up', { x: 0, y: -100 });
+            const diag = createMockNode('diag', { x: 50, y: 50 });
+
+            graph._addNode(current);
+            graph._addNode(right);
+            graph._addNode(up);
+            graph._addNode(diag);
+
+            expect(command.navigateByArrowKey(graph as unknown as Graph, current as unknown as Node, 'ArrowRight', 'free')).toBe(right);
+            expect(command.navigateByArrowKey(graph as unknown as Graph, current as unknown as Node, 'ArrowUp', 'free')).toBe(up);
+        });
+
+        it('should navigate along dependency edges in network layout', () => {
+            const a = createMockNode('a', { x: 0, y: 0 });
+            const b = createMockNode('b', { x: 100, y: 50 });
+            const c = createMockNode('c', { x: 0, y: 120 });
+            const d = createMockNode('d', { x: 200, y: 40 });
+            const e = createMockNode('e', { x: 200, y: 200 });
+
+            graph._addNode(a);
+            graph._addNode(b);
+            graph._addNode(c);
+            graph._addNode(d);
+            graph._addNode(e);
+
+            // Predecessors: a -> b, c -> b
+            graph._addEdge('a', 'b', 'dependency');
+            graph._addEdge('c', 'b', 'dependency');
+            // Successors: b -> d, b -> e
+            graph._addEdge('b', 'd', 'dependency');
+            graph._addEdge('b', 'e', 'dependency');
+
+            // Left: choose closest predecessor by vertical distance (a is closest to b.y=50)
+            expect(command.navigateByArrowKey(graph as unknown as Graph, b as unknown as Node, 'ArrowLeft', 'network')).toBe(a);
+            // Right: choose closest successor by vertical distance (d is closest to b.y=50)
+            expect(command.navigateByArrowKey(graph as unknown as Graph, b as unknown as Node, 'ArrowRight', 'network')).toBe(d);
+            // Up: choose dependency neighbor above (d is closest to b.y=50 among {a,d})
+            expect(command.navigateByArrowKey(graph as unknown as Graph, b as unknown as Node, 'ArrowUp', 'network')).toBe(d);
+            // Down: choose dependency neighbor below (c is closer to b.y=50 than e)
+            expect(command.navigateByArrowKey(graph as unknown as Graph, b as unknown as Node, 'ArrowDown', 'network')).toBe(c);
         });
     });
 });

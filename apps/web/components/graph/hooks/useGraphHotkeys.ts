@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback } from 'react';
 import type { Graph, Node, Edge } from '@antv/x6';
+import type { LayoutMode } from '@cdm/types';
 import { AddChildCommand, AddSiblingCommand, NavigationCommand } from '@cdm/plugin-mindmap-core';
 
 // Commands are singletons per module
@@ -12,6 +13,8 @@ const navigationCommand = new NavigationCommand();
 export interface UseGraphHotkeysOptions {
     graph: Graph | null;
     isReady: boolean;
+    /** Current layout mode (mindmap/logic/free/network) */
+    currentLayout: LayoutMode;
     /** Currently selected edge for deletion */
     selectedEdge: Edge | null;
     setSelectedEdge: (edge: Edge | null) => void;
@@ -67,6 +70,7 @@ export interface UseGraphHotkeysReturn {
 export function useGraphHotkeys({
     graph,
     isReady,
+    currentLayout,
     selectedEdge,
     setSelectedEdge,
     connectionStartNode,
@@ -310,36 +314,18 @@ export function useGraphHotkeys({
                     node.setData({ ...nodeData, isEditing: true });
                     break;
 
-                // Arrow key navigation (VERTICAL LAYOUT)
-                // - ArrowUp: parent
-                // - ArrowDown: first child
-                // - ArrowLeft/Right: prev/next sibling
+                // Arrow key navigation (layout-aware: mindmap/logic/free/network)
                 case 'ArrowUp':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    navigateToParent(graph, node);
-                    break;
-
                 case 'ArrowDown':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    navigateToFirstChild(graph, node);
-                    break;
-
                 case 'ArrowLeft':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    navigateToPrevSibling(graph, node);
-                    break;
-
                 case 'ArrowRight':
                     e.preventDefault();
                     e.stopPropagation();
-                    navigateToNextSibling(graph, node);
+                    navigateByArrowKey(graph, node, e.key as 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight', currentLayout);
                     break;
             }
         },
-        [graph, isReady, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge, setSelectedEdge, setConnectionStartNode, onCollapseNode, onExpandNode, onCollapseDescendants, onToggleMinimap, onZoomToFit, onZoomTo100, onToggleFocusMode]
+        [graph, isReady, currentLayout, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge, setSelectedEdge, setConnectionStartNode, onCollapseNode, onExpandNode, onCollapseDescendants, onToggleMinimap, onZoomToFit, onZoomTo100, onToggleFocusMode]
     );
 
     return { handleKeyDown };
@@ -440,42 +426,17 @@ function ensureNodeTimestamps(node: Node): void {
     node.setData({ ...data, createdAt, updatedAt });
 }
 
-	function navigateToParent(graph: Graph, currentNode: Node): void {
-	    const parent = navigationCommand.navigateUp(graph, currentNode);
-	    if (parent) {
-	        graph.unselect(graph.getSelectedCells());
-	        graph.select(parent);
-	        // Story 8.6: Smart scroll - only if not visible
-	        ensureNodeVisible(graph, parent);
-	    }
-	}
+function navigateByArrowKey(
+    graph: Graph,
+    currentNode: Node,
+    key: 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight',
+    layoutMode: LayoutMode
+): void {
+    const next = navigationCommand.navigateByArrowKey(graph, currentNode, key, layoutMode);
+    if (!next) return;
 
-	function navigateToFirstChild(graph: Graph, currentNode: Node): void {
-	    const firstChild = navigationCommand.navigateDown(graph, currentNode);
-	    if (firstChild) {
-	        graph.unselect(graph.getSelectedCells());
-	        graph.select(firstChild);
-	        // Story 8.6: Smart scroll - only if not visible
-	        ensureNodeVisible(graph, firstChild);
-	    }
-	}
-
-	function navigateToPrevSibling(graph: Graph, currentNode: Node): void {
-	    const prevSibling = navigationCommand.navigateLeft(graph, currentNode);
-	    if (prevSibling) {
-	        graph.unselect(graph.getSelectedCells());
-	        graph.select(prevSibling);
-	        // Story 8.6: Smart scroll - only if not visible
-	        ensureNodeVisible(graph, prevSibling);
-	    }
-	}
-
-	function navigateToNextSibling(graph: Graph, currentNode: Node): void {
-	    const nextSibling = navigationCommand.navigateRight(graph, currentNode);
-	    if (nextSibling) {
-	        graph.unselect(graph.getSelectedCells());
-	        graph.select(nextSibling);
-	        // Story 8.6: Smart scroll - only if not visible
-	        ensureNodeVisible(graph, nextSibling);
-	    }
-	}
+    graph.unselect(graph.getSelectedCells());
+    graph.select(next);
+    // Story 8.6: Smart scroll - only if not visible
+    ensureNodeVisible(graph, next);
+}
