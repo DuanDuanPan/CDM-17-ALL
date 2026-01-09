@@ -259,7 +259,7 @@ export function GraphComponent({
     } = useNodeCollapse({ graph, isReady });
 
     // Story 8.3: Zoom Shortcuts System
-    const { zoomToFit, zoomTo100, centerNode } = useZoomShortcuts({ graph, isReady });
+    const { zoomToFit, zoomTo100, centerNode, prefersReducedMotion } = useZoomShortcuts({ graph, isReady });
 
     // Story 8.5: Focus Mode
     const {
@@ -277,10 +277,8 @@ export function GraphComponent({
     // Story 8.9: Subgraph Drill-Down Navigation
     const {
         drillPath,
-        currentRootId,
         isDrillMode,
         drillInto,
-        drillUp,
         drillToPath,
         drillToRoot,
         canDrillInto,
@@ -288,6 +286,22 @@ export function GraphComponent({
         graph,
         isReady,
     });
+
+    // Story 8.9: Drill transition animation (AC1) with reduced-motion support
+    const [drillTransitionEnabled, setDrillTransitionEnabled] = useState(false);
+    useEffect(() => {
+        if (!isReady) return;
+        if (typeof window === 'undefined') return;
+        setDrillTransitionEnabled(false);
+        const raf = window.requestAnimationFrame(() => setDrillTransitionEnabled(true));
+        return () => window.cancelAnimationFrame(raf);
+    }, [isReady, drillPath]);
+
+    const drillTransitionClass = drillTransitionEnabled
+        ? prefersReducedMotion
+            ? 'animate-in fade-in duration-200'
+            : 'animate-in fade-in zoom-in-95 duration-300'
+        : '';
 
     const { handleKeyDown } = useGraphHotkeys({
         graph, isReady, selectedEdge, setSelectedEdge,
@@ -402,7 +416,7 @@ export function GraphComponent({
                 id="graph-container"
                 data-testid="graph-canvas"
                 ref={containerRef}
-                className="w-full h-full"
+                className={`w-full h-full ${drillTransitionClass}`}
                 style={{ minHeight: '100%', outline: 'none' }}
                 tabIndex={0}
                 onKeyDown={handleKeyDown}

@@ -283,20 +283,28 @@ export function useGraphHotkeys({
             }
 
             // Story 8.9: Cmd/Ctrl + Enter to drill into selected node's subgraph (AC1)
+            // Important: If the node is not drillable, this shortcut should NO-OP (must not fall through to Enter-create).
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !e.altKey && !e.shiftKey) {
                 if (isInputFocused) {
                     return;
                 }
+
                 const selectedNodes = graph.getSelectedCells().filter((cell) => cell.isNode());
-                if (selectedNodes.length === 1 && onDrillInto && canDrillInto) {
+                if (selectedNodes.length === 1) {
                     const nodeId = selectedNodes[0].id;
-                    if (canDrillInto(nodeId)) {
+                    const canDrill = Boolean(onDrillInto && canDrillInto && canDrillInto(nodeId));
+                    if (canDrill) {
                         e.preventDefault();
                         e.stopPropagation();
-                        onDrillInto(nodeId);
+                        onDrillInto?.(nodeId);
                         return;
                     }
                 }
+
+                // Swallow Cmd/Ctrl+Enter regardless of selection state to avoid accidentally triggering Enter-create behavior.
+                e.preventDefault();
+                e.stopPropagation();
+                return;
             }
 
             // Handle edge deletion with Delete/Backspace

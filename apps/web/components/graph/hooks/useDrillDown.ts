@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import type { Graph, Node, Edge, Cell } from '@antv/x6';
+import type { Graph, Node, Edge } from '@antv/x6';
 import {
     useDrillPath,
     pushPath,
@@ -19,8 +19,8 @@ import {
     goToPath,
     resetPath,
     restoreFromUrl,
-    getCurrentRootId,
 } from '@/lib/drillDownStore';
+import { isDependencyEdge } from '@/lib/edgeValidation';
 
 export interface UseDrillDownOptions {
     graph: Graph | null;
@@ -60,6 +60,13 @@ export interface UseDrillDownReturn {
 export function useDrillDown({ graph, isReady }: UseDrillDownOptions): UseDrillDownReturn {
     const drillPath = useDrillPath();
     const isInitialized = useRef(false);
+    const currentRootIdRef = useRef<string | null>(null);
+    const reapplyRafRef = useRef<number | null>(null);
+    const viewportRafRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        currentRootIdRef.current = drillPath.length > 0 ? drillPath[drillPath.length - 1] : null;
+    }, [drillPath]);
 
     // Restore drill path from URL on mount
     useEffect(() => {
@@ -74,7 +81,66 @@ export function useDrillDown({ graph, isReady }: UseDrillDownOptions): UseDrillD
 
         const currentRootId = drillPath.length > 0 ? drillPath[drillPath.length - 1] : null;
         applyVisibilityFilter(graph, currentRootId);
+
+        // Center/fit after visibility changes (cancel previous scheduled viewport updates)
+        if (typeof window === 'undefined') return;
+        if (viewportRafRef.current !== null) {
+            window.cancelAnimationFrame(viewportRafRef.current);
+        }
+        viewportRafRef.current = window.requestAnimationFrame(() => {
+            viewportRafRef.current = null;
+
+            if (!graph) return;
+
+            if (!currentRootId) {
+                graph.zoomToFit({ padding: 60, maxScale: 1.2 });
+                return;
+            }
+
+            const rootCell = graph.getCellById(currentRootId);
+            if (rootCell && rootCell.isNode()) {
+                graph.centerCell(rootCell as Node);
+                graph.zoomToFit({ padding: 80, maxScale: 1.5 });
+            }
+        });
     }, [graph, isReady, drillPath]);
+
+    // Re-apply visibility on graph mutations (collaboration, collapse/expand, add/remove)
+    useEffect(() => {
+        if (!graph || !isReady) return;
+        if (typeof window === 'undefined') return;
+
+        const scheduleReapply = () => {
+            if (reapplyRafRef.current !== null) return;
+            reapplyRafRef.current = window.requestAnimationFrame(() => {
+                reapplyRafRef.current = null;
+                applyVisibilityFilter(graph, currentRootIdRef.current);
+            });
+        };
+
+        graph.on('node:added', scheduleReapply);
+        graph.on('node:removed', scheduleReapply);
+        graph.on('edge:added', scheduleReapply);
+        graph.on('edge:removed', scheduleReapply);
+        graph.on('node:change:data', scheduleReapply);
+
+        return () => {
+            graph.off('node:added', scheduleReapply);
+            graph.off('node:removed', scheduleReapply);
+            graph.off('edge:added', scheduleReapply);
+            graph.off('edge:removed', scheduleReapply);
+            graph.off('node:change:data', scheduleReapply);
+
+            if (reapplyRafRef.current !== null) {
+                window.cancelAnimationFrame(reapplyRafRef.current);
+                reapplyRafRef.current = null;
+            }
+            if (viewportRafRef.current !== null) {
+                window.cancelAnimationFrame(viewportRafRef.current);
+                viewportRafRef.current = null;
+            }
+        };
+    }, [graph, isReady]);
 
     /**
      * Check if a node has hierarchical children (can be drilled into)
@@ -89,10 +155,7 @@ export function useDrillDown({ graph, isReady }: UseDrillDownOptions): UseDrillD
 
             // Get outgoing edges that are NOT dependency edges
             const outEdges = graph.getOutgoingEdges(node as Node) || [];
-            const hierarchyChildren = outEdges.filter((edge) => {
-                const edgeData = edge.getData() || {};
-                return edgeData.edgeType !== 'dependency';
-            });
+            const hierarchyChildren = outEdges.filter((edge) => !isDependencyEdge(edge));
 
             return hierarchyChildren.length > 0;
         },
@@ -158,87 +221,124 @@ function applyVisibilityFilter(graph: Graph, rootNodeId: string | null): void {
     const allNodes = graph.getNodes();
     const allEdges = graph.getEdges();
 
-    if (!rootNodeId) {
-        // Main view: show all nodes and edges
-        allNodes.forEach((node) => node.show());
-        allEdges.forEach((edge) => edge.show());
+    const nodesById = new Map<string, Node>(allNodes.map((node) => [node.id, node]));
+    const hierarchyChildrenMap = buildHierarchyChildrenMap(allEdges);
 
-        // AC2: Fit view to show all visible nodes with animation
-        setTimeout(() => {
-            graph.zoomToFit({ padding: 60, maxScale: 1.2 });
-        }, 50);
-        return;
+    // Validate root if in drill mode
+    if (rootNodeId) {
+        const rootCell = graph.getCellById(rootNodeId);
+        if (!rootCell || !rootCell.isNode()) {
+            console.warn('[useDrillDown] Root node not found, resetting to main view:', rootNodeId);
+            resetPath();
+            return;
+        }
     }
 
-    // Find the root node
-    const rootCell = graph.getCellById(rootNodeId);
-    if (!rootCell || !rootCell.isNode()) {
-        // Root node doesn't exist - reset to main view
-        console.warn('[useDrillDown] Root node not found, resetting to main view:', rootNodeId);
-        resetPath();
-        return;
-    }
+    const visibleNodeIds = rootNodeId
+        ? computeVisibleInDrillMode(rootNodeId, nodesById, hierarchyChildrenMap)
+        : computeVisibleInMainView(nodesById, hierarchyChildrenMap);
 
-    const rootNode = rootCell as Node;
+    // Apply visibility in a single batch to reduce expensive reflows
+    graph.batchUpdate(() => {
+        allNodes.forEach((node) => {
+            if (visibleNodeIds.has(node.id)) node.show();
+            else node.hide();
+        });
 
-    // Collect visible node IDs (root + all descendants via hierarchy edges)
-    const visibleNodeIds = new Set<string>();
-    collectDescendants(graph, rootNode, visibleNodeIds);
-
-    // Apply visibility to nodes
-    allNodes.forEach((node) => {
-        if (visibleNodeIds.has(node.id)) {
-            node.show();
-        } else {
-            node.hide();
-        }
+        allEdges.forEach((edge) => {
+            const sourceId = edge.getSourceCellId();
+            const targetId = edge.getTargetCellId();
+            const visible = Boolean(sourceId && targetId && visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId));
+            if (visible) edge.show();
+            else edge.hide();
+        });
     });
-
-    // Apply visibility to edges (only show if both source and target are visible)
-    allEdges.forEach((edge) => {
-        const sourceId = edge.getSourceCellId();
-        const targetId = edge.getTargetCellId();
-
-        if (sourceId && targetId && visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId)) {
-            edge.show();
-        } else {
-            edge.hide();
-        }
-    });
-
-    // AC2: Center on subgraph root with smooth animation
-    // Delay to allow DOM to update visibility first
-    setTimeout(() => {
-        graph.centerCell(rootNode);
-        graph.zoomToFit({ padding: 80, maxScale: 1.5 });
-    }, 50);
 }
 
 /**
- * Recursively collect all descendant node IDs starting from a root node.
- * Only follows hierarchy edges (not dependency edges).
- *
- * @param graph The X6 graph instance
- * @param node The current node to process
- * @param collected Set to collect node IDs
+ * Build a map of hierarchy (non-dependency) children from current edge list.
  */
-function collectDescendants(graph: Graph, node: Node, collected: Set<string>): void {
-    collected.add(node.id);
+function buildHierarchyChildrenMap(edges: Edge[]): Map<string, string[]> {
+    const map = new Map<string, string[]>();
 
-    // Get outgoing edges that are NOT dependency edges
-    const outEdges = graph.getOutgoingEdges(node) || [];
+    for (const edge of edges) {
+        if (isDependencyEdge(edge)) continue;
+        const sourceId = edge.getSourceCellId();
+        const targetId = edge.getTargetCellId();
+        if (!sourceId || !targetId) continue;
+        const list = map.get(sourceId);
+        if (list) list.push(targetId);
+        else map.set(sourceId, [targetId]);
+    }
 
-    for (const edge of outEdges) {
-        const edgeData = edge.getData() || {};
+    return map;
+}
 
-        // Skip dependency edges - only follow hierarchy edges
-        if (edgeData.edgeType === 'dependency') {
-            continue;
-        }
+function isNodeCollapsed(node: Node): boolean {
+    const data = node.getData() as { collapsed?: unknown } | null;
+    return data?.collapsed === true;
+}
 
-        const targetCell = edge.getTargetCell();
-        if (targetCell && targetCell.isNode() && !collected.has(targetCell.id)) {
-            collectDescendants(graph, targetCell as Node, collected);
+/**
+ * Main view visibility:
+ * - Show all nodes except descendants of any collapsed node (Story 8.1 compatibility)
+ */
+function computeVisibleInMainView(
+    nodesById: Map<string, Node>,
+    hierarchyChildrenMap: Map<string, string[]>
+): Set<string> {
+    const hiddenByCollapse = new Set<string>();
+
+    const collapsedNodes = Array.from(nodesById.values()).filter((node) => isNodeCollapsed(node));
+    for (const collapsedNode of collapsedNodes) {
+        const stack = [...(hierarchyChildrenMap.get(collapsedNode.id) ?? [])];
+        while (stack.length > 0) {
+            const id = stack.pop()!;
+            if (hiddenByCollapse.has(id)) continue;
+            hiddenByCollapse.add(id);
+            const children = hierarchyChildrenMap.get(id);
+            if (children) stack.push(...children);
         }
     }
+
+    const visible = new Set<string>();
+    nodesById.forEach((_, id) => {
+        if (!hiddenByCollapse.has(id)) visible.add(id);
+    });
+    return visible;
+}
+
+/**
+ * Drill mode visibility:
+ * - Include root + descendants via hierarchy edges
+ * - Stop descending when a node is collapsed (collapse hides descendants)
+ */
+function computeVisibleInDrillMode(
+    rootNodeId: string,
+    nodesById: Map<string, Node>,
+    hierarchyChildrenMap: Map<string, string[]>
+): Set<string> {
+    const visible = new Set<string>();
+    const visited = new Set<string>();
+    const queue: string[] = [rootNodeId];
+
+    for (let i = 0; i < queue.length; i++) {
+        const currentId = queue[i];
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+
+        const node = nodesById.get(currentId);
+        if (!node) continue;
+
+        visible.add(currentId);
+        if (isNodeCollapsed(node)) continue;
+
+        const children = hierarchyChildrenMap.get(currentId);
+        if (!children) continue;
+        for (const childId of children) {
+            if (!visited.has(childId)) queue.push(childId);
+        }
+    }
+
+    return visible;
 }

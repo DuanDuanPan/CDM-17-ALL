@@ -394,14 +394,15 @@ describe('DrillBreadcrumb', () => {
                 />
             );
 
-            // All levels should be rendered
+            // Overflow behavior: collapse middle items into "..." when path > 4
             expect(screen.getByText('L1')).toBeTruthy();
-            expect(screen.getByText('L2')).toBeTruthy();
-            expect(screen.getByText('L3')).toBeTruthy();
+            expect(screen.getByText('...')).toBeTruthy();
             expect(screen.getByText('L4')).toBeTruthy();
             expect(screen.getByText('L5')).toBeTruthy();
+            expect(screen.queryByText('L2')).toBeNull();
+            expect(screen.queryByText('L3')).toBeNull();
 
-            // L1-L4 should be clickable (have title), L5 should not (it's current)
+            // L1 and L4 should be clickable, L5 should not (it's current)
             expect(screen.getByTitle('返回 L1')).toBeTruthy();
             expect(screen.getByTitle('返回 L4')).toBeTruthy();
             expect(screen.queryByTitle('返回 L5')).toBeNull();

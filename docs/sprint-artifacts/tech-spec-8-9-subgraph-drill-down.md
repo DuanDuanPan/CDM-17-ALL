@@ -349,9 +349,9 @@ export interface NodeContextMenuProps {
 
 ### Phase 4: Breadcrumb Component
 
-#### Task 4.1: [NEW] `Breadcrumb.tsx`
+#### Task 4.1: [NEW] `DrillBreadcrumb.tsx`
 
-**文件**: `apps/web/components/graph/parts/Breadcrumb.tsx`
+**文件**: `apps/web/components/graph/parts/DrillBreadcrumb.tsx`
 
 ```typescript
 'use client';
@@ -446,7 +446,7 @@ export function Breadcrumb({ getNodeLabel }: BreadcrumbProps) {
 
 #### 单元测试 (Vitest)
 
-**文件**: `apps/web/__tests__/lib/drillDownStore.test.ts`
+**文件**: `apps/web/lib/__tests__/drillDownStore.test.ts`
 
 ```bash
 # 运行命令
@@ -498,10 +498,10 @@ pnpm --filter @cdm/web test:e2e drill-down
 | 文件 | 类型 | 预估行数 | 描述 |
 |------|------|:--------:|------|
 | `apps/web/lib/drillDownStore.ts` | NEW | ~100 | 下钻路径 Store |
-| `apps/web/components/graph/parts/Breadcrumb.tsx` | NEW | ~80 | 面包屑组件（含返回功能） |
+| `apps/web/components/graph/parts/DrillBreadcrumb.tsx` | NEW | ~80 | 面包屑组件（含返回功能） |
 | `apps/web/components/graph/hooks/useGraphHotkeys.ts` | MODIFY | +15 | 下钻快捷键（仅 Cmd/Ctrl+Enter） |
 | `apps/web/components/graph/GraphComponent.tsx` | MODIFY | +40 | 集成下钻逻辑 |
 | `apps/web/components/graph/parts/NodeContextMenu.tsx` | MODIFY | +15 | 菜单项 |
-| `apps/web/__tests__/lib/drillDownStore.test.ts` | NEW | ~200 | 单元测试（14 cases） |
-| `apps/web/__tests__/components/Breadcrumb.test.tsx` | NEW | ~150 | 组件测试（11 cases） |
+| `apps/web/lib/__tests__/drillDownStore.test.ts` | NEW | ~200 | 单元测试（14 cases） |
+| `apps/web/__tests__/components/DrillBreadcrumb.test.tsx` | NEW | ~150 | 组件测试（11 cases） |
 | `apps/web/e2e/drill-down.spec.ts` | NEW | ~250 | E2E 测试（16 cases） |

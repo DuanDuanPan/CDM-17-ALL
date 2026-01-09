@@ -1,6 +1,6 @@
 # Story 8.9: 子图下钻导航 (Subgraph Drill-Down Navigation)
 
-Status: review
+Status: done
 Tech-Spec: [tech-spec-8-9-subgraph-drill-down.md](./tech-spec-8-9-subgraph-drill-down.md)
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
@@ -160,7 +160,7 @@ const breadcrumbActive = "text-sm text-white font-medium px-2 py-1 cursor-defaul
 - [x] Task 1.1: 创建下钻状态 Store
   - [x] 1.1.1 新建 `apps/web/lib/drillDownStore.ts`
   - [x] 1.1.2 定义 `DrillDownPath = string[]`（节点 ID 路径）
-  - [x] 1.1.3 实现 `setDrillPath(path)` / `getCurrentPath()` / `subscribe(listener)`
+  - [x] 1.1.3 实现 `setDrillPath(path)` / `getDrillPath()` / `subscribe(listener)`
   - [x] 1.1.4 支持 `pushPath(nodeId)` / `popPath()` / `goToPath(path)`
   - [x] 1.1.5 使用 `useSyncExternalStore` 创建 `useDrillPath()` hook
 
@@ -186,7 +186,7 @@ const breadcrumbActive = "text-sm text-white font-medium px-2 py-1 cursor-defaul
 ### Phase 3: 面包屑导航组件 (AC: #2, #3)
 
 - [x] Task 3.1: 创建 Breadcrumb 组件
-  - [x] 3.1.1 新建 `apps/web/components/graph/parts/Breadcrumb.tsx`
+  - [x] 3.1.1 新建 `apps/web/components/graph/parts/DrillBreadcrumb.tsx`
   - [x] 3.1.2 消费 `useDrillPath()` 获取当前路径
   - [x] 3.1.3 根据路径查询节点标题（从 Yjs 或 store）
   - [x] 3.1.4 渲染面包屑项，支持点击导航
@@ -208,6 +208,17 @@ const breadcrumbActive = "text-sm text-white font-medium px-2 py-1 cursor-defaul
 - [x] Task 5.1: 单元测试 (Vitest)
 - [x] Task 5.2: 组件测试 (Vitest + RTL)
 - [x] Task 5.3: E2E 测试 (Playwright)
+
+### Review Follow-ups (AI)
+
+- [x] [AI-Review][CRITICAL] 已修复：面包屑“>4 折叠为 `...`” [apps/web/components/graph/parts/DrillBreadcrumb.tsx:85]
+- [x] [AI-Review][CRITICAL] 已修复：`prefers-reduced-motion` 支持（面包屑 fade-only；下钻切换禁用 zoom） [apps/web/components/graph/parts/DrillBreadcrumb.tsx:108] [apps/web/components/graph/GraphComponent.tsx:300]
+- [x] [AI-Review][CRITICAL] 已补齐：Playwright E2E（`apps/web/e2e/drill-down.spec.ts`） [apps/web/e2e/drill-down.spec.ts:1]
+- [x] [AI-Review][CRITICAL] 已修复：`Cmd/Ctrl+Enter` 不可下钻时 NO-OP 且不落入 Enter 创建节点逻辑 [apps/web/components/graph/hooks/useGraphHotkeys.ts:285]
+- [x] [AI-Review][HIGH] 已修复：退出下钻后保留折叠隐藏（主视图可见性与 collapse 兼容） [apps/web/components/graph/hooks/useDrillDown.ts:286]
+- [x] [AI-Review][HIGH] 已修复：过滤逻辑批量更新 + 取消竞态（`graph.batchUpdate` + rAF；移除 `setTimeout`） [apps/web/components/graph/hooks/useDrillDown.ts:242]
+- [x] [AI-Review][MEDIUM] 已修复：文档与实现漂移（Breadcrumb 命名、测试路径、API 名称） [docs/sprint-artifacts/story-8-9-subgraph-drill-down.md:163]
+- [x] [AI-Review][LOW] 已修复：代码卫生（移除未使用导入） [apps/web/components/graph/hooks/useDrillDown.ts:13]
 
 ---
 
@@ -259,12 +270,12 @@ const breadcrumbActive = "text-sm text-white font-medium px-2 py-1 cursor-defaul
 | 文件 | 类型 | 描述 |
 |------|------|------|
 | `apps/web/lib/drillDownStore.ts` | [NEW] | 下钻路径状态 store + hooks |
-| `apps/web/components/graph/parts/Breadcrumb.tsx` | [NEW] | 面包屑导航组件（含返回功能） |
+| `apps/web/components/graph/parts/DrillBreadcrumb.tsx` | [NEW] | 面包屑导航组件（含返回功能） |
 | `apps/web/components/graph/GraphComponent.tsx` | [MODIFY] | 集成下钻过滤逻辑 |
 | `apps/web/components/graph/parts/NodeContextMenu.tsx` | [MODIFY] | 添加"进入子图"菜单项 |
 | `apps/web/components/graph/hooks/useGraphHotkeys.ts` | [MODIFY] | 添加 `Cmd/Ctrl+Enter` 下钻快捷键 |
 | `apps/web/e2e/drill-down.spec.ts` | [NEW] | E2E 测试 |
-| `apps/web/__tests__/lib/drillDownStore.test.ts` | [NEW] | 单元测试 |
+| `apps/web/lib/__tests__/drillDownStore.test.ts` | [NEW] | 单元测试 |
 
 ---
 
@@ -289,7 +300,7 @@ const breadcrumbActive = "text-sm text-white font-medium px-2 py-1 cursor-defaul
 
 ### 单元测试 (Vitest)
 
-**文件**: `apps/web/__tests__/lib/drillDownStore.test.ts`
+**文件**: `apps/web/lib/__tests__/drillDownStore.test.ts`
 
 #### 核心功能测试
 
@@ -302,7 +313,7 @@ const breadcrumbActive = "text-sm text-white font-medium px-2 py-1 cursor-defaul
 | `goToPath` 直接跳转到指定路径 | AC2 | P0 |
 | `goToPath` 跨层级跳转（level 3 → level 1） | AC2 | P1 |
 | `resetPath` 清空所有层级 | AC3 | P1 |
-| `getCurrentPath` 返回当前路径副本 | AC1 | P1 |
+| `getDrillPath` 返回当前路径快照（稳定引用） | AC1 | P1 |
 
 #### 持久化测试
 
@@ -324,7 +335,7 @@ const breadcrumbActive = "text-sm text-white font-medium px-2 py-1 cursor-defaul
 
 ### 组件测试 (Vitest + React Testing Library)
 
-**文件**: `apps/web/__tests__/components/Breadcrumb.test.tsx`
+**文件**: `apps/web/__tests__/components/DrillBreadcrumb.test.tsx`
 
 #### Breadcrumb 组件
 
@@ -506,11 +517,32 @@ export const deepPath = ['root', 'a', 'a1', 'a1-1'];
 
 ---
 
+## Dev Agent Record
+
+### File List (Code Review Fixes)
+
+| 文件 | 类型 | 描述 |
+|------|------|------|
+| `apps/web/components/graph/parts/DrillBreadcrumb.tsx` | [MODIFY] | 面包屑溢出折叠（`...`）+ reduced-motion |
+| `apps/web/components/graph/GraphComponent.tsx` | [MODIFY] | 下钻切换过渡（遵守 reduced-motion） |
+| `apps/web/components/graph/hooks/useDrillDown.ts` | [MODIFY] | 批量可见性更新 + 竞态控制 + 与折叠兼容 |
+| `apps/web/components/graph/hooks/useGraphHotkeys.ts` | [MODIFY] | `Cmd/Ctrl+Enter` 不可下钻时 NO-OP（不落入 Enter 创建） |
+| `apps/web/__tests__/components/DrillBreadcrumb.test.tsx` | [MODIFY] | 覆盖溢出折叠断言 |
+| `apps/web/__tests__/hooks/useDrillDown.test.ts` | [MODIFY] | 适配 `batchUpdate/on/off` mock |
+| `apps/web/__tests__/hooks/useGraphHotkeys.test.ts` | [MODIFY] | 新增 hotkey 不落入创建逻辑用例 |
+| `apps/web/e2e/drill-down.spec.ts` | [NEW] | Playwright E2E：下钻/持久化/返回主图/叶子节点 |
+| `docs/sprint-artifacts/story-8-9-subgraph-drill-down.md` | [MODIFY] | 修复文档漂移 + 记录 Code Review fixes |
+| `docs/sprint-artifacts/tech-spec-8-9-subgraph-drill-down.md` | [MODIFY] | 修复文档漂移（Breadcrumb 命名/测试路径） |
+
+### Change Log
+
+- 2026-01-09: Code Review（AI）— 修复溢出折叠、reduced-motion、hotkey 误触发、可见性过滤性能/竞态、折叠兼容；补齐 Playwright E2E；修正文档漂移。
+
 ## Senior Developer Review (AI)
 
 ### Review Summary
 
-- ⏳ 待开发：准备实施
+- ✅ Code Review 已完成（2026-01-09）：关键问题已修复
 - ✅ AC 覆盖完整，测试策略明确
 - ✅ 技术决策遵循 Yjs-First 原则（下钻是视图状态，不修改数据层）
 - ✅ 与现有 Focus Mode / Collapse / 双击编辑功能无冲突
@@ -530,3 +562,20 @@ export const deepPath = ['root', 'a', 'a1', 'a1-1'];
 - ✅ Awareness 同步已明确排除在本 Story 范围外
 - ✅ 返回快捷键已移除，简化与现有 Escape 逻辑的冲突
 - 💡 建议：未来可考虑添加 Awareness 同步作为增强功能（显示协作者当前层级）
+
+### Findings (2026-01-09)
+
+> 结论：发现 8 个问题（4 CRITICAL / 2 HIGH / 1 MEDIUM / 1 LOW），已全部修复；测试已补齐。
+
+- [FIXED][CRITICAL] 面包屑溢出未折叠（>4） [apps/web/components/graph/parts/DrillBreadcrumb.tsx:85]
+- [FIXED][CRITICAL] reduced-motion 未落实（面包屑/下钻切换） [apps/web/components/graph/parts/DrillBreadcrumb.tsx:108] [apps/web/components/graph/GraphComponent.tsx:300]
+- [FIXED][CRITICAL] Playwright E2E 缺失 [apps/web/e2e/drill-down.spec.ts:1]
+- [FIXED][CRITICAL] `Cmd/Ctrl+Enter` 不可下钻时落入 Enter 创建节点 [apps/web/components/graph/hooks/useGraphHotkeys.ts:285]
+- [FIXED][HIGH] 退出下钻后覆盖折叠隐藏（可见性泄漏） [apps/web/components/graph/hooks/useDrillDown.ts:286]
+- [FIXED][HIGH] 可见性更新未批量 + 不可取消的视口 setTimeout（性能/竞态） [apps/web/components/graph/hooks/useDrillDown.ts:242]
+- [FIXED][MEDIUM] 文档与实现漂移（Breadcrumb 命名/测试路径/API 名称） [docs/sprint-artifacts/story-8-9-subgraph-drill-down.md:163]
+- [FIXED][LOW] 未使用导入清理 [apps/web/components/graph/hooks/useDrillDown.ts:13]
+
+### Tests Run
+
+- `pnpm --filter @cdm/web test`

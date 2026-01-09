@@ -52,7 +52,11 @@ const createMockGraph = (
                 id: `${nodeData.id}-${e.targetId}-${idx}`,
                 isEdge: () => true,
                 isNode: () => false,
-                getData: () => ({ edgeType: e.edgeType }),
+                getData: () => ({
+                    metadata: {
+                        kind: e.edgeType === 'dependency' ? 'dependency' : 'hierarchical',
+                    },
+                }),
                 getTargetCell: () => nodeMap.get(e.targetId) || null,
                 getSourceCellId: () => nodeData.id,
                 getTargetCellId: () => e.targetId,
@@ -72,6 +76,9 @@ const createMockGraph = (
             edgeMap.forEach((edges) => allEdges.push(...edges));
             return allEdges;
         }),
+        batchUpdate: vi.fn((fn: () => void) => fn()),
+        on: vi.fn(),
+        off: vi.fn(),
         zoomToFit: vi.fn(),
         centerCell: vi.fn(),
     } as unknown as Graph;

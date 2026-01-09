@@ -39,6 +39,15 @@ interface BreadcrumbItem {
     path: readonly string[]; // Path up to and including this item
 }
 
+type BreadcrumbToken =
+    | { kind: 'item'; item: BreadcrumbItem }
+    | { kind: 'ellipsis' };
+
+function shouldReduceMotion(): boolean {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+}
+
 /**
  * Breadcrumb navigation for subgraph drill-down.
  * Displays current drill path with clickable items for navigation.
@@ -50,6 +59,8 @@ export function DrillBreadcrumb({
     onNavigate,
     onNavigateToRoot,
 }: DrillBreadcrumbProps) {
+    const reduceMotion = useMemo(() => shouldReduceMotion(), []);
+
     // Build breadcrumb items with labels from graph
     const breadcrumbItems = useMemo((): BreadcrumbItem[] => {
         if (!graph || drillPath.length === 0) return [];
@@ -71,6 +82,16 @@ export function DrillBreadcrumb({
         });
     }, [graph, drillPath]);
 
+    // Overflow: collapse middle items into "..." when path > 4 (Task 3.1.7)
+    const tokens = useMemo((): BreadcrumbToken[] => {
+        if (breadcrumbItems.length <= 4) {
+            return breadcrumbItems.map((item) => ({ kind: 'item', item }));
+        }
+        const first = breadcrumbItems[0];
+        const lastTwo = breadcrumbItems.slice(-2);
+        return [{ kind: 'item', item: first }, { kind: 'ellipsis' }, ...lastTwo.map((item) => ({ kind: 'item', item }))];
+    }, [breadcrumbItems]);
+
     // Don't render if not in drill mode
     if (!isDrillMode) return null;
 
@@ -83,7 +104,8 @@ export function DrillBreadcrumb({
                 'bg-black/40 backdrop-blur-md',
                 'border border-white/10 rounded-lg',
                 'shadow-2xl shadow-black/20',
-                'animate-in fade-in slide-in-from-top-2 duration-300'
+                // Reduced motion: fade only (no transform-based slide)
+                reduceMotion ? 'animate-in fade-in duration-200' : 'animate-in fade-in slide-in-from-top-2 duration-300'
             )}
             aria-label="下钻导航路径"
         >
@@ -102,16 +124,19 @@ export function DrillBreadcrumb({
             </button>
 
             {/* Path items */}
-            {breadcrumbItems.map((item, index) => {
-                const isLast = index === breadcrumbItems.length - 1;
+            {tokens.map((token, index) => {
+                const isLast = index === tokens.length - 1;
 
                 return (
-                    <div key={item.id} className="flex items-center gap-1.5">
+                    <div key={token.kind === 'ellipsis' ? 'ellipsis' : token.item.id} className="flex items-center gap-1.5">
                         {/* Separator */}
                         <ChevronRight className="w-4 h-4 text-white/30" />
 
-                        {/* Breadcrumb item */}
-                        {isLast ? (
+                        {token.kind === 'ellipsis' ? (
+                            <span className="text-sm text-zinc-500 px-2 py-1 select-none" aria-label="折叠的路径">
+                                ...
+                            </span>
+                        ) : isLast ? (
                             // Current (active) item - not clickable
                             <span
                                 className={cn(
@@ -119,24 +144,24 @@ export function DrillBreadcrumb({
                                     'px-2 py-1 cursor-default',
                                     'max-w-[150px] truncate'
                                 )}
-                                title={item.label}
+                                title={token.item.label}
                             >
-                                {item.label}
+                                {token.item.label}
                             </span>
                         ) : (
                             // Clickable item
                             <button
-                                onClick={() => onNavigate(item.path)}
+                                onClick={() => onNavigate(token.item.path)}
                                 className={cn(
                                     'text-sm text-zinc-500 hover:text-zinc-300',
                                     'hover:bg-white/5 px-2 py-1 rounded-md',
-                                    'transition-all duration-200',
+                                    'transition-all duration-200 motion-reduce:transition-none',
                                     'focus:outline-none focus:ring-2 focus:ring-white/20',
                                     'max-w-[120px] truncate'
                                 )}
-                                title={`返回 ${item.label}`}
+                                title={`返回 ${token.item.label}`}
                             >
-                                {item.label}
+                                {token.item.label}
                             </button>
                         )}
                     </div>

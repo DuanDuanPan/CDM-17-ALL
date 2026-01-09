@@ -110,5 +110,51 @@ describe('useGraphHotkeys', () => {
         expect(onToggleMinimap).not.toHaveBeenCalled();
         expect(preventDefault).not.toHaveBeenCalled();
     });
-});
 
+    it('swallows Cmd/Ctrl+Enter when node is not drillable (must not fall through to Enter-create)', () => {
+        const onDrillInto = vi.fn();
+        const canDrillInto = vi.fn(() => false);
+
+        const mockGraph = {
+            ...createMockGraph(),
+            getSelectedCells: vi.fn(() => [{ id: 'node1', isNode: () => true }]),
+        } as unknown as Graph;
+
+        const { result } = renderHook(() =>
+            useGraphHotkeys({
+                graph: mockGraph,
+                isReady: true,
+                currentLayout: 'mindmap',
+                selectedEdge: null,
+                setSelectedEdge: vi.fn(),
+                connectionStartNode: null,
+                setConnectionStartNode: vi.fn(),
+                isDependencyMode: false,
+                removeEdge: vi.fn(),
+                onDrillInto,
+                canDrillInto,
+            })
+        );
+
+        const preventDefault = vi.fn();
+        const stopPropagation = vi.fn();
+
+        act(() => {
+            result.current.handleKeyDown({
+                key: 'Enter',
+                code: 'Enter',
+                ctrlKey: true,
+                metaKey: false,
+                altKey: false,
+                shiftKey: false,
+                target: document.createElement('div'),
+                preventDefault,
+                stopPropagation,
+            } as unknown as React.KeyboardEvent);
+        });
+
+        expect(onDrillInto).not.toHaveBeenCalled();
+        expect(preventDefault).toHaveBeenCalledTimes(1);
+        expect(stopPropagation).toHaveBeenCalledTimes(1);
+    });
+});
