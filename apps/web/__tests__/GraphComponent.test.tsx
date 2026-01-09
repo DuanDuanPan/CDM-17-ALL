@@ -182,6 +182,17 @@ vi.mock('@/components/graph/hooks', () => ({
     exitFocusMode: vi.fn(),
     setFocusLevel: vi.fn(),
   })),
+  // Story 8.9: Drill-down navigation mock
+  useDrillDown: vi.fn(() => ({
+    drillPath: [],
+    currentRootId: null,
+    isDrillMode: false,
+    drillInto: vi.fn(),
+    drillUp: vi.fn(),
+    drillToPath: vi.fn(),
+    drillToRoot: vi.fn(),
+    canDrillInto: vi.fn(() => false),
+  })),
 }));
 
 // Mock context

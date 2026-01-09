@@ -32,9 +32,9 @@ import { useMinimapStorage } from '@/hooks/useMinimapStorage';
 import { setGraphScale } from '@/lib/semanticZoomLOD';
 
 // Story 7.4: Extracted hooks and UI components
-import { useGraphTransform, useGraphHotkeys, useGraphEvents, useGraphSelection, useGraphDependencyMode, useGraphContextMenu, useGraphCursor, useGraphInitialization, useNodeCollapse, useZoomShortcuts, useFocusMode } from './hooks';
+import { useGraphTransform, useGraphHotkeys, useGraphEvents, useGraphSelection, useGraphDependencyMode, useGraphContextMenu, useGraphCursor, useGraphInitialization, useNodeCollapse, useZoomShortcuts, useFocusMode, useDrillDown } from './hooks';
 import type { EdgeContextMenuState, NodeContextMenuState } from './hooks';
-import { EdgeContextMenu, NodeContextMenu, ConnectionStatus, DependencyModeIndicator, MinimapContainer, ZoomIndicator, FocusModeButton } from './parts';
+import { EdgeContextMenu, NodeContextMenu, ConnectionStatus, DependencyModeIndicator, MinimapContainer, ZoomIndicator, FocusModeButton, DrillBreadcrumb } from './parts';
 
 // Story 5.2: Template save functionality
 import { SaveTemplateDialog } from '@/components/TemplateLibrary/SaveTemplateDialog';
@@ -274,6 +274,21 @@ export function GraphComponent({
         selectedNodeId: selectedNodeIds[0] || null,
     });
 
+    // Story 8.9: Subgraph Drill-Down Navigation
+    const {
+        drillPath,
+        currentRootId,
+        isDrillMode,
+        drillInto,
+        drillUp,
+        drillToPath,
+        drillToRoot,
+        canDrillInto,
+    } = useDrillDown({
+        graph,
+        isReady,
+    });
+
     const { handleKeyDown } = useGraphHotkeys({
         graph, isReady, selectedEdge, setSelectedEdge,
         connectionStartNode, setConnectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge,
@@ -289,6 +304,9 @@ export function GraphComponent({
         onZoomTo100: zoomTo100,
         // Story 8.5: Focus mode toggle
         onToggleFocusMode: toggleFocusMode,
+        // Story 8.9: Drill-down navigation
+        onDrillInto: drillInto,
+        canDrillInto,
     });
     useGraphEvents({
         graph, isReady, containerRef, onNodeSelect, setSelectedEdge,
@@ -404,6 +422,15 @@ export function GraphComponent({
             {/* Connection Status */}
             <ConnectionStatus syncStatus={syncStatus} />
 
+            {/* Story 8.9: Drill-Down Breadcrumb Navigation */}
+            <DrillBreadcrumb
+                drillPath={drillPath}
+                isDrillMode={isDrillMode}
+                graph={graph}
+                onNavigate={drillToPath}
+                onNavigateToRoot={drillToRoot}
+            />
+
             {/* View Controls: Bottom-Right Stack */}
             <div className="absolute bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
                 {/* Story 8.5: Focus Mode Button */}
@@ -516,6 +543,9 @@ export function GraphComponent({
                 onCollapse={nodeContextMenu.nodeId ? () => collapseNode(nodeContextMenu.nodeId!) : undefined}
                 onExpand={nodeContextMenu.nodeId ? () => expandNode(nodeContextMenu.nodeId!) : undefined}
                 onCollapseDescendants={nodeContextMenu.nodeId ? () => collapseDescendants(nodeContextMenu.nodeId!) : undefined}
+                // Story 8.9: Drill-down navigation props
+                canDrillInto={nodeContextMenu.nodeId ? canDrillInto(nodeContextMenu.nodeId) : false}
+                onDrillInto={nodeContextMenu.nodeId ? () => drillInto(nodeContextMenu.nodeId!) : undefined}
             />
 
             {/* Story 5.2: Save as Template Dialog */}

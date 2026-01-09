@@ -1,7 +1,7 @@
 'use client';
 
 import type { Graph } from '@antv/x6';
-import { LayoutTemplate, ChevronRight, ChevronDown, ChevronsDownUp } from 'lucide-react';
+import { LayoutTemplate, ChevronRight, ChevronDown, ChevronsDownUp, FolderOpen } from 'lucide-react';
 
 export interface NodeContextMenuProps {
     visible: boolean;
@@ -27,12 +27,16 @@ export interface NodeContextMenuProps {
     onCollapse?: () => void;
     onExpand?: () => void;
     onCollapseDescendants?: () => void;
+    // Story 8.9: Drill-down navigation
+    canDrillInto?: boolean;
+    onDrillInto?: () => void;
 }
 
 /**
  * Node context menu for clipboard operations, subscriptions, and collapse/expand.
  * Story 7.4: Extracted from GraphComponent for single responsibility.
  * Story 8.1: Added collapse/expand menu items.
+ * Story 8.9: Added drill-down navigation menu item.
  */
 export function NodeContextMenu({
     visible,
@@ -57,6 +61,9 @@ export function NodeContextMenu({
     onCollapse,
     onExpand,
     onCollapseDescendants,
+    // Story 8.9: Drill-down navigation
+    canDrillInto,
+    onDrillInto,
 }: NodeContextMenuProps) {
     if (!visible) return null;
 
@@ -166,6 +173,20 @@ export function NodeContextMenu({
                                 <span className="ml-auto text-xs text-gray-400">⌘⌥[</span>
                             </button>
                         )}
+                    </>
+                )}
+                {/* Story 8.9: Drill-down navigation menu item */}
+                {nodeId && canDrillInto && onDrillInto && (
+                    <>
+                        <div className="border-t border-gray-100 my-1" />
+                        <button
+                            onClick={() => handleAction(onDrillInto)}
+                            className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 text-sm"
+                        >
+                            <FolderOpen className="w-4 h-4 text-blue-500" />
+                            进入子图
+                            <span className="ml-auto text-xs text-gray-400">⌘↵</span>
+                        </button>
                     </>
                 )}
             </div>

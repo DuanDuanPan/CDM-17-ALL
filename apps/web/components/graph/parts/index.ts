@@ -33,3 +33,7 @@ export { OutlineItem } from './OutlineItem';
 // Story 8.5: Focus Mode
 export { FocusModeButton } from './FocusModeButton';
 export type { FocusModeButtonProps } from './FocusModeButton';
+
+// Story 8.9: Subgraph Drill-Down Navigation
+export { DrillBreadcrumb } from './DrillBreadcrumb';
+export type { DrillBreadcrumbProps } from './DrillBreadcrumb';

@@ -52,3 +52,7 @@ export type { OutlineNode, UseOutlineDataOptions, UseOutlineDataReturn } from '.
 // Story 8.5: Focus Mode
 export { useFocusMode } from './useFocusMode';
 export type { UseFocusModeOptions, UseFocusModeReturn } from './useFocusMode';
+
+// Story 8.9: Subgraph Drill-Down Navigation
+export { useDrillDown } from './useDrillDown';
+export type { UseDrillDownOptions, UseDrillDownReturn } from './useDrillDown';

@@ -45,6 +45,11 @@ export interface UseGraphHotkeysOptions {
     // Story 8.5: Focus Mode
     /** Toggle focus mode */
     onToggleFocusMode?: () => void;
+    // Story 8.9: Subgraph Drill-Down Navigation
+    /** Drill into selected node's subgraph */
+    onDrillInto?: (nodeId: string) => void;
+    /** Check if a node can be drilled into */
+    canDrillInto?: (nodeId: string) => boolean;
 }
 
 export interface UseGraphHotkeysReturn {
@@ -66,6 +71,7 @@ export interface UseGraphHotkeysReturn {
  * - Story 8.2: Minimap toggle (M)
  * - Story 8.3: Zoom shortcuts (Cmd+0, Cmd+1, Alt+0, Alt+1)
  * - Story 8.5: Focus mode (F)
+ * - Story 8.9: Drill into subgraph (Cmd/Ctrl+Enter)
  */
 export function useGraphHotkeys({
     graph,
@@ -89,6 +95,9 @@ export function useGraphHotkeys({
     onZoomTo100,
     // Story 8.5: Focus Mode
     onToggleFocusMode,
+    // Story 8.9: Drill-Down Navigation
+    onDrillInto,
+    canDrillInto,
 }: UseGraphHotkeysOptions): UseGraphHotkeysReturn {
     // Global Space-to-edit: allow editing even when graph container isn't focused
     useEffect(() => {
@@ -273,6 +282,23 @@ export function useGraphHotkeys({
                 return;
             }
 
+            // Story 8.9: Cmd/Ctrl + Enter to drill into selected node's subgraph (AC1)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !e.altKey && !e.shiftKey) {
+                if (isInputFocused) {
+                    return;
+                }
+                const selectedNodes = graph.getSelectedCells().filter((cell) => cell.isNode());
+                if (selectedNodes.length === 1 && onDrillInto && canDrillInto) {
+                    const nodeId = selectedNodes[0].id;
+                    if (canDrillInto(nodeId)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onDrillInto(nodeId);
+                        return;
+                    }
+                }
+            }
+
             // Handle edge deletion with Delete/Backspace
             if (selectedEdge && (e.key === 'Delete' || e.key === 'Backspace')) {
                 e.preventDefault();
@@ -329,7 +355,7 @@ export function useGraphHotkeys({
                     break;
             }
         },
-        [graph, isReady, currentLayout, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge, setSelectedEdge, setConnectionStartNode, onCollapseNode, onExpandNode, onCollapseDescendants, onToggleMinimap, onZoomToFit, onZoomTo100, onToggleFocusMode]
+        [graph, isReady, currentLayout, selectedEdge, connectionStartNode, isDependencyMode, onExitDependencyMode, removeEdge, setSelectedEdge, setConnectionStartNode, onCollapseNode, onExpandNode, onCollapseDescendants, onToggleMinimap, onZoomToFit, onZoomTo100, onToggleFocusMode, onDrillInto, canDrillInto]
     );
 
     return { handleKeyDown };
