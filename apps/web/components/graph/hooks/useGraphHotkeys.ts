@@ -234,7 +234,9 @@ export function useGraphHotkeys({
             }
 
             // Story 8.2: M key to toggle minimap (AC: #1)
-            if (e.key === 'm' && !e.ctrlKey && !e.metaKey && !e.altKey && onToggleMinimap) {
+            // NOTE: Under some IMEs, `e.key` can be reported as "Process", so fall back to `e.code`.
+            const isMKey = e.key === 'm' || e.key === 'M' || e.code === 'KeyM';
+            if (isMKey && !e.ctrlKey && !e.metaKey && !e.altKey && onToggleMinimap) {
                 const target = e.target as HTMLElement | null;
                 // Don't trigger when typing in inputs or contentEditable
                 if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')) {
@@ -246,7 +248,9 @@ export function useGraphHotkeys({
             }
 
             // Story 8.5: F key to toggle focus mode (AC1)
-            if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey && onToggleFocusMode) {
+            // NOTE: Under some IMEs, `e.key` can be reported as "Process", so fall back to `e.code`.
+            const isFKey = e.key === 'f' || e.key === 'F' || e.code === 'KeyF';
+            if (isFKey && !e.ctrlKey && !e.metaKey && !e.altKey && onToggleFocusMode) {
                 // Don't trigger when typing in inputs or contentEditable
                 if (isInputFocused) {
                     return;
