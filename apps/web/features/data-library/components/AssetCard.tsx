@@ -20,6 +20,8 @@ import { formatFileSize } from '../utils/formatFileSize';
 interface AssetCardProps {
   asset: DataAssetWithFolder;
   onClick?: () => void;
+  /** Story 9.2: Enable drag for folder organization */
+  draggable?: boolean;
 }
 
 /**
@@ -86,10 +88,16 @@ function getFormatColor(format: DataAssetFormat): string {
 
 /**
  * Asset Card Component
+ * Story 9.2: Added draggable support for folder organization
  */
-export function AssetCard({ asset, onClick }: AssetCardProps) {
+export function AssetCard({ asset, onClick, draggable = false }: AssetCardProps) {
   const Icon = getFormatIcon(asset.format);
   const colorClass = getFormatColor(asset.format);
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData('text/plain', asset.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
 
   return (
     <div
@@ -98,6 +106,8 @@ export function AssetCard({ asset, onClick }: AssetCardProps) {
                  hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600
                  transition-all duration-200 cursor-pointer overflow-hidden"
       onClick={onClick}
+      draggable={draggable}
+      onDragStart={draggable ? handleDragStart : undefined}
     >
       {/* Thumbnail Area */}
       <div className="relative h-32 bg-gray-100 dark:bg-gray-700 flex items-center justify-center">

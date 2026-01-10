@@ -592,8 +592,10 @@ cdm-17-gemini/
     │   └── manifest.json
     └── industrial-viewer/      # [NEW] CAD/CAE Lightweight Preview
         ├── client/
-        │   ├── ModelViewer.tsx       # Three.js glTF/STL
-        │   └── ContourViewer.tsx     # Scalar field visualization
+        │   ├── ModelViewer.tsx       # Online3DViewer (STEP/IGES/glTF/STL)
+        │   ├── ContourViewer.tsx     # Scalar field visualization
+        │   └── hooks/
+        │       └── useOnline3DViewer.ts  # EmbeddedViewer wrapper
         └── manifest.json
 ```
 
@@ -719,13 +721,13 @@ npx create-turbo@latest cdm-17-gemini
 
 **设计决策**:
 
-| 决策项 | 选择 | 理由 |
-|--------|------|------|
-| **UI 入口** | 浮动 Drawer (60-70%宽度) | 最大化展示，不占用固定空间 |
-| **快捷键** | `Cmd/Ctrl + D` | 与现有快捷键体系一致 |
-| **存储策略** | 复用现有附件存储 | 减少架构复杂度 |
-| **轻量化策略** | 直接上传 glTF/STL/VTK | 无需服务端转换，MVP 阶段简化 |
-| **权限模型** | MVP 暂忽略 | 后续版本对接密级体系 |
+| 决策项         | 选择                     | 理由                         |
+| -------------- | ------------------------ | ---------------------------- |
+| **UI 入口**    | 浮动 Drawer (60-70%宽度) | 最大化展示，不占用固定空间   |
+| **快捷键**     | `Cmd/Ctrl + D`           | 与现有快捷键体系一致         |
+| **存储策略**   | 复用现有附件存储         | 减少架构复杂度               |
+| **轻量化策略** | 直接上传 glTF/STL/VTK    | 无需服务端转换，MVP 阶段简化 |
+| **权限模型**   | MVP 暂忽略               | 后续版本对接密级体系         |
 
 ### 2. 数据模型
 
@@ -822,12 +824,11 @@ apps/web/src/features/data-library/
 
 apps/web/src/features/industrial-viewer/
 ├── components/
-│   ├── ModelViewer.tsx       # Three.js glTF/STL
-│   ├── ContourViewer.tsx     # 云图
+│   ├── ModelViewer.tsx       # Online3DViewer (STEP/IGES/glTF/STL)
+│   ├── ContourViewer.tsx     # 云图 (VTK)
 │   └── ViewerToolbar.tsx
 ├── hooks/
-│   ├── useThreeScene.ts
-│   └── useGltfLoader.ts
+│   └── useOnline3DViewer.ts  # EmbeddedViewer wrapper hook
 └── index.ts
 ```
 
@@ -848,10 +849,10 @@ async onDeliverableUploaded(payload: { nodeId: string; attachment: Attachment })
 
 ### 6. Mock 数据（卫星领域）
 
-| 名称 | 类型 | 阶段 |
-|------|------|------|
-| 卫星总体结构 | STEP | 详细设计 |
-| 帆板展开机构 | STEP | 详细设计 |
-| 帆板网格模型 | MESH | 仿真验证 |
+| 名称           | 类型    | 阶段     |
+| -------------- | ------- | -------- |
+| 卫星总体结构   | STEP    | 详细设计 |
+| 帆板展开机构   | STEP    | 详细设计 |
+| 帆板网格模型   | MESH    | 仿真验证 |
 | 热控系统温度场 | CONTOUR | 仿真验证 |
-| 结构应力分析 | CONTOUR | 仿真验证 |
+| 结构应力分析   | CONTOUR | 仿真验证 |

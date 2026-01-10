@@ -1,23 +1,21 @@
 /**
  * Story 9.1: Data Library (数据资源库)
  * Data Asset Service - Business logic for data assets
+ *
+ * GR-2 Compliance: Folder and Link services extracted to separate files
  */
 
 import {
   Injectable,
   Logger,
   NotFoundException,
-  ConflictException,
 } from '@nestjs/common';
-import {
-  DataAssetRepository,
-  DataFolderRepository,
-  NodeDataLinkRepository,
-} from './data-asset.repository';
+import { DataAssetRepository } from './data-asset.repository';
+import { DataFolderService } from './data-folder.service';
+import { NodeDataLinkService } from './node-data-link.service';
 import type {
   DataAsset as PrismaDataAsset,
   DataFolder as PrismaDataFolder,
-  NodeDataLink as PrismaNodeDataLink,
 } from '@cdm/database';
 import type {
   CreateDataAssetDto,
@@ -32,6 +30,7 @@ import type {
   NodeDataLink,
   DataAsset,
 } from '@cdm/types';
+import type { UpdateDataFolderDto } from './dto';
 
 @Injectable()
 export class DataAssetService {
@@ -39,9 +38,9 @@ export class DataAssetService {
 
   constructor(
     private readonly assetRepo: DataAssetRepository,
-    private readonly folderRepo: DataFolderRepository,
-    private readonly linkRepo: NodeDataLinkRepository
-  ) {}
+    private readonly folderService: DataFolderService,
+    private readonly linkService: NodeDataLinkService
+  ) { }
 
   // ========================================
   // Data Asset Operations
@@ -150,113 +149,43 @@ export class DataAssetService {
   }
 
   // ========================================
-  // Folder Operations
+  // Folder Operations (delegated)
   // ========================================
 
-  /**
-   * Create a new folder
-   */
   async createFolder(dto: CreateDataFolderDto): Promise<DataFolder> {
-    const folder = await this.folderRepo.create({
-      name: dto.name,
-      description: dto.description,
-      parent: dto.parentId ? { connect: { id: dto.parentId } } : undefined,
-      graph: { connect: { id: dto.graphId } },
-    });
-
-    this.logger.log(`Created folder: ${folder.id} (${folder.name})`);
-    return this.toFolderResponse(folder);
+    return this.folderService.createFolder(dto);
   }
 
-  /**
-   * Get folder tree for a graph
-   */
   async getFolderTree(graphId: string): Promise<DataFolderTreeNode[]> {
-    const folders = await this.folderRepo.findByGraphWithAssetCount(graphId);
-
-    // Build tree structure
-    const folderMap = new Map<string, DataFolderTreeNode>();
-    const rootFolders: DataFolderTreeNode[] = [];
-
-    // First pass: create all folder nodes
-    for (const folder of folders) {
-      const node: DataFolderTreeNode = {
-        ...this.toFolderResponse(folder),
-        children: [],
-        assetCount: folder._count.assets,
-      };
-      folderMap.set(folder.id, node);
-    }
-
-    // Second pass: build hierarchy
-    for (const folder of folders) {
-      const node = folderMap.get(folder.id)!;
-      if (folder.parentId && folderMap.has(folder.parentId)) {
-        folderMap.get(folder.parentId)!.children!.push(node);
-      } else {
-        rootFolders.push(node);
-      }
-    }
-
-    return rootFolders;
+    return this.folderService.getFolderTree(graphId);
   }
 
-  /**
-   * Delete a folder
-   */
+  async updateFolder(id: string, data: UpdateDataFolderDto): Promise<DataFolder> {
+    return this.folderService.updateFolder(id, data);
+  }
+
   async deleteFolder(id: string): Promise<void> {
-    const existing = await this.folderRepo.findById(id);
-    if (!existing) {
-      throw new NotFoundException(`Folder ${id} not found`);
-    }
-
-    await this.folderRepo.delete(id);
-    this.logger.log(`Deleted folder: ${id}`);
+    return this.folderService.deleteFolder(id);
   }
 
   // ========================================
-  // Node-Asset Link Operations
+  // Node-Asset Link Operations (delegated)
   // ========================================
 
-  /**
-   * Link a node to a data asset
-   */
   async linkNodeToAsset(dto: CreateNodeDataLinkDto): Promise<NodeDataLink> {
-    // Check if link already exists
-    const existing = await this.linkRepo.findByNodeAndAsset(dto.nodeId, dto.assetId);
-    if (existing) {
-      throw new ConflictException('Link already exists');
-    }
-
-    const link = await this.linkRepo.create({
-      node: { connect: { id: dto.nodeId } },
-      asset: { connect: { id: dto.assetId } },
-      linkType: dto.linkType || 'reference',
-      note: dto.note,
-    });
-
-    this.logger.log(`Linked node ${dto.nodeId} to asset ${dto.assetId}`);
-    return this.toLinkResponse(link);
+    return this.linkService.linkNodeToAsset(dto);
   }
 
-  /**
-   * Get all assets linked to a node
-   */
   async getNodeAssets(nodeId: string): Promise<DataAssetWithFolder[]> {
-    const links = await this.linkRepo.findByNode(nodeId);
-    return links.map((link) => this.toAssetResponse(link.asset as PrismaDataAsset & { folder: PrismaDataFolder | null }));
+    return this.linkService.getNodeAssets(nodeId);
   }
 
-  /**
-   * Unlink a node from a data asset
-   */
-  async unlinkNodeFromAsset(nodeId: string, assetId: string): Promise<void> {
-    const deleted = await this.linkRepo.deleteByNodeAndAsset(nodeId, assetId);
-    if (!deleted) {
-      throw new NotFoundException('Link not found');
-    }
+  async getNodeAssetsByNodes(nodeIds: string[]): Promise<DataAssetWithFolder[]> {
+    return this.linkService.getNodeAssetsByNodes(nodeIds);
+  }
 
-    this.logger.log(`Unlinked node ${nodeId} from asset ${assetId}`);
+  async unlinkNodeFromAsset(nodeId: string, assetId: string): Promise<void> {
+    return this.linkService.unlinkNodeFromAsset(nodeId, assetId);
   }
 
   // ========================================
@@ -280,7 +209,7 @@ export class DataAssetService {
       secretLevel: asset.secretLevel as 'public' | 'internal' | 'confidential' | 'secret',
       createdAt: asset.createdAt.toISOString(),
       updatedAt: asset.updatedAt.toISOString(),
-      folder: asset.folder ? this.toFolderResponse(asset.folder) : null,
+      folder: asset.folder ? this.folderService.toFolderResponse(asset.folder) : null,
     };
   }
 
@@ -301,29 +230,6 @@ export class DataAssetService {
       secretLevel: asset.secretLevel as 'public' | 'internal' | 'confidential' | 'secret',
       createdAt: asset.createdAt.toISOString(),
       updatedAt: asset.updatedAt.toISOString(),
-    };
-  }
-
-  private toFolderResponse(folder: PrismaDataFolder): DataFolder {
-    return {
-      id: folder.id,
-      name: folder.name,
-      description: folder.description,
-      parentId: folder.parentId,
-      graphId: folder.graphId,
-      createdAt: folder.createdAt.toISOString(),
-      updatedAt: folder.updatedAt.toISOString(),
-    };
-  }
-
-  private toLinkResponse(link: PrismaNodeDataLink): NodeDataLink {
-    return {
-      id: link.id,
-      nodeId: link.nodeId,
-      assetId: link.assetId,
-      linkType: link.linkType as 'reference' | 'attachment' | 'source',
-      note: link.note,
-      createdAt: link.createdAt.toISOString(),
     };
   }
 }

@@ -1,17 +1,70 @@
 /**
  * Story 9.1: Data Library API Client
  * Fetches data assets from the backend API
+ * Story 9.2: Extended with folder update, batch node assets query
  */
 
 import type {
   DataAssetListResponse,
   DataAssetQueryDto,
   DataAssetFormat,
+  DataAssetWithFolder,
+  DataFolderTreeResponse,
+  DataFolder,
 } from '@cdm/types';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
   'http://localhost:3001').replace(/\/$/, '');
+
+type ParsedApiError = { code?: string; message: string };
+
+function parseMaybeNestedApiError(payload: unknown): ParsedApiError {
+  if (!payload || typeof payload !== 'object') {
+    return { message: '请求失败' };
+  }
+
+  const obj = payload as Record<string, unknown>;
+  const code = typeof obj.code === 'string' ? obj.code : undefined;
+
+  // Nest default often uses { statusCode, message, error }
+  const messageValue = obj.message;
+  if (typeof messageValue === 'string') {
+    return { code, message: messageValue };
+  }
+
+  // message can be an object if HttpException was constructed with an object
+  if (messageValue && typeof messageValue === 'object') {
+    const nested = messageValue as Record<string, unknown>;
+    const nestedCode = typeof nested.code === 'string' ? nested.code : undefined;
+    const nestedMessage =
+      typeof nested.message === 'string' ? nested.message : JSON.stringify(nested);
+
+    return { code: nestedCode ?? code, message: nestedMessage };
+  }
+
+  // message can be an array of strings for validation errors
+  if (Array.isArray(messageValue)) {
+    const items = messageValue.filter((v): v is string => typeof v === 'string');
+    if (items.length > 0) return { code, message: items.join('; ') };
+  }
+
+  // Fallback: stringify payload (best-effort)
+  try {
+    return { code, message: JSON.stringify(payload) };
+  } catch {
+    return { code, message: '请求失败' };
+  }
+}
+
+async function readApiError(response: Response): Promise<ParsedApiError> {
+  try {
+    const payload = await response.json();
+    return parseMaybeNestedApiError(payload);
+  } catch {
+    return { message: `请求失败 (${response.status})` };
+  }
+}
 
 /**
  * Fetch data assets with optional filtering
@@ -49,7 +102,7 @@ export async function fetchDataAssets(
   );
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
+    const error = await readApiError(response);
     throw new Error(error.message || 'Failed to fetch data assets');
   }
 
@@ -67,4 +120,169 @@ export interface FetchDataAssetsOptions {
   tags?: string[];
   page?: number;
   pageSize?: number;
+}
+
+// ========================================
+// Story 9.2: Folder API Functions
+// ========================================
+
+/**
+ * Fetch folder tree for a graph
+ */
+export async function fetchDataFolders(graphId: string): Promise<DataFolderTreeResponse> {
+  const response = await fetch(
+    `${API_BASE}/api/data-assets/folders?graphId=${encodeURIComponent(graphId)}`,
+    {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to fetch folders');
+  }
+
+  return response.json();
+}
+
+/**
+ * Create a new folder
+ */
+export async function createDataFolder(data: {
+  graphId: string;
+  name: string;
+  parentId?: string;
+}): Promise<{ success: boolean; folder: DataFolder }> {
+  const response = await fetch(`${API_BASE}/api/data-assets/folders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to create folder');
+  }
+
+  return response.json();
+}
+
+/**
+ * Update/rename a folder
+ */
+export async function updateDataFolder(data: {
+  id: string;
+  name?: string;
+  description?: string;
+}): Promise<{ success: boolean; folder: DataFolder }> {
+  const { id, ...body } = data;
+  const response = await fetch(
+    `${API_BASE}/api/data-assets/folders:update?filterByTk=${encodeURIComponent(id)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to update folder');
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a folder (must be empty)
+ */
+export async function deleteDataFolder(id: string): Promise<{ success: boolean }> {
+  const response = await fetch(
+    `${API_BASE}/api/data-assets/folders:destroy?filterByTk=${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.code === 'FOLDER_NOT_EMPTY' ? '无法删除非空文件夹' : error.message || 'Failed to delete folder');
+  }
+
+  return response.json();
+}
+
+// ========================================
+// Story 9.2: Asset Update API
+// ========================================
+
+/**
+ * Update a data asset (e.g., move to folder)
+ */
+export async function updateDataAsset(data: {
+  id: string;
+  folderId?: string | null;
+  name?: string;
+}): Promise<{ asset: DataAssetWithFolder }> {
+  const { id, ...body } = data;
+  const response = await fetch(
+    `${API_BASE}/api/data-assets:update?filterByTk=${encodeURIComponent(id)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to update asset');
+  }
+
+  return response.json();
+}
+
+// ========================================
+// Story 9.2: Node-Asset Link API Functions
+// ========================================
+
+/**
+ * Fetch assets linked to a single node
+ */
+export async function fetchNodeAssets(nodeId: string): Promise<{ assets: DataAssetWithFolder[] }> {
+  const response = await fetch(
+    `${API_BASE}/api/data-assets/links?nodeId=${encodeURIComponent(nodeId)}`,
+    {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to fetch node assets');
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetch assets linked to multiple nodes (batch query)
+ * Used for PBS "include sub-nodes" and Task batch asset queries
+ */
+export async function fetchNodeAssetsByNodes(nodeIds: string[]): Promise<{ assets: DataAssetWithFolder[] }> {
+  const response = await fetch(`${API_BASE}/api/data-assets/links:byNodes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nodeIds }),
+  });
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to fetch node assets');
+  }
+
+  return response.json();
 }

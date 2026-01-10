@@ -32,6 +32,8 @@ import {
   UpdateDataAssetDto,
   CreateDataFolderDto,
   CreateNodeDataLinkDto,
+  UpdateDataFolderDto,
+  LinksByNodesDto,
 } from './dto';
 import type {
   DataAssetQueryDto,
@@ -42,6 +44,8 @@ import type {
   CreateNodeDataLinkResponse,
   DataLibrarySuccessResponse,
   DataAssetFormat,
+  DataFolder,
+  DataAssetWithFolder,
 } from '@cdm/types';
 
 @Controller()
@@ -150,7 +154,7 @@ export class DataAssetController {
    */
   @Post('data-assets/folders')
   @HttpCode(HttpStatus.CREATED)
-  async createFolder(@Body() dto: CreateDataFolderDto): Promise<DataLibrarySuccessResponse & { folder: unknown }> {
+  async createFolder(@Body() dto: CreateDataFolderDto): Promise<DataLibrarySuccessResponse & { folder: DataFolder }> {
     const folder = await this.service.createFolder(dto);
     return {
       success: true,
@@ -159,7 +163,23 @@ export class DataAssetController {
   }
 
   /**
+   * Story 9.2: PUT /data-assets/folders:update - Update/rename a folder
+   */
+  @Put('data-assets/folders\\:update')
+  async updateFolder(
+    @Query('filterByTk') id: string,
+    @Body() dto: UpdateDataFolderDto
+  ): Promise<DataLibrarySuccessResponse & { folder: DataFolder }> {
+    const folder = await this.service.updateFolder(id, dto);
+    return {
+      success: true,
+      folder,
+    };
+  }
+
+  /**
    * DELETE /data-assets/folders:destroy - Delete a folder
+   * Story 9.2: Enhanced with non-empty folder validation
    */
   @Delete('data-assets/folders\\:destroy')
   @HttpCode(HttpStatus.OK)
@@ -176,8 +196,19 @@ export class DataAssetController {
    * GET /data-assets/links - Get assets linked to a node
    */
   @Get('data-assets/links')
-  async getLinks(@Query('nodeId') nodeId: string): Promise<{ assets: unknown[] }> {
+  async getLinks(@Query('nodeId') nodeId: string): Promise<{ assets: DataAssetWithFolder[] }> {
     const assets = await this.service.getNodeAssets(nodeId);
+    return { assets };
+  }
+
+  /**
+   * Story 9.2: POST /data-assets/links:byNodes - Get assets linked to multiple nodes (batch)
+   * Used for PBS "include sub-nodes" and Task batch asset queries
+   */
+  @Post('data-assets/links\\:byNodes')
+  @HttpCode(HttpStatus.OK)
+  async getLinksByNodes(@Body() dto: LinksByNodesDto): Promise<{ assets: DataAssetWithFolder[] }> {
+    const assets = await this.service.getNodeAssetsByNodes(dto.nodeIds);
     return { assets };
   }
 

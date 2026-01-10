@@ -1,11 +1,27 @@
 /**
  * Story 9.1: Data Library (数据资源库)
  * Data Asset Repository - Data access layer for data assets
+ * 
+ * GR-2 Compliance: Repository classes extracted to separate files
  */
 
 import { Injectable } from '@nestjs/common';
-import { prisma, type DataAsset, type DataFolder, type NodeDataLink, type Prisma } from '@cdm/database';
+import { prisma, type DataAsset, type DataFolder, type Prisma } from '@cdm/database';
 import type { DataAssetQueryDto, DataAssetFormat } from '@cdm/types';
+
+// Re-export for backward compatibility
+export { DataFolderRepository } from './data-folder.repository';
+export { NodeDataLinkRepository } from './node-data-link.repository';
+
+function parseDateBoundary(value: string, boundary: 'start' | 'end'): Date {
+  // If the input is date-only (YYYY-MM-DD), treat it as UTC day boundary.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const time = boundary === 'start' ? '00:00:00.000' : '23:59:59.999';
+    return new Date(`${value}T${time}Z`);
+  }
+
+  return new Date(value);
+}
 
 @Injectable()
 export class DataAssetRepository {
@@ -91,10 +107,10 @@ export class DataAssetRepository {
     if (createdAfter || createdBefore) {
       where.createdAt = {};
       if (createdAfter) {
-        where.createdAt.gte = new Date(createdAfter);
+        where.createdAt.gte = parseDateBoundary(createdAfter, 'start');
       }
       if (createdBefore) {
-        where.createdAt.lte = new Date(createdBefore);
+        where.createdAt.lte = parseDateBoundary(createdBefore, 'end');
       }
     }
 
@@ -151,138 +167,5 @@ export class DataAssetRepository {
       format: r.format,
       count: r._count.format,
     }));
-  }
-}
-
-@Injectable()
-export class DataFolderRepository {
-  /**
-   * Create a new folder
-   */
-  async create(data: Prisma.DataFolderCreateInput): Promise<DataFolder> {
-    return prisma.dataFolder.create({
-      data,
-    });
-  }
-
-  /**
-   * Find a folder by ID
-   */
-  async findById(id: string): Promise<DataFolder | null> {
-    return prisma.dataFolder.findUnique({
-      where: { id },
-    });
-  }
-
-  /**
-   * Find all folders for a graph (flat list)
-   */
-  async findByGraph(graphId: string): Promise<DataFolder[]> {
-    return prisma.dataFolder.findMany({
-      where: { graphId },
-      orderBy: { name: 'asc' },
-    });
-  }
-
-  /**
-   * Find folders with asset count
-   */
-  async findByGraphWithAssetCount(graphId: string): Promise<(DataFolder & { _count: { assets: number } })[]> {
-    return prisma.dataFolder.findMany({
-      where: { graphId },
-      include: {
-        _count: {
-          select: { assets: true },
-        },
-      },
-      orderBy: { name: 'asc' },
-    });
-  }
-
-  /**
-   * Update a folder
-   */
-  async update(id: string, data: Prisma.DataFolderUpdateInput): Promise<DataFolder> {
-    return prisma.dataFolder.update({
-      where: { id },
-      data,
-    });
-  }
-
-  /**
-   * Delete a folder
-   */
-  async delete(id: string): Promise<DataFolder> {
-    return prisma.dataFolder.delete({
-      where: { id },
-    });
-  }
-}
-
-@Injectable()
-export class NodeDataLinkRepository {
-  /**
-   * Create a link between node and asset
-   */
-  async create(data: Prisma.NodeDataLinkCreateInput): Promise<NodeDataLink> {
-    return prisma.nodeDataLink.create({
-      data,
-    });
-  }
-
-  /**
-   * Find link by node and asset
-   */
-  async findByNodeAndAsset(nodeId: string, assetId: string): Promise<NodeDataLink | null> {
-    return prisma.nodeDataLink.findUnique({
-      where: {
-        nodeId_assetId: { nodeId, assetId },
-      },
-    });
-  }
-
-  /**
-   * Find all links for a node
-   */
-  async findByNode(nodeId: string): Promise<(NodeDataLink & { asset: DataAsset })[]> {
-    return prisma.nodeDataLink.findMany({
-      where: { nodeId },
-      include: { asset: true },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  /**
-   * Find all links for an asset
-   */
-  async findByAsset(assetId: string): Promise<NodeDataLink[]> {
-    return prisma.nodeDataLink.findMany({
-      where: { assetId },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  /**
-   * Delete a link
-   */
-  async delete(id: string): Promise<NodeDataLink> {
-    return prisma.nodeDataLink.delete({
-      where: { id },
-    });
-  }
-
-  /**
-   * Delete link by node and asset
-   */
-  async deleteByNodeAndAsset(nodeId: string, assetId: string): Promise<NodeDataLink | null> {
-    try {
-      return await prisma.nodeDataLink.delete({
-        where: {
-          nodeId_assetId: { nodeId, assetId },
-        },
-      });
-    } catch {
-      return null;
-    }
   }
 }

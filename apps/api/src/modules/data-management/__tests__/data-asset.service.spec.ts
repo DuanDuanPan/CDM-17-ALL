@@ -3,7 +3,7 @@
  * Unit tests for DataAssetService
  */
 
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { DataAssetService } from '../data-asset.service';
 
 describe('DataAssetService', () => {
@@ -20,6 +20,9 @@ describe('DataAssetService', () => {
     create: jest.fn(),
     findById: jest.fn(),
     findByGraphWithAssetCount: jest.fn(),
+    hasAssets: jest.fn(),
+    hasChildren: jest.fn(),
+    update: jest.fn(),
     delete: jest.fn(),
   };
 
@@ -27,6 +30,7 @@ describe('DataAssetService', () => {
     findByNodeAndAsset: jest.fn(),
     create: jest.fn(),
     findByNode: jest.fn(),
+    findByNodeIds: jest.fn(),
     deleteByNodeAndAsset: jest.fn(),
   };
 
@@ -223,5 +227,59 @@ describe('DataAssetService', () => {
     await expect(
       service.unlinkNodeFromAsset('node-1', 'asset-1')
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('getNodeAssetsByNodes: returns deduplicated assets', async () => {
+    const now = new Date('2026-01-01T00:00:00.000Z');
+    const assetA = {
+      id: 'asset-a',
+      name: 'Asset A',
+      description: null,
+      format: 'OTHER',
+      fileSize: null,
+      storagePath: null,
+      thumbnail: null,
+      version: 'v1.0.0',
+      tags: [],
+      graphId: 'graph-1',
+      folderId: null,
+      creatorId: null,
+      secretLevel: 'internal',
+      createdAt: now,
+      updatedAt: now,
+      folder: null,
+    };
+
+    linkRepo.findByNodeIds.mockResolvedValueOnce([
+      { id: 'l1', nodeId: 'n1', assetId: 'asset-a', asset: assetA },
+      { id: 'l2', nodeId: 'n2', assetId: 'asset-a', asset: assetA },
+    ]);
+
+    const result = await service.getNodeAssetsByNodes(['n1', 'n2']);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('asset-a');
+  });
+
+  it('updateFolder: throws BadRequestException when no fields provided', async () => {
+    folderRepo.findById.mockResolvedValueOnce({ id: 'folder-1' });
+
+    await expect(service.updateFolder('folder-1', {} as any)).rejects.toBeInstanceOf(
+      BadRequestException
+    );
+  });
+
+  it('deleteFolder: blocks deleting non-empty folder (assets)', async () => {
+    folderRepo.findById.mockResolvedValueOnce({ id: 'folder-1' });
+    folderRepo.hasAssets.mockResolvedValueOnce(true);
+
+    await expect(service.deleteFolder('folder-1')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('deleteFolder: blocks deleting folder with children', async () => {
+    folderRepo.findById.mockResolvedValueOnce({ id: 'folder-1' });
+    folderRepo.hasAssets.mockResolvedValueOnce(false);
+    folderRepo.hasChildren.mockResolvedValueOnce(true);
+
+    await expect(service.deleteFolder('folder-1')).rejects.toBeInstanceOf(BadRequestException);
   });
 });

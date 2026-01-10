@@ -10,6 +10,13 @@ import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DataLibraryDrawer } from '../components/DataLibraryDrawer';
 
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 // Mock the useDataAssets hook
 vi.mock('../hooks/useDataAssets', () => ({
   useDataAssets: vi.fn(() => ({
@@ -21,6 +28,20 @@ vi.mock('../hooks/useDataAssets', () => ({
     isFetching: false,
     error: null,
     refetch: vi.fn(),
+  })),
+}));
+
+vi.mock('../hooks/useDataFolders', () => ({
+  useDataFolders: vi.fn(() => ({
+    folders: [],
+    isLoading: false,
+    createFolder: vi.fn(),
+    renameFolder: vi.fn(),
+    deleteFolder: vi.fn(),
+    isCreating: false,
+    deleteError: null,
+    moveAsset: vi.fn(),
+    isMovingAsset: false,
   })),
 }));
 

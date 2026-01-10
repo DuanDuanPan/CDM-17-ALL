@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2026-01-10 - Story 9.1 Data Library Drawer: in-progress
+last_updated: 2026-01-10 - Story 9.2 Multi-Dimensional Organization: in-progress
 
 development_status:
   epic-1: done
@@ -86,7 +86,7 @@ development_status:
   3-2-comprehensive-audit-log: backlog
   3-3-secure-version-history: backlog
   3-4-secure-export-share: backlog
-  3-5-performance-optimization: ready-for-dev
+  3-5-performance-optimization: backlog
   3-6-infrastructure-lint-fix: done  # ESLint 9 Flat Config migrated; All 5 packages pass
   epic-3-retrospective: optional
 
@@ -118,4 +118,5 @@ development_status:
 
   epic-9: in-progress
   9-1-data-library-drawer: done  # All tasks complete, Round 2+3 review passed (2026-01-10)
-  9-2-multi-dimensional-organization: ready-for-dev
+  9-2-multi-dimensional-organization: in-progress  # Review fixes applied; pending refactor (2026-01-10)
+  9-3-lightweight-viewer-step-gltf: ready-for-dev  # Story created (2026-01-10)

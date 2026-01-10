@@ -1102,7 +1102,7 @@ So that **无需下载专业软件即可查看设计模型。**
 
 **Given** 数据列表中有 glTF/glb 类型文件
 **When** 双击或点击"预览"
-**Then** 在模态框中显示 Three.js 3D 预览器
+**Then** 在模态框中显示 Online3DViewer 3D 预览器（支持 STEP/IGES/glTF/STL）
 **And** 支持鼠标旋转/滚轮缩放/右键平移
 **And** 支持线框/实体/带边线渲染模式切换
 **And** 显示模型结构树（如有）

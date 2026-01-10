@@ -4,6 +4,7 @@
  * Story 9.1: Asset List Component
  * Displays data assets in a list/table layout
  * AC#3: List view for data assets
+ * Story 9.2: Added draggable support for folder organization
  */
 
 import {
@@ -22,6 +23,8 @@ import { formatFileSize } from '../utils/formatFileSize';
 interface AssetListProps {
   assets: DataAssetWithFolder[];
   onAssetClick?: (asset: DataAssetWithFolder) => void;
+  /** Story 9.2: Enable drag for folder organization */
+  draggable?: boolean;
 }
 
 /**
@@ -88,8 +91,14 @@ function getFormatColor(assetFormat: DataAssetFormat): string {
 
 /**
  * Asset List Component
+ * Story 9.2: Added draggable support for folder organization
  */
-export function AssetList({ assets, onAssetClick }: AssetListProps) {
+export function AssetList({ assets, onAssetClick, draggable = false }: AssetListProps) {
+  const handleDragStart = (e: React.DragEvent, assetId: string) => {
+    e.dataTransfer.setData('text/plain', assetId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
   return (
     <div data-testid="asset-list" className="space-y-1">
       {/* Header */}
@@ -115,6 +124,8 @@ export function AssetList({ assets, onAssetClick }: AssetListProps) {
                      hover:border-blue-300 dark:hover:border-blue-600
                      hover:shadow-md transition-all cursor-pointer"
             onClick={() => onAssetClick?.(asset)}
+            draggable={draggable}
+            onDragStart={draggable ? (e) => handleDragStart(e, asset.id) : undefined}
           >
             {/* Name Column */}
             <div className="col-span-5 flex items-center gap-3 min-w-0">
