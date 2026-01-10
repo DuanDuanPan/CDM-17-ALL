@@ -98,3 +98,6 @@ export * from './subscription-types';
 
 // Story 5.1: Export template library types
 export * from './template-types';
+
+// Story 9.1: Export data library types for data assets
+export * from './data-library-types';

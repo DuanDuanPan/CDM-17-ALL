@@ -23,6 +23,7 @@ import { ProductLibraryModule } from './modules/product-library'; // Story 2.7
 import { KnowledgeLibraryModule } from './modules/knowledge-library'; // Story 2.8
 import { FileModule } from './modules/file/file.module'; // Story 4.1: FIX-11
 import { SubscriptionModule } from './modules/subscriptions/subscriptions.module'; // Story 4.4: Watch & Subscription
+import { DataManagementModule } from './modules/data-management'; // Story 9.1: Data Library
 import { PluginKernelModule } from './modules/plugin-kernel/plugin-kernel.module';
 
 @Module({
@@ -37,6 +38,7 @@ import { PluginKernelModule } from './modules/plugin-kernel/plugin-kernel.module
     KnowledgeLibraryModule, // Story 2.8: Mock knowledge library for Task nodes
     FileModule, // Story 4.1: FIX-11 - File upload for deliverables
     SubscriptionModule, // Story 4.4: Watch & Subscription
+    DataManagementModule, // Story 9.1: Data Library
 
     // Story 7.5: Kernel → plugin infrastructure contracts (global)
     PluginKernelModule,

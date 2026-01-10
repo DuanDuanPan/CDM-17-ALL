@@ -169,7 +169,6 @@ export function useOutlineData({
         return roots
             .map((r) => buildTree(r.id, 0, visited))
             .filter((n): n is OutlineNode => n !== null);
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- version is used to trigger refresh
     }, [graph, isReady, version, getRootNodes, buildTree]);
 
     // ═══════════════════════════════════════════════

@@ -113,6 +113,7 @@ FR23: Epic 1 - 快速上手与指引
 FR24: Epic 3 - 安全分享闭环
 FR28: Epic 2 - 多选与剪贴板操作
 FR25: Epic 8 - 大规模图谱体验优化
+FR29: Epic 9 - 数据管理与工业格式预览
 
 ## Epic List
 
@@ -150,6 +151,11 @@ FR25: Epic 8 - 大规模图谱体验优化
 针对 500-5000+ 节点场景，提供高效的导航、组织和聚焦能力，确保复杂图谱"不迷路、不卡顿、好管理"。
 **FRs covered:** FR1 (增强), FR8 (增强), FR18 (增强), FR25
 **Core Value:** 用户在处理企业级复杂图谱时仍能保持高效和专注。
+
+### Epic 9: 数据管理与工业格式预览 (Data Management & Industrial Format Preview)
+构建独立的数据资源库，自动汇聚图中过程数据，支持 PBS/任务/文件夹 三种组织形式，实现 STEP/网格/云图 工业格式的轻量化在线预览。
+**FRs covered:** FR17 (增强), FR29
+**Core Value:** 用户能够集中管理和预览项目中的所有过程数据，无需下载和使用专业软件。
 
 ---
 
@@ -1044,3 +1050,116 @@ So that **我无需手动管理，画布自动保持整洁。**
 **Then** 之前的分支应折叠，新分支自动展开
 **And** 用户可配置自动折叠的距离阈值
 **And** 智能折叠可通过开关禁用
+
+
+## Epic 9: 数据管理与工业格式预览 (Data Management & Industrial Format Preview)
+
+**目标**: 构建独立的数据资源库，自动汇聚图中过程数据，支持 PBS/任务/文件夹 三种组织形式，实现 STEP/网格/云图 工业格式的轻量化在线预览。
+
+### Story 9.1: 数据资源库 Drawer (Data Library Drawer)
+
+As a **用户**,
+I want **通过最大化浮动抽屉访问数据资源库**,
+So that **我可以在不离开脑图画布的情况下高效浏览所有数据资产。**
+
+**Acceptance Criteria:**
+
+**Given** 脑图画布处于活动状态
+**When** 点击工具栏"数据库"图标或按 `Cmd/Ctrl + D`
+**Then** 应从右侧滑出数据资源库 Drawer
+**And** Drawer 宽度应为视口的 60-70%（最大化展示）
+**And** 支持拖拽边缘调整宽度
+**When** 点击 Drawer 外部或关闭按钮或按 `ESC`
+**Then** Drawer 应平滑收起
+**And** 支持网格/列表视图切换
+**And** 支持按名称/类型/时间搜索过滤
+
+### Story 9.2: 多维度组织视图 (Multi-Dimensional Organization)
+
+As a **用户**,
+I want **在 PBS / 任务 / 文件夹 三种视图中组织数据资产**,
+So that **我能按照最适合当前工作的方式查找数据。**
+
+**Acceptance Criteria:**
+
+**Given** 数据资源库 Drawer 已打开
+**When** 点击 "PBS 视图" Tab
+**Then** 左侧显示 PBS 树结构，右侧显示选中节点关联的数据
+**When** 点击 "任务视图" Tab
+**Then** 按任务状态分组显示，每个任务下列出其交付物
+**When** 点击 "文件夹视图" Tab
+**Then** 显示用户自建的虚拟文件夹结构
+**And** 支持创建/重命名/删除文件夹
+**And** 数据资产可拖拽到文件夹
+
+### Story 9.3: 轻量化预览器 - STEP/glTF (Lightweight Viewer - STEP)
+
+As a **工程师**,
+I want **在浏览器中预览 3D 模型**,
+So that **无需下载专业软件即可查看设计模型。**
+
+**Acceptance Criteria:**
+
+**Given** 数据列表中有 glTF/glb 类型文件
+**When** 双击或点击"预览"
+**Then** 在模态框中显示 Three.js 3D 预览器
+**And** 支持鼠标旋转/滚轮缩放/右键平移
+**And** 支持线框/实体/带边线渲染模式切换
+**And** 显示模型结构树（如有）
+
+### Story 9.4: 轻量化预览器 - 网格与云图 (Lightweight Viewer - Mesh & Contour)
+
+As a **仿真工程师**,
+I want **预览网格模型和仿真云图结果**,
+So that **快速检查仿真数据无需启动重型软件。**
+
+**Acceptance Criteria:**
+
+**Given** 数据列表中有网格文件（STL/OBJ）
+**When** 双击预览
+**Then** 显示网格预览，支持线框/实体切换
+**Given** 数据列表中有云图文件（VTK/json 标量场）
+**When** 双击预览
+**Then** 显示带颜色映射的云图
+**And** 支持切换色标（Rainbow, Jet, Coolwarm）
+**And** 支持调整色标范围
+
+### Story 9.5: 数据上传与节点关联 (Data Upload & Node Linking)
+
+As a **用户**,
+I want **上传数据资产并关联到脑图节点**,
+So that **建立数据与工作项之间的追溯关系。**
+
+**Acceptance Criteria:**
+
+**Given** 数据资源库 Drawer 已打开
+**When** 点击"上传"并选择文件
+**Then** 文件上传到服务器，自动识别格式类型
+**Given** 选中一个数据资产
+**When** 点击"关联到节点"
+**Then** 可选择任务节点或数据节点进行关联
+**And** 关联类型可选：输入/输出/参考
+**Given** 脑图中选中任务/数据节点
+**When** 查看节点详情面板
+**Then** 显示关联的数据资产列表，支持快速预览
+
+### Story 9.6: 过程数据自动汇聚 (Process Data Auto-Aggregation)
+
+As a **项目经理**,
+I want **图中产生的过程数据自动汇聚到数据资源库**,
+So that **无需手动整理，所有数据资产统一可见。**
+
+**Acceptance Criteria:**
+
+**Given** 用户在任务节点上传了交付物附件
+**When** 上传完成后
+**Then** 该附件自动出现在数据资源库中
+**And** 自动建立与该任务节点的关联（类型=OUTPUT）
+**Given** 用户创建了数据节点并上传了文件
+**When** 上传完成后
+**Then** 该文件自动汇聚到数据资源库
+**And** 在 PBS 视图中按所属 PBS 节点自动归类
+**Given** 数据资源库 Drawer 打开
+**When** 查看数据来源
+**Then** 每个资产应显示来源标签（来自任务/来自数据节点/手动上传）
+**And** 点击来源可跳转定位到脑图中的源节点

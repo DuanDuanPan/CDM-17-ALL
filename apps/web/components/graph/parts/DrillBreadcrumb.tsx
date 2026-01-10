@@ -85,11 +85,11 @@ export function DrillBreadcrumb({
     // Overflow: collapse middle items into "..." when path > 4 (Task 3.1.7)
     const tokens = useMemo((): BreadcrumbToken[] => {
         if (breadcrumbItems.length <= 4) {
-            return breadcrumbItems.map((item) => ({ kind: 'item', item }));
+            return breadcrumbItems.map((item) => ({ kind: 'item' as const, item }));
         }
         const first = breadcrumbItems[0];
         const lastTwo = breadcrumbItems.slice(-2);
-        return [{ kind: 'item', item: first }, { kind: 'ellipsis' }, ...lastTwo.map((item) => ({ kind: 'item', item }))];
+        return [{ kind: 'item' as const, item: first }, { kind: 'ellipsis' as const }, ...lastTwo.map((item) => ({ kind: 'item' as const, item }))];
     }, [breadcrumbItems]);
 
     // Don't render if not in drill mode

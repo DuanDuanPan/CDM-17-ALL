@@ -73,6 +73,10 @@ model Graph {
 
   nodes    Node[]
   edges    Edge[]
+
+  // Story 9.1: Data Library
+  dataFolders DataFolder[]
+  dataAssets  DataAsset[]
   
   // Story 4.3: Contextual Comments
   comments Comment[]
@@ -123,6 +127,9 @@ model Node {
 
   // Story 4.4: Watch & Subscription
   subscriptions Subscription[]
+
+  // Story 9.1: Data Library - Node to DataAsset links
+  dataLinks     NodeDataLink[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -412,3 +419,101 @@ model TemplateUsageLog {
   @@index([userId])
 }
 
+// ========================================
+// Story 9.1: Data Library (数据资源库)
+// ========================================
+
+// Data Asset Format Enum - defines supported file formats
+enum DataAssetFormat {
+  STEP       // 3D CAD format (.step, .stp)
+  IGES       // CAD format (.iges, .igs)
+  STL        // 3D printing format
+  OBJ        // 3D object format
+  FBX        // 3D interchange format
+  GLTF       // GL Transmission Format
+  PDF        // Document format
+  DOCX       // Word document
+  XLSX       // Excel spreadsheet
+  JSON       // Data format
+  XML        // Markup format
+  CSV        // Comma-separated values
+  IMAGE      // Image files (png, jpg, svg)
+  VIDEO      // Video files (mp4, mov)
+  OTHER      // Other formats
+}
+
+// Data Folder - hierarchical folder structure for organizing assets
+model DataFolder {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  parentId    String?  // Null means root folder
+  graphId     String
+  graph       Graph    @relation(fields: [graphId], references: [id], onDelete: Cascade)
+
+  parent      DataFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
+  children    DataFolder[] @relation("FolderHierarchy")
+
+  assets      DataAsset[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([graphId])
+  @@index([parentId])
+}
+
+// Data Asset - individual data files/resources in the library
+model DataAsset {
+  id          String          @id @default(cuid())
+  name        String
+  description String?         @db.Text
+  format      DataAssetFormat @default(OTHER)
+  fileSize    Int?            // Size in bytes
+  storagePath String?         // Storage path or URL
+  thumbnail   String?         // Thumbnail image path/URL
+  version     String          @default("v1.0.0")
+  tags        String[]        @default([])
+
+  // Ownership and organization
+  graphId     String
+  graph       Graph           @relation(fields: [graphId], references: [id], onDelete: Cascade)
+  folderId    String?         // Null means in root
+  folder      DataFolder?     @relation(fields: [folderId], references: [id])
+  creatorId   String?         // User who created/uploaded
+
+  // Classification
+  secretLevel String          @default("internal") // public, internal, confidential, secret
+
+  // Links to nodes
+  nodeLinks   NodeDataLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([graphId])
+  @@index([folderId])
+  @@index([format])
+  @@index([tags])
+  @@index([name])
+}
+
+// NodeDataLink - links between nodes and data assets (many-to-many)
+model NodeDataLink {
+  id        String   @id @default(cuid())
+  nodeId    String
+  assetId   String
+
+  node      Node      @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  asset     DataAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  // Link metadata
+  linkType  String    @default("reference") // reference, attachment, source
+  note      String?   // Optional note about the link
+
+  createdAt DateTime @default(now())
+
+  @@unique([nodeId, assetId]) // Prevent duplicate links
+  @@index([nodeId])
+  @@index([assetId])
+}

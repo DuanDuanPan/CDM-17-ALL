@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Archive, Menu, Search, Share2, Settings } from 'lucide-react';
+import { Archive, Menu, Search, Share2, Settings, Database } from 'lucide-react';
 import { LayoutSwitcher } from '../toolbar/LayoutSwitcher';
 import { ViewSwitcher } from '@/features/views';
 import { ActiveUsersAvatarStack } from '../collab/ActiveUsersAvatarStack';
@@ -15,6 +15,8 @@ import { MAX_VISIBLE_AVATARS } from '@/lib/constants';
 import { useNotifications } from '@/hooks/useNotifications';
 import { GlobalSearchDialog } from '@/components/CommandPalette/GlobalSearchDialog';
 import { ArchiveDrawer } from '@/components/ArchiveBox/ArchiveDrawer';
+// Story 9.1: Data Library Drawer
+import { DataLibraryDrawer } from '@/features/data-library';
 
 export interface TopBarProps {
   userId?: string; // Story 2.4: Current user ID for notifications
@@ -48,6 +50,8 @@ export function TopBar({
   onViewModeChange,
 }: TopBarProps) {
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  // Story 9.1: Data Library Drawer state
+  const [isDataLibraryOpen, setIsDataLibraryOpen] = useState(false);
 
   // Story 1.4 MED-12: Get collaboration state from context (optional for standalone usage)
   const collabContext = useCollaborationUIOptional();
@@ -109,6 +113,40 @@ export function TopBar({
     [navigateToNode]
   );
 
+  // Story 9.1: Keyboard shortcut Cmd/Ctrl + D to open Data Library
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isE2E =
+        typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('e2e') === '1';
+
+      const target = e.target;
+      const isEditableTarget =
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT');
+
+      if (isEditableTarget) return;
+
+      // E2E helper shortcut: Alt + D (avoids browser-reserved Cmd/Ctrl+D behavior)
+      if (isE2E && e.altKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        setIsDataLibraryOpen(true);
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault(); // Prevent browser bookmark
+        setIsDataLibraryOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <header className="h-12 border-b border-gray-200/50 bg-white/70 backdrop-blur-md flex items-center justify-between px-4 relative z-10">
       {/* Left section */}
@@ -150,6 +188,12 @@ export function TopBar({
           graphId={graphContext?.graphId || undefined}
           onRestore={handleArchiveRestore}
         />
+        {/* Story 9.1: Data Library Drawer */}
+        <DataLibraryDrawer
+          isOpen={isDataLibraryOpen}
+          onClose={() => setIsDataLibraryOpen(false)}
+          graphId={graphContext?.graphId || ''}
+        />
 
         {/* Active Users Avatar Stack (Story 1.4) - Now from Context */}
         {remoteUsers.length > 0 && (
@@ -181,6 +225,15 @@ export function TopBar({
             aria-label="归档箱"
           >
             <Archive className="w-4 h-4 text-gray-600" />
+          </button>
+          {/* Story 9.1: Data Library Button */}
+          <button
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            onClick={() => setIsDataLibraryOpen(true)}
+            aria-label="数据资源库 (Cmd/Ctrl+D)"
+            title="数据资源库"
+          >
+            <Database className="w-4 h-4 text-gray-600" />
           </button>
           {/* Story 2.4: Notification Bell */}
           <NotificationBell

@@ -580,7 +580,21 @@ cdm-17-gemini/
     │   ├── client/             # UI Components (Registry targets)
     │   ├── server/             # Backend Services
     │   └── manifest.json
-    └── workflow-approval/
+    ├── workflow-approval/
+    ├── data-management/        # [NEW] Data Resource Library
+    │   ├── client/
+    │   │   ├── DataLibraryDrawer.tsx
+    │   │   ├── AssetCard.tsx
+    │   │   └── hooks/useDataAssets.ts
+    │   ├── server/
+    │   │   ├── data-asset.service.ts
+    │   │   └── data-asset.repository.ts
+    │   └── manifest.json
+    └── industrial-viewer/      # [NEW] CAD/CAE Lightweight Preview
+        ├── client/
+        │   ├── ModelViewer.tsx       # Three.js glTF/STL
+        │   └── ContourViewer.tsx     # Scalar field visualization
+        └── manifest.json
 ```
 
 ### Architectural Boundaries
@@ -694,3 +708,150 @@ npx create-turbo@latest cdm-17-gemini
 *   **Unit:** Service tests MUST mock Repository (never hit DB).
 *   **E2E:** `test/app.e2e-spec.ts` hits real Dockerized DB (spin up/down per suite).
 *   **FactoryBot:** Use factories for generating complex test data fixtures.
+
+## Data Management & Industrial Format Preview (Epic 9)
+
+> 新增模块：数据资源库 + 工业格式轻量化预览
+
+### 1. 模块概述
+
+**目标**: 构建独立的数据资源库，自动汇聚图中过程数据，支持 PBS/任务/文件夹三种组织形式，实现 STEP/网格/云图工业格式的轻量化在线预览。
+
+**设计决策**:
+
+| 决策项 | 选择 | 理由 |
+|--------|------|------|
+| **UI 入口** | 浮动 Drawer (60-70%宽度) | 最大化展示，不占用固定空间 |
+| **快捷键** | `Cmd/Ctrl + D` | 与现有快捷键体系一致 |
+| **存储策略** | 复用现有附件存储 | 减少架构复杂度 |
+| **轻量化策略** | 直接上传 glTF/STL/VTK | 无需服务端转换，MVP 阶段简化 |
+| **权限模型** | MVP 暂忽略 | 后续版本对接密级体系 |
+
+### 2. 数据模型
+
+```prisma
+// packages/database/schema.prisma (新增)
+
+model DataAsset {
+  id            String    @id @default(uuid())
+  name          String
+  format        DataFormat
+  mimeType      String
+  size          Int       // 文件大小 (bytes)
+  path          String    // 相对存储路径
+  thumbnailUrl  String?
+  previewUrl    String?
+  metadata      Json?
+  sourceType    DataSourceType  @default(MANUAL)
+  sourceNodeId  String?
+  folderId      String?
+  folder        DataFolder?     @relation(fields: [folderId], references: [id])
+  links         NodeDataLink[]
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([format])
+  @@index([sourceNodeId])
+}
+
+model DataFolder {
+  id        String    @id @default(uuid())
+  name      String
+  parentId  String?
+  parent    DataFolder?  @relation("FolderTree", fields: [parentId], references: [id])
+  children  DataFolder[] @relation("FolderTree")
+  assets    DataAsset[]
+  graphId   String
+  createdAt DateTime  @default(now())
+}
+
+model NodeDataLink {
+  id        String    @id @default(uuid())
+  nodeId    String
+  assetId   String
+  asset     DataAsset @relation(fields: [assetId], references: [id])
+  linkType  LinkType  @default(REFERENCE)
+  createdAt DateTime  @default(now())
+  
+  @@unique([nodeId, assetId])
+}
+
+enum DataFormat { STEP, MESH, CONTOUR, DOCUMENT, OTHER }
+enum DataSourceType { MANUAL, TASK_OUTPUT, DATA_NODE }
+enum LinkType { INPUT, OUTPUT, REFERENCE }
+```
+
+### 3. API 设计
+
+```bash
+# 数据资产
+GET    /api/data-assets                      # 列表
+POST   /api/data-assets:upload               # 上传
+GET    /api/data-assets:get?filterByTk=:id   # 获取单个
+DELETE /api/data-assets:destroy?filterByTk=:id
+
+# 节点关联
+POST   /api/data-assets/:id/links            # 创建关联
+GET    /api/nodes/:nodeId/data-assets        # 节点关联资产
+
+# 文件夹
+GET    /api/data-folders                     # 文件夹树
+POST   /api/data-folders                     # 创建
+DELETE /api/data-folders:destroy             # 删除
+
+# 组织视图
+GET    /api/data-assets:byPbs?graphId=:id    # PBS 视图
+GET    /api/data-assets:byTask?graphId=:id   # 任务视图
+```
+
+### 4. 前端组件架构
+
+```text
+apps/web/src/features/data-library/
+├── components/
+│   ├── DataLibraryDrawer.tsx
+│   ├── AssetGrid.tsx / AssetList.tsx
+│   ├── AssetCard.tsx
+│   ├── OrganizationTabs.tsx
+│   └── UploadButton.tsx
+├── hooks/
+│   ├── useDataAssets.ts
+│   └── useDataFolders.ts
+└── index.ts
+
+apps/web/src/features/industrial-viewer/
+├── components/
+│   ├── ModelViewer.tsx       # Three.js glTF/STL
+│   ├── ContourViewer.tsx     # 云图
+│   └── ViewerToolbar.tsx
+├── hooks/
+│   ├── useThreeScene.ts
+│   └── useGltfLoader.ts
+└── index.ts
+```
+
+### 5. 过程数据自动汇聚
+
+```typescript
+// 事件驱动架构
+@OnEvent('task.deliverable.uploaded')
+async onDeliverableUploaded(payload: { nodeId: string; attachment: Attachment }) {
+  await dataAssetService.createFromAttachment({
+    attachment: payload.attachment,
+    sourceType: 'TASK_OUTPUT',
+    sourceNodeId: payload.nodeId,
+    linkType: 'OUTPUT',
+  });
+}
+```
+
+### 6. Mock 数据（卫星领域）
+
+| 名称 | 类型 | 阶段 |
+|------|------|------|
+| 卫星总体结构 | STEP | 详细设计 |
+| 帆板展开机构 | STEP | 详细设计 |
+| 帆板网格模型 | MESH | 仿真验证 |
+| 热控系统温度场 | CONTOUR | 仿真验证 |
+| 结构应力分析 | CONTOUR | 仿真验证 |
