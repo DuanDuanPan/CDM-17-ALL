@@ -115,7 +115,7 @@ export function ModelViewerModal({
         <div className="flex-1 flex overflow-hidden">
           {/* Structure Tree Panel */}
           {isTreePanelOpen && (
-            <div className="w-64 border-r border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col">
+            <div className="w-64 shrink-0 border-r border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col">
               <div className="p-2 border-b border-gray-100 dark:border-gray-800">
                 <span className="text-xs font-medium text-gray-500 uppercase">
                   模型结构
@@ -131,7 +131,7 @@ export function ModelViewerModal({
           )}
 
           {/* 3D Viewer */}
-          <div className="flex-1 relative">
+          <div className="flex-1 min-w-0 relative">
             <ModelViewer
               assetUrl={assetUrl}
               onModelLoaded={setModel}

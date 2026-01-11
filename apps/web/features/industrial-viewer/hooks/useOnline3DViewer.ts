@@ -35,6 +35,10 @@ export function useOnline3DViewer(
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<EmbeddedViewer | null>(null);
+  // Dedicated host element per viewer instance.
+  // Prevents touching the container's children directly while Online3DViewer is mid-load
+  // (it inserts/removes a progress div internally).
+  const viewerHostRef = useRef<HTMLDivElement | null>(null);
   // PMREM render target (from three) tied to the viewer's WebGL context
   const environmentRenderTargetRef = useRef<unknown>(null);
 
@@ -65,6 +69,11 @@ export function useOnline3DViewer(
         ovModule = OV;
         console.log('[UseOnline3DViewer] OV module imported');
 
+        if (destroyedRef.current) {
+          console.log('[UseOnline3DViewer] Component destroyed, aborting init');
+          return;
+        }
+
         // Pre-load external library if needed for this format (offline support)
         const fileExtension = modelUrl.split('.').pop()?.toLowerCase() || '';
         const requiredLibrary = getRequiredLibraryForFormat(fileExtension);
@@ -90,6 +99,15 @@ export function useOnline3DViewer(
           viewerRef.current = null;
         }
 
+        // Remove the previous host element (if still mounted).
+        // Do NOT call replaceChildren() on the host/container; Online3DViewer may still attempt to
+        // remove its internally-inserted progress div when async loads finish.
+        const previousHost = viewerHostRef.current;
+        if (previousHost && previousHost.parentElement === container) {
+          container.removeChild(previousHost);
+        }
+        viewerHostRef.current = null;
+
         // Dispose previously generated environment map (if any)
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,9 +117,14 @@ export function useOnline3DViewer(
         }
         environmentRenderTargetRef.current = null;
 
-        // Clear container children (EmbeddedViewer doesn't remove its canvas on Destroy)
-        // This prevents multiple canvases from accumulating when re-initializing.
-        container.replaceChildren();
+        // Create a dedicated host element for this viewer instance.
+        // EmbeddedViewer appends a canvas (and temporarily a progress div) to its parentElement.
+        const host = document.createElement('div');
+        host.style.width = '100%';
+        host.style.height = '100%';
+        host.className = 'w-full h-full';
+        container.appendChild(host);
+        viewerHostRef.current = host;
 
         // Ensure URL is absolute if relative
         const absoluteUrl = modelUrl.startsWith('http')
@@ -112,7 +135,7 @@ export function useOnline3DViewer(
         // Note: callbacks must be passed to constructor, not LoadModelFromUrlList
         console.log('[UseOnline3DViewer] Creating new EmbeddedViewer');
         const bgColor = backgroundColor ?? { r: 245, g: 245, b: 245, a: 255 };
-        const viewer = new OV.EmbeddedViewer(container, {
+        const viewer = new OV.EmbeddedViewer(host, {
           backgroundColor: new OV.RGBAColor(
             bgColor.r,
             bgColor.g,
@@ -238,8 +261,14 @@ export function useOnline3DViewer(
         viewerRef.current.Destroy();
         viewerRef.current = null;
       }
-      // Remove any canvases/progress divs inserted by EmbeddedViewer
-      container.replaceChildren();
+
+      // Remove the current host element (if still mounted). Removing the host is safe because it keeps
+      // Online3DViewer's internal progress div attached to the host until it removes it.
+      const currentHost = viewerHostRef.current;
+      if (currentHost && currentHost.parentElement === container) {
+        container.removeChild(currentHost);
+      }
+      viewerHostRef.current = null;
     };
   }, [modelUrl, backgroundColor]);
 
