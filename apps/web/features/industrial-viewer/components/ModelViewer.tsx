@@ -5,6 +5,7 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { Button, cn } from '@cdm/ui';
 import { useOnline3DViewer } from '../hooks/useOnline3DViewer';
 import type { Model } from 'online-3d-viewer';
+import type { RenderMode } from '../hooks/useOnline3DViewer';
 
 export interface ModelViewerProps {
   assetUrl: string;
@@ -21,6 +22,10 @@ export interface ModelViewerControls {
   highlightNode: (nodeId: number) => void;
   clearHighlight: () => void;
   edgesEnabled: boolean;
+  /** Story 9.4 AC#2 */
+  renderMode: RenderMode;
+  /** Story 9.4 AC#2 */
+  toggleRenderMode: () => void;
 }
 
 export function ModelViewer({
@@ -41,6 +46,8 @@ export function ModelViewer({
     resetView,
     highlightNode,
     clearHighlight,
+    renderMode,
+    toggleRenderMode,
   } = useOnline3DViewer({
     modelUrl: assetUrl,
     showEdges,
@@ -69,6 +76,8 @@ export function ModelViewer({
         highlightNode,
         clearHighlight,
         edgesEnabled,
+        renderMode,
+        toggleRenderMode,
       });
     }
   }, [
@@ -80,6 +89,8 @@ export function ModelViewer({
     highlightNode,
     clearHighlight,
     edgesEnabled,
+    renderMode,
+    toggleRenderMode,
   ]);
 
   const handleRetry = () => {

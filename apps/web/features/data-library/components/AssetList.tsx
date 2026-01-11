@@ -23,6 +23,7 @@ import {
 import { cn } from '@cdm/ui';
 import type { DataAssetWithFolder, DataAssetFormat } from '@cdm/types';
 import { format } from 'date-fns';
+import { getAssetPreviewType } from '../hooks/useAssetPreview';
 import { formatFileSize } from '../utils/formatFileSize';
 import type { AssetDragData } from './dnd';
 
@@ -33,23 +34,6 @@ interface AssetListProps {
   onAssetPreview?: (asset: DataAssetWithFolder) => void;
   /** Story 9.2: Enable drag for folder organization */
   draggable?: boolean;
-}
-
-/** 3D formats that support preview */
-const PREVIEWABLE_3D_FORMATS: DataAssetFormat[] = [
-  'STEP',
-  'IGES',
-  'GLTF',
-  'STL',
-  'OBJ',
-  'FBX',
-];
-
-/**
- * Check if format supports 3D preview
- */
-function isPreviewable(assetFormat: DataAssetFormat): boolean {
-  return PREVIEWABLE_3D_FORMATS.includes(assetFormat);
 }
 
 /**
@@ -128,7 +112,7 @@ const AssetListRowInner = forwardRef<HTMLDivElement, AssetListRowInnerProps & Re
   function AssetListRowInner({ asset, onClick, onPreview, isDragging, className, style, ...props }, ref) {
     const Icon = getFormatIcon(asset.format);
     const colorClass = getFormatColor(asset.format);
-    const canPreview = isPreviewable(asset.format) && !!onPreview;
+    const canPreview = getAssetPreviewType(asset) !== null && !!asset.storagePath && !!onPreview;
 
     const handlePreviewClick = (e: React.MouseEvent) => {
       e.stopPropagation();

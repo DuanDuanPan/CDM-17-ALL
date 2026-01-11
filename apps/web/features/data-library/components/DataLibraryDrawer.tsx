@@ -10,6 +10,8 @@
  * AC#1-3: PBS, Task, and Folder organization views
  * AC#4: Drag-drop assets to folders
  * AC#5: State persistence
+ *
+ * Story 9.4: Contour viewer integration
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -25,12 +27,20 @@ import { usePbsNodes } from '../hooks/usePbsNodes';
 import { usePbsAssets } from '../hooks/usePbsAssets';
 import { useTaskAssets } from '../hooks/useTaskAssets';
 import { useDataFolders } from '../hooks/useDataFolders';
-import type { DataAssetFormat, DataAssetWithFolder, TaskStatus } from '@cdm/types';
+import { useAssetPreview } from '../hooks/useAssetPreview';
+import { useDataLibraryDrawerOrgState } from '../hooks/useDataLibraryDrawerOrgState';
+import type { DataAssetFormat } from '@cdm/types';
 import type { ViewMode } from './data-library-drawer/types';
 
 // Story 9.3: Lazy load ModelViewerModal to avoid SSR issues with Online3DViewer
 const ModelViewerModal = dynamic(
   () => import('@/features/industrial-viewer').then((mod) => mod.ModelViewerModal),
+  { ssr: false }
+);
+
+// Story 9.4: Lazy load ContourViewerModal for VTK.js
+const ContourViewerModal = dynamic(
+  () => import('@/features/industrial-viewer').then((mod) => mod.ContourViewerModal),
   { ssr: false }
 );
 
@@ -65,48 +75,25 @@ export function DataLibraryDrawer({
   const [orgView, setOrgView] = useOrganizationView(graphId);
   const [showOrgPanel, setShowOrgPanel] = useState(true);
 
-  // Story 9.2: Selection state for each organization view
-  const [selectedPbsId, setSelectedPbsId] = useState<string | null>(null);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [pbsIncludeSubNodes, setPbsIncludeSubNodes] = useState(false);
+  const {
+    selectedPbsId,
+    setSelectedPbsId,
+    selectedTaskId,
+    setSelectedTaskId,
+    selectedFolderId,
+    setSelectedFolderId,
+    pbsIncludeSubNodes,
+    setPbsIncludeSubNodes,
+    pbsExpandedIds,
+    togglePbsExpand,
+    taskExpandedGroups,
+    toggleTaskGroup,
+    folderExpandedIds,
+    toggleFolderExpand,
+  } = useDataLibraryDrawerOrgState();
 
-  // Story 9.2: Expanded state for each organization view (AC#5)
-  const [pbsExpandedIds, setPbsExpandedIds] = useState<Set<string>>(new Set());
-  const [taskExpandedGroups, setTaskExpandedGroups] = useState<Set<TaskStatus>>(
-    new Set(['todo', 'in-progress', 'done'])
-  );
-  const [folderExpandedIds, setFolderExpandedIds] = useState<Set<string>>(new Set());
-
-  // Story 9.3: Preview state for 3D models
-  const [previewAsset, setPreviewAsset] = useState<DataAssetWithFolder | null>(null);
-
-  const togglePbsExpand = useCallback((nodeId: string) => {
-    setPbsExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(nodeId)) next.delete(nodeId);
-      else next.add(nodeId);
-      return next;
-    });
-  }, []);
-
-  const toggleTaskGroup = useCallback((status: TaskStatus) => {
-    setTaskExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(status)) next.delete(status);
-      else next.add(status);
-      return next;
-    });
-  }, []);
-
-  const toggleFolderExpand = useCallback((folderId: string) => {
-    setFolderExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(folderId)) next.delete(folderId);
-      else next.add(folderId);
-      return next;
-    });
-  }, []);
+  // Story 9.4: Preview state using useAssetPreview hook
+  const { previewAsset, previewType, handleAssetPreview, handleClosePreview } = useAssetPreview();
 
   // Story 9.2: PBS nodes hook for descendant IDs
   const { getDescendantIds } = usePbsNodes();
@@ -190,15 +177,6 @@ export function DataLibraryDrawer({
     [moveAsset, refetch]
   );
 
-  // Story 9.3: Handle asset preview
-  const handleAssetPreview = useCallback((asset: DataAssetWithFolder) => {
-    setPreviewAsset(asset);
-  }, []);
-
-  const handleClosePreview = useCallback(() => {
-    setPreviewAsset(null);
-  }, []);
-
   // Story 9.2: Check if assets are loading from organization hooks
   const orgAssetsLoading = Boolean(
     (orgView === 'pbs' && selectedPbsId && pbsAssetsLoading) ||
@@ -220,15 +198,11 @@ export function DataLibraryDrawer({
         : refetch;
 
   // Mount effect for portal
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => setMounted(true), []);
 
   // Refetch on open
   useEffect(() => {
-    if (isOpen) {
-      refetch();
-    }
+    if (isOpen) refetch();
   }, [isOpen, refetch]);
 
   // AC#2: ESC key to close
@@ -248,71 +222,76 @@ export function DataLibraryDrawer({
   const emptyStateMessage =
     searchQuery || formatFilter || createdAfter || createdBefore
       ? '无匹配资产'
-      : getDataLibraryEmptyStateMessage({
-          orgView,
-          selectedPbsId,
-          selectedTaskId,
-          selectedFolderId,
-        });
+      : getDataLibraryEmptyStateMessage({ orgView, selectedPbsId, selectedTaskId, selectedFolderId });
 
   return (
     <>
-    <DataLibraryDrawerView
-      drawerWidth={drawerWidth}
-      isResizing={isResizing}
-      onResizeStart={handleResizeStart}
-      onClose={onClose}
-      searchQuery={searchQuery}
-      onSearchQueryChange={setSearchQuery}
-      formatFilter={formatFilter}
-      onFormatFilterChange={setFormatFilter}
-      createdAfter={createdAfter}
-      onCreatedAfterChange={setCreatedAfter}
-      createdBefore={createdBefore}
-      onCreatedBeforeChange={setCreatedBefore}
-      viewMode={viewMode}
-      onViewModeChange={setViewMode}
-      showOrgPanel={showOrgPanel}
-      onToggleOrgPanel={() => setShowOrgPanel((prev) => !prev)}
-      orgView={orgView}
-      onOrgViewChange={setOrgView}
-      graphId={graphId}
-      selectedPbsId={selectedPbsId}
-      onSelectPbs={setSelectedPbsId}
-      pbsExpandedIds={pbsExpandedIds}
-      onTogglePbsExpand={togglePbsExpand}
-      pbsIncludeSubNodes={pbsIncludeSubNodes}
-      onPbsIncludeSubNodesChange={setPbsIncludeSubNodes}
-      selectedTaskId={selectedTaskId}
-      onSelectTask={setSelectedTaskId}
-      taskExpandedGroups={taskExpandedGroups}
-      onToggleTaskGroup={toggleTaskGroup}
-      selectedFolderId={selectedFolderId}
-      onSelectFolder={setSelectedFolderId}
-      folderExpandedIds={folderExpandedIds}
-      onToggleFolderExpand={toggleFolderExpand}
-      onAssetDrop={handleAssetDrop}
-      isLoading={isLoading || orgAssetsLoading}
-      error={activeError}
-      onRetry={activeRefetch}
-      visibleAssets={visibleAssets}
-      baseAssetCount={baseAssets.length}
-      emptyStateMessage={emptyStateMessage}
-      isMovingAsset={isMovingAsset}
-      draggableAssets={orgView === 'folder'}
-      onAssetPreview={handleAssetPreview}
-    />
-
-    {/* Story 9.3: Model preview modal */}
-    {previewAsset && previewAsset.storagePath && (
-      <ModelViewerModal
-        isOpen={!!previewAsset}
-        onClose={handleClosePreview}
-        assetUrl={previewAsset.storagePath}
-        assetName={previewAsset.name}
+      <DataLibraryDrawerView
+        drawerWidth={drawerWidth}
+        isResizing={isResizing}
+        onResizeStart={handleResizeStart}
+        onClose={onClose}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        formatFilter={formatFilter}
+        onFormatFilterChange={setFormatFilter}
+        createdAfter={createdAfter}
+        onCreatedAfterChange={setCreatedAfter}
+        createdBefore={createdBefore}
+        onCreatedBeforeChange={setCreatedBefore}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        showOrgPanel={showOrgPanel}
+        onToggleOrgPanel={() => setShowOrgPanel((prev) => !prev)}
+        orgView={orgView}
+        onOrgViewChange={setOrgView}
+        graphId={graphId}
+        selectedPbsId={selectedPbsId}
+        onSelectPbs={setSelectedPbsId}
+        pbsExpandedIds={pbsExpandedIds}
+        onTogglePbsExpand={togglePbsExpand}
+        pbsIncludeSubNodes={pbsIncludeSubNodes}
+        onPbsIncludeSubNodesChange={setPbsIncludeSubNodes}
+        selectedTaskId={selectedTaskId}
+        onSelectTask={setSelectedTaskId}
+        taskExpandedGroups={taskExpandedGroups}
+        onToggleTaskGroup={toggleTaskGroup}
+        selectedFolderId={selectedFolderId}
+        onSelectFolder={setSelectedFolderId}
+        folderExpandedIds={folderExpandedIds}
+        onToggleFolderExpand={toggleFolderExpand}
+        onAssetDrop={handleAssetDrop}
+        isLoading={isLoading || orgAssetsLoading}
+        error={activeError}
+        onRetry={activeRefetch}
+        visibleAssets={visibleAssets}
+        baseAssetCount={baseAssets.length}
+        emptyStateMessage={emptyStateMessage}
+        isMovingAsset={isMovingAsset}
+        draggableAssets={orgView === 'folder'}
+        onAssetPreview={handleAssetPreview}
       />
-    )}
-  </>
+
+      {/* Story 9.3/9.4: Preview modals based on asset type */}
+      {previewAsset && previewAsset.storagePath && previewType === 'model' && (
+        <ModelViewerModal
+          isOpen={!!previewAsset}
+          onClose={handleClosePreview}
+          assetUrl={previewAsset.storagePath}
+          assetName={previewAsset.name}
+        />
+      )}
+
+      {/* Story 9.4: Contour preview modal for VTK/JSON scalar field */}
+      {previewAsset && previewAsset.storagePath && previewType === 'contour' && (
+        <ContourViewerModal
+          isOpen={!!previewAsset}
+          onClose={handleClosePreview}
+          assetUrl={previewAsset.storagePath}
+          assetName={previewAsset.name}
+        />
+      )}
+    </>
   );
 }
 

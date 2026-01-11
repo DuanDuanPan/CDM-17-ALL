@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2026-01-11 - Story 9.2/9.3 completed
+last_updated: 2026-01-11 - Story 9.5 ready-for-dev (create-story workflow)
 
 development_status:
   epic-1: done
@@ -120,3 +120,5 @@ development_status:
   9-1-data-library-drawer: done  # All tasks complete, Round 2+3 review passed (2026-01-10)
   9-2-multi-dimensional-organization: done  # All review fixes applied; completed (2026-01-11)
   9-3-lightweight-viewer-step-gltf: done  # Code review completed, all issues fixed (2026-01-11)
+  9-4-lightweight-viewer-mesh-contour: in-progress  # Contour viewer integrated; VTU + tests pending
+  9-5-data-upload-node-linking: ready-for-dev  # Story context created (2026-01-11)

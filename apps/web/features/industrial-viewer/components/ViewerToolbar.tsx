@@ -1,8 +1,16 @@
 'use client';
 
+/**
+ * ViewerToolbar Component
+ *
+ * Story 9.3: Model viewer toolbar with edge toggle and view controls.
+ * Story 9.4 Task 1.2: Added render mode toggle (solid/wireframe).
+ */
+
 import * as React from 'react';
-import { Home, Maximize2, Minimize2 } from 'lucide-react';
+import { Home, Maximize2, Minimize2, Box, Grid3X3 } from 'lucide-react';
 import { Button, cn } from '@cdm/ui';
+import type { RenderMode } from '../hooks/useOnline3DViewer';
 
 export interface ViewerToolbarProps {
   edgesEnabled: boolean;
@@ -10,6 +18,10 @@ export interface ViewerToolbarProps {
   onToggleEdges: () => void;
   onResetView: () => void;
   onToggleFullscreen?: () => void;
+  /** Story 9.4 AC#2: Current render mode */
+  renderMode?: RenderMode;
+  /** Story 9.4 AC#2: Toggle render mode callback */
+  onToggleRenderMode?: () => void;
   className?: string;
 }
 
@@ -19,6 +31,8 @@ export function ViewerToolbar({
   onToggleEdges,
   onResetView,
   onToggleFullscreen,
+  renderMode = 'solid',
+  onToggleRenderMode,
   className,
 }: ViewerToolbarProps) {
   return (
@@ -70,6 +84,28 @@ export function ViewerToolbar({
         </button>
       </div>
 
+      {/* Story 9.4 AC#2: Render Mode Toggle */}
+      {onToggleRenderMode && (
+        <>
+          <div className="w-px h-5 bg-gray-600" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleRenderMode}
+            className="p-1.5 rounded-full hover:bg-white/10 text-gray-300 hover:text-white"
+            title={renderMode === 'solid' ? '切换到线框模式' : '切换到实体模式'}
+            data-testid="render-mode-toggle"
+            data-mode={renderMode}
+          >
+            {renderMode === 'solid' ? (
+              <Box className="w-4 h-4" />
+            ) : (
+              <Grid3X3 className="w-4 h-4" />
+            )}
+          </Button>
+        </>
+      )}
+
       <div className="w-px h-5 bg-gray-600" />
 
       {/* Fullscreen Toggle */}
@@ -92,3 +128,4 @@ export function ViewerToolbar({
     </div>
   );
 }
+

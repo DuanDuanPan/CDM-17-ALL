@@ -20,6 +20,10 @@ export {
     CardContent,
 } from './card';
 
+// Story 9.4: Select component
+export { Select } from './select';
+export type { SelectProps, SelectOption } from './select';
+
 // Toast notifications
 export { ToastProvider, useToast } from './toast';
 export type { Toast, ToastType } from './toast';
@@ -31,3 +35,4 @@ export type { ConfirmDialogOptions } from './confirm-dialog';
 // Story 8.1: Collapse toggle
 export { CollapseToggle } from './collapse-toggle';
 export type { CollapseToggleProps } from './collapse-toggle';
+

@@ -78,4 +78,47 @@ describe('ViewerToolbar', () => {
     render(<ViewerToolbar {...defaultProps} isFullscreen={false} />);
     expect(screen.getByTitle('全屏显示')).toBeDefined();
   });
+
+  // === Story 9.4 AC#2: Render Mode Tests (Task 4.2.5) ===
+
+  it('renders render mode toggle button when callback is provided', () => {
+    const onToggleRenderMode = vi.fn();
+    render(<ViewerToolbar {...defaultProps} onToggleRenderMode={onToggleRenderMode} />);
+    expect(screen.getByTestId('render-mode-toggle')).toBeDefined();
+  });
+
+  it('shows solid icon when renderMode is solid', () => {
+    const onToggleRenderMode = vi.fn();
+    render(<ViewerToolbar {...defaultProps} renderMode="solid" onToggleRenderMode={onToggleRenderMode} />);
+    const toggle = screen.getByTestId('render-mode-toggle');
+    expect(toggle.getAttribute('data-mode')).toBe('solid');
+    expect(screen.getByTitle('切换到线框模式')).toBeDefined();
+  });
+
+  it('shows wireframe icon when renderMode is wireframe', () => {
+    const onToggleRenderMode = vi.fn();
+    render(<ViewerToolbar {...defaultProps} renderMode="wireframe" onToggleRenderMode={onToggleRenderMode} />);
+    const toggle = screen.getByTestId('render-mode-toggle');
+    expect(toggle.getAttribute('data-mode')).toBe('wireframe');
+    expect(screen.getByTitle('切换到实体模式')).toBeDefined();
+  });
+
+  it('calls onToggleRenderMode when render mode button is clicked', async () => {
+    const user = userEvent.setup();
+    const onToggleRenderMode = vi.fn();
+    render(<ViewerToolbar {...defaultProps} onToggleRenderMode={onToggleRenderMode} />);
+
+    await user.click(screen.getByTestId('render-mode-toggle'));
+    expect(onToggleRenderMode).toHaveBeenCalledTimes(1);
+  });
+
+  it('reflects render mode state in data-mode attribute', () => {
+    const onToggleRenderMode = vi.fn();
+    const { rerender } = render(<ViewerToolbar {...defaultProps} renderMode="solid" onToggleRenderMode={onToggleRenderMode} />);
+    const toggle = screen.getByTestId('render-mode-toggle');
+    expect(toggle.getAttribute('data-mode')).toBe('solid');
+
+    rerender(<ViewerToolbar {...defaultProps} renderMode="wireframe" onToggleRenderMode={onToggleRenderMode} />);
+    expect(toggle.getAttribute('data-mode')).toBe('wireframe');
+  });
 });

@@ -1,0 +1,20 @@
+{
+  "format": "scalar-field-json",
+  "version": "1.0",
+  "geometry": {
+    "points": [
+      [0, 0, 0],
+      [1, 0, 0],
+      [0, 1, 0]
+    ],
+    "cells": [
+      [3, 0, 1, 2]
+    ]
+  },
+  "scalars": {
+    "name": "Stress",
+    "unit": "MPa",
+    "values": [0.1, 0.5, 0.9]
+  }
+}
+

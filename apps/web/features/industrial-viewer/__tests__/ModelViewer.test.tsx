@@ -20,6 +20,10 @@ vi.mock('../hooks/useOnline3DViewer', () => ({
     resetView: vi.fn(),
     highlightNode: vi.fn(),
     clearHighlight: vi.fn(),
+    // Story 9.4: Added renderMode support
+    renderMode: 'solid' as const,
+    setRenderMode: vi.fn(),
+    toggleRenderMode: vi.fn(),
   })),
 }));
 
@@ -48,6 +52,9 @@ describe('ModelViewer', () => {
       resetView: vi.fn(),
       highlightNode: vi.fn(),
       clearHighlight: vi.fn(),
+      renderMode: 'solid',
+      setRenderMode: vi.fn(),
+      toggleRenderMode: vi.fn(),
     });
 
     render(<ModelViewer assetUrl="/test/model.step" />);
@@ -68,6 +75,9 @@ describe('ModelViewer', () => {
       resetView: vi.fn(),
       highlightNode: vi.fn(),
       clearHighlight: vi.fn(),
+      renderMode: 'solid',
+      setRenderMode: vi.fn(),
+      toggleRenderMode: vi.fn(),
     });
 
     render(<ModelViewer assetUrl="/test/model.step" />);
@@ -90,6 +100,8 @@ describe('ModelViewer', () => {
       resetView: vi.fn(),
       highlightNode: vi.fn(),
       clearHighlight: vi.fn(),
+      renderMode: 'solid' as const,
+      toggleRenderMode: vi.fn(),
     };
 
     mockedUseOnline3DViewer.mockReturnValueOnce({
@@ -98,6 +110,9 @@ describe('ModelViewer', () => {
       error: null,
       model: null,
       ...mockControls,
+      renderMode: 'solid',
+      setRenderMode: vi.fn(),
+      toggleRenderMode: vi.fn(),
     });
 
     render(
@@ -111,6 +126,8 @@ describe('ModelViewer', () => {
         resetView: expect.any(Function),
         highlightNode: expect.any(Function),
         clearHighlight: expect.any(Function),
+        renderMode: 'solid',
+        toggleRenderMode: expect.any(Function),
       })
     );
   });

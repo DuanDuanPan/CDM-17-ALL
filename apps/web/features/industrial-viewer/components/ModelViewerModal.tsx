@@ -144,6 +144,8 @@ export function ModelViewerModal({
                 onToggleEdges={controls.toggleEdges}
                 onResetView={controls.resetView}
                 onToggleFullscreen={toggleFullscreen}
+                renderMode={controls.renderMode}
+                onToggleRenderMode={controls.toggleRenderMode}
               />
             )}
           </div>

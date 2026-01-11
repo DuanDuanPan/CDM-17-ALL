@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@cdm/ui';
 import type { DataAssetWithFolder, DataAssetFormat } from '@cdm/types';
+import { getAssetPreviewType } from '../hooks/useAssetPreview';
 import { formatFileSize } from '../utils/formatFileSize';
 import type { AssetDragData } from './dnd';
 
@@ -31,23 +32,6 @@ interface AssetCardProps {
   onPreview?: () => void;
   /** Story 9.2: Enable drag for folder organization */
   draggable?: boolean;
-}
-
-/** 3D formats that support preview */
-const PREVIEWABLE_3D_FORMATS: DataAssetFormat[] = [
-  'STEP',
-  'IGES',
-  'GLTF',
-  'STL',
-  'OBJ',
-  'FBX',
-];
-
-/**
- * Check if format supports 3D preview
- */
-function isPreviewable(format: DataAssetFormat): boolean {
-  return PREVIEWABLE_3D_FORMATS.includes(format);
 }
 
 /**
@@ -126,7 +110,7 @@ const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HT
   function AssetCardInner({ asset, onClick, onPreview, isDragging, className, style, ...props }, ref) {
     const Icon = getFormatIcon(asset.format);
     const colorClass = getFormatColor(asset.format);
-    const canPreview = isPreviewable(asset.format) && !!onPreview;
+    const canPreview = getAssetPreviewType(asset) !== null && !!asset.storagePath && !!onPreview;
 
     const handleDoubleClick = (e: React.MouseEvent) => {
       e.stopPropagation();
