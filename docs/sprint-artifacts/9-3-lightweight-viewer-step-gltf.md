@@ -1,6 +1,6 @@
 # Story 9.3: 轻量化预览器 - STEP/glTF (Lightweight Viewer - STEP/glTF)
 
-Status: review
+Status: done
 Tech-Spec: [tech-spec-9-3-lightweight-viewer.md](./tech-spec-9-3-lightweight-viewer.md)
 
 ## Story

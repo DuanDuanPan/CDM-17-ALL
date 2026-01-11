@@ -1,6 +1,6 @@
 # Story 9.2: 多维度组织视图 (Multi-Dimensional Organization)
 
-Status: in-progress
+Status: done
 Tech-Spec: [tech-spec-9-2-multi-dimensional-organization.md](./tech-spec-9-2-multi-dimensional-organization.md)
 
 ## Story

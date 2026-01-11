@@ -6,6 +6,7 @@ import {
   loadExternalLibrary,
   getRequiredLibraryForFormat,
 } from '../utils/externalLibraryLoader';
+import { isMeshUserDataInNodeSubtree } from '../utils/meshHighlight';
 
 export interface UseOnline3DViewerOptions {
   modelUrl: string;
@@ -333,15 +334,7 @@ export function useOnline3DViewer(
       innerViewer.SetMeshesHighlight?.(
         new OV.RGBColor(255, 200, 0),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (meshUserData: any) => {
-          // Mesh userData contains the originalMeshInstance (see threeconverter.js in online-3d-viewer)
-          let node = meshUserData?.originalMeshInstance?.GetNode?.();
-          while (node) {
-            if (node.GetId?.() === nodeId) return true;
-            node = node.GetParent?.();
-          }
-          return false;
-        }
+        (meshUserData: any) => isMeshUserDataInNodeSubtree(meshUserData, nodeId)
       );
     } catch (err) {
       console.warn('[UseOnline3DViewer] Failed to highlight node:', err);
