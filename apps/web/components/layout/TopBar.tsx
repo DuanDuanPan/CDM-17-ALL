@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Archive, Menu, Search, Share2, Settings, Database } from 'lucide-react';
+import { Archive, Menu, Search, Share2, Settings, Database, Keyboard } from 'lucide-react';
 import { LayoutSwitcher } from '../toolbar/LayoutSwitcher';
 import { ViewSwitcher } from '@/features/views';
 import { ActiveUsersAvatarStack } from '../collab/ActiveUsersAvatarStack';
@@ -17,6 +17,8 @@ import { GlobalSearchDialog } from '@/components/CommandPalette/GlobalSearchDial
 import { ArchiveDrawer } from '@/components/ArchiveBox/ArchiveDrawer';
 // Story 9.1: Data Library Drawer
 import { DataLibraryDrawer } from '@/features/data-library';
+// Keyboard Shortcuts Guide
+import { KeyboardShortcutsGuide } from '@/components/KeyboardShortcutsGuide';
 
 export interface TopBarProps {
   userId?: string; // Story 2.4: Current user ID for notifications
@@ -52,6 +54,8 @@ export function TopBar({
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   // Story 9.1: Data Library Drawer state
   const [isDataLibraryOpen, setIsDataLibraryOpen] = useState(false);
+  // Keyboard Shortcuts Guide state
+  const [isShortcutsGuideOpen, setIsShortcutsGuideOpen] = useState(false);
 
   // Story 1.4 MED-12: Get collaboration state from context (optional for standalone usage)
   const collabContext = useCollaborationUIOptional();
@@ -251,10 +255,25 @@ export function TopBar({
           <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <Share2 className="w-4 h-4 text-gray-600" />
           </button>
+          {/* Keyboard Shortcuts Guide Button */}
+          <button
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            onClick={() => setIsShortcutsGuideOpen(true)}
+            aria-label="快捷键指南 (?)"
+            title="快捷键指南"
+          >
+            <Keyboard className="w-4 h-4 text-gray-600" />
+          </button>
           <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <Settings className="w-4 h-4 text-gray-600" />
           </button>
         </div>
+
+        {/* Keyboard Shortcuts Guide Modal */}
+        <KeyboardShortcutsGuide
+          open={isShortcutsGuideOpen}
+          onOpenChange={setIsShortcutsGuideOpen}
+        />
       </div>
     </header>
   );
