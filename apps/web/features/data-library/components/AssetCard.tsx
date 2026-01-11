@@ -2,9 +2,13 @@
 
 /**
  * Story 9.1: Asset Card Component
+ * Story 9.3: Added preview support for 3D models
+ * Story 9.2: Migrated to @dnd-kit for high-fidelity drag preview
  * Displays a single data asset in card format (for grid view)
  */
 
+import { forwardRef } from 'react';
+import { useDraggable } from '@dnd-kit/core';
 import {
   FileText,
   FileSpreadsheet,
@@ -13,15 +17,37 @@ import {
   FileVideo,
   File,
   Cuboid,
+  Eye,
 } from 'lucide-react';
+import { cn } from '@cdm/ui';
 import type { DataAssetWithFolder, DataAssetFormat } from '@cdm/types';
 import { formatFileSize } from '../utils/formatFileSize';
+import type { AssetDragData } from './dnd';
 
 interface AssetCardProps {
   asset: DataAssetWithFolder;
   onClick?: () => void;
+  /** Story 9.3: Preview callback for 3D models */
+  onPreview?: () => void;
   /** Story 9.2: Enable drag for folder organization */
   draggable?: boolean;
+}
+
+/** 3D formats that support preview */
+const PREVIEWABLE_3D_FORMATS: DataAssetFormat[] = [
+  'STEP',
+  'IGES',
+  'GLTF',
+  'STL',
+  'OBJ',
+  'FBX',
+];
+
+/**
+ * Check if format supports 3D preview
+ */
+function isPreviewable(format: DataAssetFormat): boolean {
+  return PREVIEWABLE_3D_FORMATS.includes(format);
 }
 
 /**
@@ -87,85 +113,169 @@ function getFormatColor(format: DataAssetFormat): string {
 }
 
 /**
- * Asset Card Component
- * Story 9.2: Added draggable support for folder organization
+ * Inner Asset Card Component (non-draggable version)
  */
-export function AssetCard({ asset, onClick, draggable = false }: AssetCardProps) {
-  const Icon = getFormatIcon(asset.format);
-  const colorClass = getFormatColor(asset.format);
+interface AssetCardInnerProps {
+  asset: DataAssetWithFolder;
+  onClick?: () => void;
+  onPreview?: () => void;
+  isDragging?: boolean;
+}
 
-  const handleDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData('text/plain', asset.id);
-    e.dataTransfer.effectAllowed = 'move';
+const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HTMLAttributes<HTMLDivElement>>(
+  function AssetCardInner({ asset, onClick, onPreview, isDragging, className, style, ...props }, ref) {
+    const Icon = getFormatIcon(asset.format);
+    const colorClass = getFormatColor(asset.format);
+    const canPreview = isPreviewable(asset.format) && !!onPreview;
+
+    const handleDoubleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (canPreview) {
+        onPreview?.();
+      }
+    };
+
+    const handlePreviewClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (canPreview) {
+        onPreview?.();
+      }
+    };
+
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          'group relative flex flex-col bg-white dark:bg-gray-800',
+          'border border-gray-200 dark:border-gray-700 rounded-xl',
+          'hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600',
+          'transition-all duration-200 cursor-pointer overflow-hidden',
+          isDragging && 'opacity-50 ring-2 ring-blue-400',
+          className
+        )}
+        style={style}
+        onClick={onClick}
+        onDoubleClick={handleDoubleClick}
+        data-testid="asset-card"
+        {...props}
+      >
+        {/* Thumbnail Area */}
+        <div className="relative h-32 bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+          {asset.thumbnail ? (
+            <img
+              src={asset.thumbnail}
+              alt={asset.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className={`w-16 h-16 ${colorClass} rounded-xl flex items-center justify-center`}>
+              <Icon className="w-8 h-8 text-white" />
+            </div>
+          )}
+
+          {/* Format Badge */}
+          <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/50 text-white text-xs font-medium rounded">
+            {asset.format}
+          </div>
+
+          {/* Preview Button (Story 9.3) - shown on hover for 3D formats */}
+          {canPreview && (
+            <button
+              type="button"
+              onClick={handlePreviewClick}
+              className="absolute bottom-2 right-2 p-2 bg-blue-500 text-white rounded-full
+                         opacity-0 group-hover:opacity-100 transition-opacity shadow-lg
+                         hover:bg-blue-600"
+              title="预览"
+              data-testid="preview-button"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="p-4 flex-1 flex flex-col">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate mb-1">
+            {asset.name}
+          </h3>
+
+          {asset.description && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-2">
+              {asset.description}
+            </p>
+          )}
+
+          <div className="mt-auto flex items-center justify-between text-xs text-gray-400">
+            <span>{formatFileSize(asset.fileSize)}</span>
+            <span>{asset.version}</span>
+          </div>
+
+          {/* Tags */}
+          {asset.tags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {asset.tags.slice(0, 3).map((tag) => (
+                <span
+                  key={tag}
+                  className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700
+                           text-gray-600 dark:text-gray-300 text-xs rounded"
+                >
+                  {tag}
+                </span>
+              ))}
+              {asset.tags.length > 3 && (
+                <span className="text-xs text-gray-400">+{asset.tags.length - 3}</span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+);
+
+/**
+ * Draggable Asset Card Component
+ * Uses @dnd-kit for high-fidelity drag preview
+ * Original card stays in place, only DragOverlay follows cursor
+ */
+function DraggableAssetCard({ asset, onClick, onPreview }: Omit<AssetCardProps, 'draggable'>) {
+  const dragData: AssetDragData = {
+    type: 'asset',
+    asset,
   };
 
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: asset.id,
+    data: dragData,
+  });
+
+  // Do NOT apply transform - original card stays in place
+  // Only show isDragging visual feedback (opacity + ring)
   return (
-    <div
-      className="group relative flex flex-col bg-white dark:bg-gray-800
-                 border border-gray-200 dark:border-gray-700 rounded-xl
-                 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600
-                 transition-all duration-200 cursor-pointer overflow-hidden"
+    <AssetCardInner
+      ref={setNodeRef}
+      asset={asset}
       onClick={onClick}
-      draggable={draggable}
-      onDragStart={draggable ? handleDragStart : undefined}
-    >
-      {/* Thumbnail Area */}
-      <div className="relative h-32 bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-        {asset.thumbnail ? (
-          <img
-            src={asset.thumbnail}
-            alt={asset.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className={`w-16 h-16 ${colorClass} rounded-xl flex items-center justify-center`}>
-            <Icon className="w-8 h-8 text-white" />
-          </div>
-        )}
-
-        {/* Format Badge */}
-        <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/50 text-white text-xs font-medium rounded">
-          {asset.format}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="p-4 flex-1 flex flex-col">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate mb-1">
-          {asset.name}
-        </h3>
-
-        {asset.description && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-2">
-            {asset.description}
-          </p>
-        )}
-
-        <div className="mt-auto flex items-center justify-between text-xs text-gray-400">
-          <span>{formatFileSize(asset.fileSize)}</span>
-          <span>{asset.version}</span>
-        </div>
-
-        {/* Tags */}
-        {asset.tags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {asset.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700
-                         text-gray-600 dark:text-gray-300 text-xs rounded"
-              >
-                {tag}
-              </span>
-            ))}
-            {asset.tags.length > 3 && (
-              <span className="text-xs text-gray-400">+{asset.tags.length - 3}</span>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+      onPreview={onPreview}
+      isDragging={isDragging}
+      {...listeners}
+      {...attributes}
+    />
   );
+}
+
+/**
+ * Asset Card Component
+ * Story 9.2: Added draggable support for folder organization with @dnd-kit
+ * Story 9.3: Added double-click preview and preview button for 3D models
+ */
+export function AssetCard({ asset, onClick, onPreview, draggable = false }: AssetCardProps) {
+  if (draggable) {
+    return <DraggableAssetCard asset={asset} onClick={onClick} onPreview={onPreview} />;
+  }
+
+  return <AssetCardInner asset={asset} onClick={onClick} onPreview={onPreview} />;
 }
 
 export default AssetCard;

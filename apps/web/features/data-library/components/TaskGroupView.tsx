@@ -15,7 +15,7 @@ import {
   ListTodo,
   Paperclip,
 } from 'lucide-react';
-import { cn } from '@cdm/ui';
+import { cn, Button } from '@cdm/ui';
 import { useTaskNodes, type TaskNode } from '../hooks/useTaskNodes';
 import { TaskItemDetails } from './TaskItemDetails';
 import type { TaskStatus } from '@cdm/types';
@@ -138,10 +138,10 @@ function TaskStatusGroup({
   return (
     <div data-testid={`task-group-${status}`} className="mb-1">
       {/* Group header */}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         className={cn(
-          'w-full flex items-center gap-2 px-3 py-2 text-left',
+          'w-full justify-start gap-2 px-3 py-2 h-auto text-left rounded-none',
           'hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150',
           config.bgColor
         )}
@@ -158,7 +158,7 @@ function TaskStatusGroup({
         <span className="text-xs text-gray-400 bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
           {tasks.length}
         </span>
-      </button>
+      </Button>
 
       {/* Task list */}
       {isExpanded && tasks.length > 0 && (

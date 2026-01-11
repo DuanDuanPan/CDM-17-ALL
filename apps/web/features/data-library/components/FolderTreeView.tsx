@@ -2,17 +2,20 @@
  * Story 9.2: Folder Tree View Component
  * Displays folder tree structure with CRUD operations and drag-drop support
  * AC#3: View 3 allows folder creation, rename, delete
- * AC#4: Drag-drop to move assets into folders
+ * AC#4: Drag-drop to move assets into folders (migrated to @dnd-kit)
  */
 
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useDroppable } from '@dnd-kit/core';
 import { Folder, FolderPlus, FolderTree } from 'lucide-react';
-import { cn } from '@cdm/ui';
+import { toast } from 'sonner';
+import { cn, Button, useConfirmDialog } from '@cdm/ui';
 import { useDataFolders } from '../hooks/useDataFolders';
 import { FolderTreeItem } from './folder-tree/FolderTreeItem';
 import { NewFolderInput } from './folder-tree/NewFolderInput';
+import type { FolderDropData } from './dnd';
 
 interface FolderTreeViewProps {
   /** Graph ID for context */
@@ -25,12 +28,11 @@ interface FolderTreeViewProps {
   expandedIds: Set<string>;
   /** Toggle expand/collapse for a folder (AC#5) */
   onToggleExpand: (folderId: string) => void;
-  /** Callback when an asset is dropped on a folder */
-  onAssetDrop?: (assetId: string, folderId: string | null) => void;
 }
 
 /**
  * Folder Tree View - displays folder hierarchy with CRUD operations
+ * Story 9.2: Migrated to @dnd-kit for high-fidelity drag preview
  */
 export function FolderTreeView({
   graphId,
@@ -38,7 +40,6 @@ export function FolderTreeView({
   onSelect,
   expandedIds,
   onToggleExpand,
-  onAssetDrop,
 }: FolderTreeViewProps) {
   const {
     folders,
@@ -47,15 +48,26 @@ export function FolderTreeView({
     renameFolder,
     deleteFolder,
     isCreating,
-    deleteError,
   } = useDataFolders({ graphId });
+
+  const { showConfirm } = useConfirmDialog();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [newFolderParentId, setNewFolderParentId] = useState<string | undefined>(
     undefined
   );
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+
+  // @dnd-kit droppable for root "All Assets" zone
+  const rootDropData: FolderDropData = {
+    type: 'folder',
+    folderId: null,
+  };
+
+  const { isOver: isOverRoot, setNodeRef: setRootNodeRef } = useDroppable({
+    id: 'folder-root',
+    data: rootDropData,
+  });
 
   // Start creating a new folder
   const handleStartCreate = useCallback((parentId?: string) => {
@@ -112,46 +124,29 @@ export function FolderTreeView({
 
   // Delete folder
   const handleDelete = useCallback(
-    async (id: string) => {
-      if (window.confirm('确定要删除此文件夹吗？')) {
-        try {
-          await deleteFolder(id);
-          if (selectedId === id) {
-            onSelect(null);
+    (id: string) => {
+      showConfirm({
+        title: '删除文件夹',
+        description: '确定要删除此文件夹吗？（仅支持删除空文件夹）',
+        confirmText: '删除',
+        cancelText: '取消',
+        variant: 'danger',
+        onConfirm: async () => {
+          try {
+            await deleteFolder(id);
+            if (selectedId === id) {
+              onSelect(null);
+            }
+            toast.success('已删除文件夹');
+          } catch (err) {
+            const message = err instanceof Error ? err.message : '删除失败';
+            toast.error(message);
           }
-        } catch {
-          // Error is displayed via deleteError
-        }
-      }
+        },
+      });
     },
-    [deleteFolder, selectedId, onSelect]
+    [showConfirm, deleteFolder, selectedId, onSelect]
   );
-
-  // Handle drop on folder
-  const handleDrop = useCallback(
-    (e: React.DragEvent, folderId: string | null) => {
-      e.preventDefault();
-      setDropTargetId(null);
-
-      const assetId = e.dataTransfer.getData('text/plain');
-      if (assetId && onAssetDrop) {
-        onAssetDrop(assetId, folderId);
-      }
-    },
-    [onAssetDrop]
-  );
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-  }, []);
-
-  const handleDragEnter = useCallback((folderId: string | null) => {
-    setDropTargetId(folderId);
-  }, []);
-
-  const handleDragLeave = useCallback(() => {
-    setDropTargetId(null);
-  }, []);
 
   // Loading state
   if (isLoading) {
@@ -174,14 +169,15 @@ export function FolderTreeView({
         <p className="text-xs mt-1 text-gray-400 mb-4">
           创建文件夹来组织您的数据资产
         </p>
-        <button
-          type="button"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-blue-600"
           onClick={() => handleStartCreate()}
         >
           <FolderPlus className="w-4 h-4" />
           新建文件夹
-        </button>
+        </Button>
       </div>
     );
   }
@@ -191,37 +187,28 @@ export function FolderTreeView({
       {/* Toolbar */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800">
         <span className="text-xs text-gray-500">文件夹</span>
-        <button
-          type="button"
-          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+        <Button
+          variant="ghost"
+          size="icon"
+          className="p-1"
           onClick={() => handleStartCreate()}
           title="新建文件夹"
           disabled={isCreating}
         >
           <FolderPlus className="w-4 h-4 text-gray-500" />
-        </button>
+        </Button>
       </div>
 
-      {/* Delete error toast */}
-      {deleteError && (
-        <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 text-xs">
-          {deleteError}
-        </div>
-      )}
-
-      {/* Root drop zone */}
+      {/* Root drop zone - "All Assets" */}
       <div
+        ref={setRootNodeRef}
         className={cn(
           'px-3 py-2 cursor-pointer transition-colors duration-150',
           'hover:bg-gray-50 dark:hover:bg-gray-800',
           selectedId === null && 'bg-blue-50 dark:bg-blue-900/30',
-          dropTargetId === 'root' && 'ring-2 ring-blue-400 ring-inset'
+          isOverRoot && 'ring-2 ring-blue-400 ring-inset bg-blue-50/50 dark:bg-blue-900/30'
         )}
         onClick={() => onSelect(null)}
-        onDrop={(e) => handleDrop(e, null)}
-        onDragOver={handleDragOver}
-        onDragEnter={() => handleDragEnter('root')}
-        onDragLeave={handleDragLeave}
       >
         <div className="flex items-center gap-2 text-sm text-gray-600">
           <Folder className="w-4 h-4" />
@@ -238,7 +225,11 @@ export function FolderTreeView({
             selectedId={selectedId}
             expandedIds={expandedIds}
             editingId={editingId}
-            dropTargetId={dropTargetId}
+            isCreatingNew={isCreatingNew}
+            newFolderParentId={newFolderParentId}
+            onConfirmCreate={handleConfirmCreate}
+            onCancelCreate={handleCancelCreate}
+            isCreating={isCreating}
             onSelect={onSelect}
             onToggle={onToggleExpand}
             onStartRename={handleStartRename}
@@ -246,9 +237,6 @@ export function FolderTreeView({
             onCancelRename={handleCancelRename}
             onDelete={handleDelete}
             onStartCreate={handleStartCreate}
-            onDrop={handleDrop}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
             level={0}
           />
         ))}

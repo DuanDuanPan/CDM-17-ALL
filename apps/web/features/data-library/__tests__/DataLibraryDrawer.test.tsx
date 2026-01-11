@@ -8,6 +8,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ConfirmDialogProvider } from '@cdm/ui';
 import { DataLibraryDrawer } from '../components/DataLibraryDrawer';
 
 vi.mock('sonner', () => ({
@@ -54,7 +55,11 @@ const createWrapper = () => {
   });
 
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return createElement(QueryClientProvider, { client: queryClient }, children);
+    return createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(ConfirmDialogProvider, null, children)
+    );
   };
 };
 

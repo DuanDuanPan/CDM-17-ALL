@@ -7,6 +7,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ConfirmDialogProvider } from '@cdm/ui';
 import { DataLibraryDrawer } from '../components/DataLibraryDrawer';
 
 vi.mock('sonner', () => ({
@@ -68,7 +69,11 @@ const createWrapper = () => {
   });
 
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return createElement(QueryClientProvider, { client: queryClient }, children);
+    return createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(ConfirmDialogProvider, null, children)
+    );
   };
 };
 
@@ -109,15 +114,23 @@ describe('Organization Views (Story 9.2)', () => {
     expect(screen.getByTestId('empty-state-pbs')).toBeDefined();
   });
 
-  it('enables asset dragging in folder view (AC4)', async () => {
+  it('renders asset cards with @dnd-kit integration in folder view (AC4)', async () => {
     const user = userEvent.setup();
     render(createElement(DataLibraryDrawer, defaultProps), { wrapper: createWrapper() });
 
     await user.click(screen.getByTestId('org-tab-folder'));
     await user.click(screen.getByTitle('网格视图'));
 
-    const assetName = screen.getByText('卫星总体结构');
-    const draggableContainer = assetName.closest('div[draggable="true"]');
-    expect(draggableContainer).toBeTruthy();
+    // Verify asset card is rendered
+    expect(screen.getByText('卫星总体结构')).toBeDefined();
+
+    // With @dnd-kit, draggable elements have role="button" and tabindex
+    // Check that the asset card is present and can be interacted with
+    const assetCard = screen.getByTestId('asset-card');
+    expect(assetCard).toBeDefined();
+
+    // @dnd-kit adds aria attributes and tabindex for accessibility
+    // The presence of these indicates drag functionality is enabled
+    expect(assetCard.getAttribute('tabindex')).toBe('0');
   });
 });

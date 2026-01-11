@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import { useOrganizationView } from './OrganizationTabs';
 import { DataLibraryDrawerView } from './data-library-drawer/DataLibraryDrawerView';
@@ -24,8 +25,14 @@ import { usePbsNodes } from '../hooks/usePbsNodes';
 import { usePbsAssets } from '../hooks/usePbsAssets';
 import { useTaskAssets } from '../hooks/useTaskAssets';
 import { useDataFolders } from '../hooks/useDataFolders';
-import type { DataAssetFormat, TaskStatus } from '@cdm/types';
+import type { DataAssetFormat, DataAssetWithFolder, TaskStatus } from '@cdm/types';
 import type { ViewMode } from './data-library-drawer/types';
+
+// Story 9.3: Lazy load ModelViewerModal to avoid SSR issues with Online3DViewer
+const ModelViewerModal = dynamic(
+  () => import('@/features/industrial-viewer').then((mod) => mod.ModelViewerModal),
+  { ssr: false }
+);
 
 interface DataLibraryDrawerProps {
   isOpen: boolean;
@@ -70,6 +77,9 @@ export function DataLibraryDrawer({
     new Set(['todo', 'in-progress', 'done'])
   );
   const [folderExpandedIds, setFolderExpandedIds] = useState<Set<string>>(new Set());
+
+  // Story 9.3: Preview state for 3D models
+  const [previewAsset, setPreviewAsset] = useState<DataAssetWithFolder | null>(null);
 
   const togglePbsExpand = useCallback((nodeId: string) => {
     setPbsExpandedIds((prev) => {
@@ -124,7 +134,7 @@ export function DataLibraryDrawer({
   });
 
   // Story 9.2: Folder operations hook
-  const { moveAsset, isMovingAsset } = useDataFolders({ graphId });
+  const { moveAsset, isMovingAsset } = useDataFolders({ graphId, enabled: isOpen });
 
   // Debounce search to avoid request storms when typing
   useEffect(() => {
@@ -180,10 +190,20 @@ export function DataLibraryDrawer({
     [moveAsset, refetch]
   );
 
+  // Story 9.3: Handle asset preview
+  const handleAssetPreview = useCallback((asset: DataAssetWithFolder) => {
+    setPreviewAsset(asset);
+  }, []);
+
+  const handleClosePreview = useCallback(() => {
+    setPreviewAsset(null);
+  }, []);
+
   // Story 9.2: Check if assets are loading from organization hooks
-  const orgAssetsLoading =
+  const orgAssetsLoading = Boolean(
     (orgView === 'pbs' && selectedPbsId && pbsAssetsLoading) ||
-    (orgView === 'task' && selectedTaskId && taskAssetsLoading);
+    (orgView === 'task' && selectedTaskId && taskAssetsLoading)
+  );
 
   const activeError =
     orgView === 'pbs' && selectedPbsId
@@ -236,6 +256,7 @@ export function DataLibraryDrawer({
         });
 
   return (
+    <>
     <DataLibraryDrawerView
       drawerWidth={drawerWidth}
       isResizing={isResizing}
@@ -279,7 +300,19 @@ export function DataLibraryDrawer({
       emptyStateMessage={emptyStateMessage}
       isMovingAsset={isMovingAsset}
       draggableAssets={orgView === 'folder'}
+      onAssetPreview={handleAssetPreview}
     />
+
+    {/* Story 9.3: Model preview modal */}
+    {previewAsset && previewAsset.storagePath && (
+      <ModelViewerModal
+        isOpen={!!previewAsset}
+        onClose={handleClosePreview}
+        assetUrl={previewAsset.storagePath}
+        assetName={previewAsset.name}
+      />
+    )}
+  </>
   );
 }
 

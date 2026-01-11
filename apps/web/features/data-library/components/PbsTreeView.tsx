@@ -7,7 +7,7 @@
 'use client';
 
 import { Box, ChevronRight, ChevronDown, FolderTree } from 'lucide-react';
-import { cn } from '@cdm/ui';
+import { cn, Button } from '@cdm/ui';
 import { usePbsNodes, type PbsTreeNode } from '../hooks/usePbsNodes';
 
 interface PbsTreeViewProps {
@@ -136,9 +136,10 @@ function PbsTreeItem({
       >
         {/* Expand/Collapse toggle */}
         {hasChildren ? (
-          <button
-            type="button"
-            className="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600"
+          <Button
+            variant="ghost"
+            size="icon"
+            className="w-4 h-4 p-0 text-gray-400 hover:text-gray-600"
             onClick={handleToggle}
             aria-label={isExpanded ? '折叠' : '展开'}
           >
@@ -147,7 +148,7 @@ function PbsTreeItem({
             ) : (
               <ChevronRight className="w-3.5 h-3.5" />
             )}
-          </button>
+          </Button>
         ) : (
           <span className="w-4" />
         )}

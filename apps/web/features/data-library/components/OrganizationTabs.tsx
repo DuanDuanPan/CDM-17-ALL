@@ -8,7 +8,7 @@
 
 import { useState } from 'react';
 import { Box, ListTodo, Folder } from 'lucide-react';
-import { cn } from '@cdm/ui';
+import { cn, Button } from '@cdm/ui';
 
 /**
  * Organization view type
@@ -71,14 +71,14 @@ export function OrganizationTabs({
           const isActive = activeView === tab.id;
 
           return (
-            <button
+            <Button
               key={tab.id}
-              type="button"
+              variant="ghost"
               data-testid={`org-tab-${tab.id}`}
               className={cn(
-                'flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-md transition-all duration-200',
+                'flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-md transition-all duration-200 h-auto',
                 isActive
-                  ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                  ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm hover:bg-white dark:hover:bg-gray-700'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
               )}
               onClick={() => onViewChange(tab.id)}
@@ -87,7 +87,7 @@ export function OrganizationTabs({
             >
               <Icon className="w-4 h-4" />
               <span>{tab.label}</span>
-            </button>
+            </Button>
           );
         })}
       </div>

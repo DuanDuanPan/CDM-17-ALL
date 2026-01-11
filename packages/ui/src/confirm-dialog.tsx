@@ -91,7 +91,7 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
             {children}
 
             {dialogOptions && createPortal(
-                <div className="fixed inset-0 z-[100] flex items-center justify-center">
+                <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 11000 }}>
                     {/* Backdrop */}
                     <div
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm"

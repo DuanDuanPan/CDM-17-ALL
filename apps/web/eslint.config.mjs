@@ -8,6 +8,7 @@ export default [
             'node_modules/**',
             'playwright-report/**',
             'test-results/**',
+            'public/libs/**',
         ],
     },
     // Story 7.2: Hook-First Pattern Enforcement

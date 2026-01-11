@@ -108,4 +108,56 @@ test.describe('Data Library Organization Views (Story 9.2)', () => {
     await expect(page.getByTestId('asset-list')).toBeVisible();
     await expect(page.getByText(`📁 ${folder.name}`)).toBeVisible();
   });
+
+  test('AC3: creating a subfolder from context menu renders input and creates folder', async ({ page }) => {
+    const parentFolder = await createFolder(page, graphId, '父文件夹');
+
+    await openDataLibraryDrawer(page);
+    await page.getByTestId('org-tab-folder').click();
+
+    const parentRow = page.getByTestId(`folder-tree-node-${parentFolder.id}`);
+    await expect(parentRow).toBeVisible();
+
+    await parentRow.hover();
+    const menuButton = page.getByTestId(`folder-tree-menu-${parentFolder.id}`);
+    await expect(menuButton).toBeVisible();
+    await menuButton.click();
+
+    await page.getByRole('button', { name: '新建子文件夹' }).click();
+
+    const input = page.getByPlaceholder('新文件夹名称');
+    await expect(input).toBeVisible();
+    await input.fill('子文件夹-1');
+    await input.press('Enter');
+
+    await expect(page.getByTestId('folder-tree').getByText('子文件夹-1')).toBeVisible();
+  });
+
+  test('AC3: deleting an empty folder shows confirm dialog and removes it', async ({ page }) => {
+    const folder = await createFolder(page, graphId, '待删除文件夹');
+
+    await openDataLibraryDrawer(page);
+    await page.getByTestId('org-tab-folder').click();
+
+    const folderRow = page.getByTestId(`folder-tree-node-${folder.id}`);
+    await expect(folderRow).toBeVisible();
+
+    await folderRow.hover();
+    const menuButton = page.getByTestId(`folder-tree-menu-${folder.id}`);
+    await expect(menuButton).toBeVisible();
+    await menuButton.click();
+
+    // Click "删除" in the folder context menu
+    await page.getByRole('button', { name: '删除' }).click();
+
+    // Confirmation dialog should appear
+    await expect(page.getByText('删除文件夹')).toBeVisible();
+    await expect(page.getByText('确定要删除此文件夹吗？（仅支持删除空文件夹）')).toBeVisible();
+
+    // Confirm deletion
+    await page.getByRole('button', { name: '删除' }).click();
+
+    // Folder should no longer be visible in tree
+    await expect(folderRow).not.toBeVisible();
+  });
 });

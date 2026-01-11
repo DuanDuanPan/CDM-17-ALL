@@ -7,6 +7,7 @@ import { FolderTreeView } from '../FolderTreeView';
 import { OrganizationTabs, type OrganizationView } from '../OrganizationTabs';
 import { PbsTreeView } from '../PbsTreeView';
 import { TaskGroupView } from '../TaskGroupView';
+import { DataLibraryDndProvider } from '../dnd';
 import type { DataAssetWithFolder, TaskStatus } from '@cdm/types';
 import type { ViewMode } from './types';
 
@@ -45,6 +46,9 @@ export interface DataLibraryDrawerContentProps {
 
   viewMode: ViewMode;
   draggableAssets: boolean;
+
+  /** Story 9.3: Preview callback for 3D models */
+  onAssetPreview?: (asset: DataAssetWithFolder) => void;
 }
 
 export function DataLibraryDrawerContent({
@@ -74,8 +78,9 @@ export function DataLibraryDrawerContent({
   emptyStateMessage,
   viewMode,
   draggableAssets,
+  onAssetPreview,
 }: DataLibraryDrawerContentProps) {
-  return (
+  const content = (
     <div className="flex-1 min-h-0 flex">
       {showOrgPanel && (
         <div className="w-64 flex-shrink-0 border-r border-gray-100 dark:border-gray-800 flex flex-col">
@@ -107,7 +112,6 @@ export function DataLibraryDrawerContent({
                 onSelect={onSelectFolder}
                 expandedIds={folderExpandedIds}
                 onToggleExpand={onToggleFolderExpand}
-                onAssetDrop={onAssetDrop}
               />
             )}
           </div>
@@ -135,12 +139,22 @@ export function DataLibraryDrawerContent({
             <p className="text-sm font-medium">{emptyStateMessage}</p>
           </div>
         ) : viewMode === 'grid' ? (
-          <AssetGrid assets={visibleAssets} draggable={draggableAssets} />
+          <AssetGrid assets={visibleAssets} draggable={draggableAssets} onAssetPreview={onAssetPreview} />
         ) : (
-          <AssetList assets={visibleAssets} draggable={draggableAssets} />
+          <AssetList assets={visibleAssets} draggable={draggableAssets} onAssetPreview={onAssetPreview} />
         )}
       </div>
     </div>
   );
-}
 
+  // Wrap with DnD provider when draggable assets are enabled (folder view)
+  if (draggableAssets) {
+    return (
+      <DataLibraryDndProvider assets={visibleAssets} onAssetDrop={onAssetDrop}>
+        {content}
+      </DataLibraryDndProvider>
+    );
+  }
+
+  return content;
+}

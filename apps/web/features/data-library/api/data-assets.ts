@@ -208,7 +208,11 @@ export async function deleteDataFolder(id: string): Promise<{ success: boolean }
 
   if (!response.ok) {
     const error = await readApiError(response);
-    throw new Error(error.code === 'FOLDER_NOT_EMPTY' ? '无法删除非空文件夹' : error.message || 'Failed to delete folder');
+    const message =
+      error.code === 'FOLDER_NOT_EMPTY'
+        ? error.message || '无法删除非空文件夹'
+        : error.message || 'Failed to delete folder';
+    throw new Error(message);
   }
 
   return response.json();
@@ -273,6 +277,11 @@ export async function fetchNodeAssets(nodeId: string): Promise<{ assets: DataAss
  * Used for PBS "include sub-nodes" and Task batch asset queries
  */
 export async function fetchNodeAssetsByNodes(nodeIds: string[]): Promise<{ assets: DataAssetWithFolder[] }> {
+  // 防御性检查：空数组直接返回，避免后端 400 错误
+  if (!nodeIds || nodeIds.length === 0) {
+    return { assets: [] };
+  }
+
   const response = await fetch(`${API_BASE}/api/data-assets/links:byNodes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

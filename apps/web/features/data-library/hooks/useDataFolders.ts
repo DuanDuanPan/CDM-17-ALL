@@ -20,13 +20,15 @@ import type { DataFolderTreeNode } from '@cdm/types';
 interface UseDataFoldersOptions {
   /** Graph ID for context */
   graphId: string;
+  /** Enable/disable fetching (mutations still available) */
+  enabled?: boolean;
 }
 
 /**
  * Hook for managing folder tree data
  * Provides CRUD operations and tree structure
  */
-export function useDataFolders({ graphId }: UseDataFoldersOptions) {
+export function useDataFolders({ graphId, enabled = true }: UseDataFoldersOptions) {
   const queryClient = useQueryClient();
 
   // Query keys
@@ -37,7 +39,7 @@ export function useDataFolders({ graphId }: UseDataFoldersOptions) {
   const foldersQuery = useQuery({
     queryKey: foldersKey,
     queryFn: () => fetchDataFolders(graphId),
-    enabled: !!graphId,
+    enabled: enabled && !!graphId,
     staleTime: 30_000, // 30s cache
   });
 
