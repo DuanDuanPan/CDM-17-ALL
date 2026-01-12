@@ -19,7 +19,7 @@ import { PrismaClient, NodeType, DataAssetFormat } from '@cdm/database';
 const prisma = new PrismaClient();
 
 // Fixed IDs for deterministic testing
-const GRAPH_ID = 'cmk89jo2s0003as6lpn7qckxt';
+const GRAPH_ID = 'cmk52kw320001a05iot66tre1';
 const PROJECT_ID = 'seed-project-story9';
 const USER_ID = 'seed-user-story9';
 

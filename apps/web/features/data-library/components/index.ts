@@ -1,5 +1,6 @@
 /**
  * Story 9.2: Data Library Components Index
+ * Story 9.5: Added UploadButton, LinkAssetDialog
  * Re-exports all components for convenient imports
  */
 
@@ -12,3 +13,5 @@ export { PbsTreeView } from './PbsTreeView';
 export { TaskGroupView } from './TaskGroupView';
 export { TaskItemDetails } from './TaskItemDetails';
 export { FolderTreeView } from './FolderTreeView';
+export { UploadButton } from './UploadButton';
+export { LinkAssetDialog } from './LinkAssetDialog';

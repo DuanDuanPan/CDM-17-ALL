@@ -4,6 +4,7 @@
  * Story 9.1: Asset Card Component
  * Story 9.3: Added preview support for 3D models
  * Story 9.2: Migrated to @dnd-kit for high-fidelity drag preview
+ * Story 9.5: Added link-to-node action button
  * Displays a single data asset in card format (for grid view)
  */
 
@@ -18,6 +19,7 @@ import {
   File,
   Cuboid,
   Eye,
+  Link2,
 } from 'lucide-react';
 import { cn } from '@cdm/ui';
 import type { DataAssetWithFolder, DataAssetFormat } from '@cdm/types';
@@ -30,6 +32,8 @@ interface AssetCardProps {
   onClick?: () => void;
   /** Story 9.3: Preview callback for 3D models */
   onPreview?: () => void;
+  /** Story 9.5: Link-to-node callback */
+  onLink?: () => void;
   /** Story 9.2: Enable drag for folder organization */
   draggable?: boolean;
 }
@@ -103,11 +107,12 @@ interface AssetCardInnerProps {
   asset: DataAssetWithFolder;
   onClick?: () => void;
   onPreview?: () => void;
+  onLink?: () => void;
   isDragging?: boolean;
 }
 
 const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HTMLAttributes<HTMLDivElement>>(
-  function AssetCardInner({ asset, onClick, onPreview, isDragging, className, style, ...props }, ref) {
+  function AssetCardInner({ asset, onClick, onPreview, onLink, isDragging, className, style, ...props }, ref) {
     const Icon = getFormatIcon(asset.format);
     const colorClass = getFormatColor(asset.format);
     const canPreview = getAssetPreviewType(asset) !== null && !!asset.storagePath && !!onPreview;
@@ -124,6 +129,11 @@ const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HT
       if (canPreview) {
         onPreview?.();
       }
+    };
+
+    const handleLinkClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onLink?.();
     };
 
     return (
@@ -176,6 +186,24 @@ const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HT
               <Eye className="w-4 h-4" />
             </button>
           )}
+
+          {/* Link Button (Story 9.5) - shown on hover */}
+          {onLink && (
+            <button
+              type="button"
+              onClick={handleLinkClick}
+              className={cn(
+                'absolute bottom-2 p-2 bg-green-500 text-white rounded-full',
+                'opacity-0 group-hover:opacity-100 transition-opacity shadow-lg',
+                'hover:bg-green-600',
+                canPreview ? 'right-12' : 'right-2'
+              )}
+              title="关联到节点"
+              data-testid="link-button"
+            >
+              <Link2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Content */}
@@ -223,7 +251,7 @@ const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HT
  * Uses @dnd-kit for high-fidelity drag preview
  * Original card stays in place, only DragOverlay follows cursor
  */
-function DraggableAssetCard({ asset, onClick, onPreview }: Omit<AssetCardProps, 'draggable'>) {
+function DraggableAssetCard({ asset, onClick, onPreview, onLink }: Omit<AssetCardProps, 'draggable'>) {
   const dragData: AssetDragData = {
     type: 'asset',
     asset,
@@ -242,6 +270,7 @@ function DraggableAssetCard({ asset, onClick, onPreview }: Omit<AssetCardProps, 
       asset={asset}
       onClick={onClick}
       onPreview={onPreview}
+      onLink={onLink}
       isDragging={isDragging}
       {...listeners}
       {...attributes}
@@ -253,13 +282,14 @@ function DraggableAssetCard({ asset, onClick, onPreview }: Omit<AssetCardProps, 
  * Asset Card Component
  * Story 9.2: Added draggable support for folder organization with @dnd-kit
  * Story 9.3: Added double-click preview and preview button for 3D models
+ * Story 9.5: Added link-to-node action button
  */
-export function AssetCard({ asset, onClick, onPreview, draggable = false }: AssetCardProps) {
+export function AssetCard({ asset, onClick, onPreview, onLink, draggable = false }: AssetCardProps) {
   if (draggable) {
-    return <DraggableAssetCard asset={asset} onClick={onClick} onPreview={onPreview} />;
+    return <DraggableAssetCard asset={asset} onClick={onClick} onPreview={onPreview} onLink={onLink} />;
   }
 
-  return <AssetCardInner asset={asset} onClick={onClick} onPreview={onPreview} />;
+  return <AssetCardInner asset={asset} onClick={onClick} onPreview={onPreview} onLink={onLink} />;
 }
 
 export default AssetCard;

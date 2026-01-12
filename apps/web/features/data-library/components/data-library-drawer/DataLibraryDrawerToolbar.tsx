@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * Story 9.1: Data Library Drawer Toolbar
+ * Story 9.5: Added UploadButton integration
+ */
+
 import {
   X,
   Search,
@@ -11,6 +16,7 @@ import {
   PanelLeft,
 } from 'lucide-react';
 import { DATA_ASSET_FORMAT_OPTIONS } from './formatOptions';
+import { UploadButton } from '../UploadButton';
 import type { DataAssetFormat } from '@cdm/types';
 import type { ViewMode } from './types';
 
@@ -31,6 +37,11 @@ export interface DataLibraryDrawerToolbarProps {
 
   showOrgPanel: boolean;
   onToggleOrgPanel: () => void;
+
+  // Story 9.5: Upload props
+  graphId: string;
+  selectedFolderId: string | null;
+  onUploadSuccess?: () => void;
 }
 
 export function DataLibraryDrawerToolbar({
@@ -46,10 +57,20 @@ export function DataLibraryDrawerToolbar({
   onViewModeChange,
   showOrgPanel,
   onToggleOrgPanel,
+  graphId,
+  selectedFolderId,
+  onUploadSuccess,
 }: DataLibraryDrawerToolbarProps) {
   return (
     <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
       <div className="flex items-center gap-4">
+        {/* Story 9.5: Upload Button */}
+        <UploadButton
+          graphId={graphId}
+          folderId={selectedFolderId ?? undefined}
+          onUploadComplete={onUploadSuccess}
+        />
+
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input

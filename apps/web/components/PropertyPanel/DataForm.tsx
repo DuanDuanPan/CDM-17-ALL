@@ -6,16 +6,19 @@
  * Supports opening preview dialogs based on data type
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Database, FileType, Shield, Folder, Tag, ExternalLink, FileText, Box, PenLine } from 'lucide-react';
-import { Button, Badge } from '@cdm/ui';
-import type { DataProps, DataType } from '@cdm/types';
+import { Button, Badge, useToast } from '@cdm/ui';
+import type { DataAssetWithFolder, DataProps, DataType } from '@cdm/types';
 import { DataPreviewDialog } from './DataPreviewDialog';
+import { LinkedAssetsSection } from './LinkedAssetsSection'; // Story 9.5
 
 export interface DataFormProps {
   nodeId: string;
   initialData?: DataProps;
   onUpdate?: (data: DataProps) => void;
+  /** Story 9.5: Open asset preview modal in parent PropertyPanel */
+  onAssetPreview?: (asset: DataAssetWithFolder) => void;
 }
 
 // Labels for data types
@@ -25,7 +28,7 @@ const DATA_TYPE_LABELS: Record<DataType, { label: string; description: string }>
   drawing: { label: '图纸', description: '中望CAD 图纸' },
 };
 
-export function DataForm({ nodeId: _nodeId, initialData, onUpdate }: DataFormProps) {
+export function DataForm({ nodeId, initialData, onUpdate, onAssetPreview }: DataFormProps) {
   const [formData, setFormData] = useState<DataProps>({
     dataType: initialData?.dataType || 'document',
     version: initialData?.version || 'v1.0.0',
@@ -34,6 +37,16 @@ export function DataForm({ nodeId: _nodeId, initialData, onUpdate }: DataFormPro
   });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { addToast } = useToast();
+
+  // Story 9.5: Guide user to Data Library for asset linking
+  const handleAddAssetClick = useCallback(() => {
+    addToast({
+      type: 'info',
+      title: '关联数据资产',
+      description: '请在右侧"数据资产库"中选择资产，通过右键菜单关联到当前节点',
+    });
+  }, [addToast]);
 
   useEffect(() => {
     setFormData({
@@ -200,6 +213,13 @@ export function DataForm({ nodeId: _nodeId, initialData, onUpdate }: DataFormPro
         dataType={formData.dataType || 'document'}
         version={formData.version ?? undefined}
         storagePath={formData.storagePath ?? undefined}
+      />
+
+      {/* Story 9.5: Linked assets section */}
+      <LinkedAssetsSection
+        nodeId={nodeId}
+        onAddClick={handleAddAssetClick}
+        onPreview={(link) => onAssetPreview?.(link.asset)}
       />
     </div>
   );

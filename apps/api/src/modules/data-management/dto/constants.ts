@@ -26,8 +26,8 @@ export const SECRET_LEVELS: readonly SecretLevel[] = [
 ] as const;
 
 export const DATA_LINK_TYPES: readonly DataLinkType[] = [
+  'input',
+  'output',
   'reference',
-  'attachment',
-  'source',
 ] as const;
 

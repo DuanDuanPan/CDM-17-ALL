@@ -12,6 +12,8 @@
  * AC#5: State persistence
  *
  * Story 9.4: Contour viewer integration
+ *
+ * Story 9.5: Upload button integration, Link-to-node dialog
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -22,6 +24,7 @@ import { DataLibraryDrawerView } from './data-library-drawer/DataLibraryDrawerVi
 import { filterAssets } from './data-library-drawer/filterAssets';
 import { getDataLibraryEmptyStateMessage } from './data-library-drawer/emptyState';
 import { useDrawerResize } from './data-library-drawer/useDrawerResize';
+import { LinkAssetDialog } from './LinkAssetDialog';
 import { useDataAssets } from '../hooks/useDataAssets';
 import { usePbsNodes } from '../hooks/usePbsNodes';
 import { usePbsAssets } from '../hooks/usePbsAssets';
@@ -29,7 +32,7 @@ import { useTaskAssets } from '../hooks/useTaskAssets';
 import { useDataFolders } from '../hooks/useDataFolders';
 import { useAssetPreview } from '../hooks/useAssetPreview';
 import { useDataLibraryDrawerOrgState } from '../hooks/useDataLibraryDrawerOrgState';
-import type { DataAssetFormat } from '@cdm/types';
+import type { DataAssetFormat, DataAssetWithFolder } from '@cdm/types';
 import type { ViewMode } from './data-library-drawer/types';
 
 // Story 9.3: Lazy load ModelViewerModal to avoid SSR issues with Online3DViewer
@@ -94,6 +97,9 @@ export function DataLibraryDrawer({
 
   // Story 9.4: Preview state using useAssetPreview hook
   const { previewAsset, previewType, handleAssetPreview, handleClosePreview } = useAssetPreview();
+
+  // Story 9.5: Link-to-node dialog state
+  const [linkingAsset, setLinkingAsset] = useState<DataAssetWithFolder | null>(null);
 
   // Story 9.2: PBS nodes hook for descendant IDs
   const { getDescendantIds } = usePbsNodes();
@@ -176,6 +182,17 @@ export function DataLibraryDrawer({
     },
     [moveAsset, refetch]
   );
+
+  // Story 9.5: Handle asset link button click
+  const handleAssetLink = useCallback((asset: DataAssetWithFolder) => {
+    setLinkingAsset(asset);
+  }, []);
+
+  // Story 9.5: Handle successful link creation
+  const handleLinkSuccess = useCallback(() => {
+    setLinkingAsset(null);
+    toast.success('已关联到节点');
+  }, []);
 
   // Story 9.2: Check if assets are loading from organization hooks
   const orgAssetsLoading = Boolean(
@@ -270,7 +287,19 @@ export function DataLibraryDrawer({
         isMovingAsset={isMovingAsset}
         draggableAssets={orgView === 'folder'}
         onAssetPreview={handleAssetPreview}
+        onAssetLink={handleAssetLink}
+        onUploadSuccess={refetch}
       />
+
+      {/* Story 9.5: Link-to-node dialog */}
+      {linkingAsset && (
+        <LinkAssetDialog
+          assetId={linkingAsset.id}
+          assetName={linkingAsset.name}
+          onClose={() => setLinkingAsset(null)}
+          onSuccess={handleLinkSuccess}
+        />
+      )}
 
       {/* Story 9.3/9.4: Preview modals based on asset type */}
       {previewAsset && previewAsset.storagePath && previewType === 'model' && (

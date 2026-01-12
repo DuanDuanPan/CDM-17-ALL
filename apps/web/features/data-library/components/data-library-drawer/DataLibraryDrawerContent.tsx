@@ -49,6 +49,8 @@ export interface DataLibraryDrawerContentProps {
 
   /** Story 9.3: Preview callback for 3D models */
   onAssetPreview?: (asset: DataAssetWithFolder) => void;
+  /** Story 9.5: Link-to-node callback */
+  onAssetLink?: (asset: DataAssetWithFolder) => void;
 }
 
 export function DataLibraryDrawerContent({
@@ -79,6 +81,7 @@ export function DataLibraryDrawerContent({
   viewMode,
   draggableAssets,
   onAssetPreview,
+  onAssetLink,
 }: DataLibraryDrawerContentProps) {
   const content = (
     <div className="flex-1 min-h-0 flex">
@@ -139,9 +142,9 @@ export function DataLibraryDrawerContent({
             <p className="text-sm font-medium">{emptyStateMessage}</p>
           </div>
         ) : viewMode === 'grid' ? (
-          <AssetGrid assets={visibleAssets} draggable={draggableAssets} onAssetPreview={onAssetPreview} />
+          <AssetGrid assets={visibleAssets} draggable={draggableAssets} onAssetPreview={onAssetPreview} onAssetLink={onAssetLink} />
         ) : (
-          <AssetList assets={visibleAssets} draggable={draggableAssets} onAssetPreview={onAssetPreview} />
+          <AssetList assets={visibleAssets} draggable={draggableAssets} onAssetPreview={onAssetPreview} onAssetLink={onAssetLink} />
         )}
       </div>
     </div>

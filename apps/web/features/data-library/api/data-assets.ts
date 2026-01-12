@@ -11,6 +11,9 @@ import type {
   DataAssetWithFolder,
   DataFolderTreeResponse,
   DataFolder,
+  DataAsset,
+  NodeDataLinkWithAsset,
+  DataLinkType,
 } from '@cdm/types';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -291,6 +294,111 @@ export async function fetchNodeAssetsByNodes(nodeIds: string[]): Promise<{ asset
   if (!response.ok) {
     const error = await readApiError(response);
     throw new Error(error.message || 'Failed to fetch node assets');
+  }
+
+  return response.json();
+}
+
+// ========================================
+// Story 9.5: Upload & Link API Functions
+// ========================================
+
+/**
+ * Upload a file and create data asset
+ * AC#1: Upload file to server, create DataAsset with auto-detected format
+ */
+export async function uploadDataAsset(
+  file: File,
+  graphId: string,
+  folderId?: string
+): Promise<{ success: boolean; asset: DataAsset }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('graphId', graphId);
+  if (folderId) {
+    formData.append('folderId', folderId);
+  }
+
+  const response = await fetch(`${API_BASE}/api/data-assets:upload`, {
+    method: 'POST',
+    body: formData,
+    // Note: Do NOT set Content-Type header - browser will set it with boundary
+  });
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to upload asset');
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetch links with full asset details for node property panel
+ * AC#4: Returns links including asset + linkType
+ */
+export async function fetchNodeAssetLinks(
+  nodeId: string
+): Promise<{ links: NodeDataLinkWithAsset[] }> {
+  const response = await fetch(
+    `${API_BASE}/api/data-assets/links:detail?nodeId=${encodeURIComponent(nodeId)}`,
+    {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to fetch node asset links');
+  }
+
+  return response.json();
+}
+
+/**
+ * Create link between node and asset
+ * AC#3: Link asset to node with linkType
+ */
+export async function createNodeAssetLink(data: {
+  nodeId: string;
+  assetId: string;
+  linkType?: DataLinkType;
+  note?: string;
+}): Promise<{ success: boolean; link: { id: string; nodeId: string; assetId: string; linkType: DataLinkType; createdAt: string } }> {
+  const response = await fetch(`${API_BASE}/api/data-assets/links`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to create link');
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete link between node and asset
+ * AC#5: Unlink asset from node
+ */
+export async function deleteNodeAssetLink(
+  nodeId: string,
+  assetId: string
+): Promise<{ success: boolean }> {
+  const response = await fetch(
+    `${API_BASE}/api/data-assets/links:destroy?nodeId=${encodeURIComponent(nodeId)}&assetId=${encodeURIComponent(assetId)}`,
+    {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to delete link');
   }
 
   return response.json();

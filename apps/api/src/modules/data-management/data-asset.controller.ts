@@ -1,10 +1,12 @@
 /**
  * Story 9.1: Data Library (数据资源库)
+ * Story 9.5: Data Upload & Node Linking
  * Data Asset Controller - REST API endpoints
  *
  * Follows NocoBase-inspired :action pattern:
  * - GET    /data-assets            → list
  * - POST   /data-assets            → create
+ * - POST   /data-assets:upload     → upload file (multipart/form-data)
  * - GET    /data-assets:get        → get single (filterByTk=id)
  * - PUT    /data-assets:update     → update (filterByTk=id)
  * - DELETE /data-assets:destroy    → delete (filterByTk=id)
@@ -24,7 +26,13 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { DataAssetService } from './data-asset.service';
 import { DataManagementAuthGuard } from './guards/data-management-auth.guard';
 import {
@@ -34,6 +42,7 @@ import {
   CreateNodeDataLinkDto,
   UpdateDataFolderDto,
   LinksByNodesDto,
+  UploadAssetDto,
 } from './dto';
 import type {
   DataAssetQueryDto,
@@ -46,7 +55,16 @@ import type {
   DataAssetFormat,
   DataFolder,
   DataAssetWithFolder,
+  NodeDataLinkWithAsset,
 } from '@cdm/types';
+
+// Reuse the same default limit as FileController (10MB) to avoid OOM on memory storage uploads.
+const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE = (() => {
+  const raw = process.env.DATA_ASSET_MAX_FILE_SIZE;
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_FILE_SIZE;
+})();
 
 @Controller()
 @UseGuards(DataManagementAuthGuard)
@@ -99,6 +117,39 @@ export class DataAssetController {
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() dto: CreateDataAssetDto): Promise<CreateDataAssetResponse> {
     const asset = await this.service.createAsset(dto);
+    return {
+      success: true,
+      asset,
+    };
+  }
+
+  /**
+   * Story 9.5: POST /data-assets:upload - Upload a file and create data asset
+   * AC#1: Upload file to server, create DataAsset with auto-detected format
+   * AC#2: Auto-detect format from file extension (case-insensitive)
+   */
+  @Post('data-assets\\:upload')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: MAX_FILE_SIZE },
+    })
+  )
+  async upload(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [new MaxFileSizeValidator({ maxSize: MAX_FILE_SIZE })],
+        fileIsRequired: true,
+      })
+    )
+    file: Express.Multer.File,
+    @Body() dto: UploadAssetDto
+  ): Promise<CreateDataAssetResponse> {
+    if (!dto.graphId) {
+      throw new BadRequestException('graphId is required');
+    }
+
+    const asset = await this.service.uploadAsset(file, dto.graphId, dto.folderId);
     return {
       success: true,
       asset,
@@ -194,11 +245,23 @@ export class DataAssetController {
 
   /**
    * GET /data-assets/links - Get assets linked to a node
+   * Returns only assets (for PBS/Task views)
    */
   @Get('data-assets/links')
   async getLinks(@Query('nodeId') nodeId: string): Promise<{ assets: DataAssetWithFolder[] }> {
     const assets = await this.service.getNodeAssets(nodeId);
     return { assets };
+  }
+
+  /**
+   * Story 9.5: GET /data-assets/links:detail - Get links with asset details
+   * AC#4: Returns links (including asset + linkType) for node property panel
+   * Does NOT break existing GET /data-assets/links response structure
+   */
+  @Get('data-assets/links\\:detail')
+  async getLinksDetail(@Query('nodeId') nodeId: string): Promise<{ links: NodeDataLinkWithAsset[] }> {
+    const links = await this.service.getNodeAssetLinks(nodeId);
+    return { links };
   }
 
   /**

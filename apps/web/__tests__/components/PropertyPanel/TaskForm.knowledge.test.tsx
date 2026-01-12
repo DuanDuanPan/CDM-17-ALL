@@ -21,6 +21,15 @@ vi.mock('@cdm/ui', async (importOriginal) => {
     };
 });
 
+// Mock Story 9.5 linked assets section dependencies (TaskForm now renders it)
+vi.mock('@/features/data-library/hooks/useAssetLinks', () => ({
+    useAssetLinks: () => ({
+        links: [],
+        isLoading: false,
+        unlinkAsset: vi.fn(),
+    }),
+}));
+
 // Mock KnowledgeSearchDialog
 vi.mock('@/components/Knowledge', () => ({
     KnowledgeSearchDialog: ({ open, onOpenChange, onSelect }: {

@@ -431,6 +431,7 @@ enum DataAssetFormat {
   OBJ        // 3D object format
   FBX        // 3D interchange format
   GLTF       // GL Transmission Format
+  VTK        // VTK scientific visualization (.vtk, .vtp, .vtu, .vti)
   PDF        // Document format
   DOCX       // Word document
   XLSX       // Excel spreadsheet

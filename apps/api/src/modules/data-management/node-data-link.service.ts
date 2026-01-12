@@ -1,5 +1,5 @@
 /**
- * Story 9.1 & 9.2: NodeDataLink Service
+ * Story 9.1, 9.2 & 9.5: NodeDataLink Service
  * Extracted from data-asset.service.ts to meet 300 LOC limit (GR-2)
  * Handles node-asset link operations: create, query, delete
  */
@@ -9,6 +9,7 @@ import {
     Logger,
     NotFoundException,
     ConflictException,
+    BadRequestException,
 } from '@nestjs/common';
 import { NodeDataLinkRepository } from './node-data-link.repository';
 import type {
@@ -21,6 +22,8 @@ import type {
     DataFolder,
     CreateNodeDataLinkDto,
     NodeDataLink,
+    NodeDataLinkWithAsset,
+    DataLinkType,
 } from '@cdm/types';
 
 @Injectable()
@@ -33,6 +36,26 @@ export class NodeDataLinkService {
      * Link a node to a data asset
      */
     async linkNodeToAsset(dto: CreateNodeDataLinkDto): Promise<NodeDataLink> {
+        const [nodeGraphId, assetGraphId] = await Promise.all([
+            this.linkRepo.getNodeGraphId(dto.nodeId),
+            this.linkRepo.getAssetGraphId(dto.assetId),
+        ]);
+
+        if (!nodeGraphId) {
+            throw new NotFoundException(`Node ${dto.nodeId} not found`);
+        }
+
+        if (!assetGraphId) {
+            throw new NotFoundException(`Data asset ${dto.assetId} not found`);
+        }
+
+        if (nodeGraphId !== assetGraphId) {
+            throw new BadRequestException({
+                code: 'CROSS_GRAPH_LINK_NOT_ALLOWED',
+                message: '不允许跨图谱关联：节点与资产必须属于同一图谱',
+            });
+        }
+
         // Check if link already exists
         const existing = await this.linkRepo.findByNodeAndAsset(dto.nodeId, dto.assetId);
         if (existing) {
@@ -124,12 +147,29 @@ export class NodeDataLinkService {
         };
     }
 
+    /**
+     * Story 9.5: Get links with full asset details for node property panel
+     * AC#4: Returns links with asset info including linkType
+     */
+    async getNodeAssetLinks(nodeId: string): Promise<NodeDataLinkWithAsset[]> {
+        const links = await this.linkRepo.findByNode(nodeId);
+        return links.map((link) => ({
+            id: link.id,
+            nodeId: link.nodeId,
+            assetId: link.assetId,
+            linkType: link.linkType as DataLinkType,
+            note: link.note,
+            createdAt: link.createdAt.toISOString(),
+            asset: this.toAssetResponse(link.asset),
+        }));
+    }
+
     private toLinkResponse(link: PrismaNodeDataLink): NodeDataLink {
         return {
             id: link.id,
             nodeId: link.nodeId,
             assetId: link.assetId,
-            linkType: link.linkType as 'reference' | 'attachment' | 'source',
+            linkType: link.linkType as DataLinkType,
             note: link.note,
             createdAt: link.createdAt.toISOString(),
         };

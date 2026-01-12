@@ -1,5 +1,6 @@
 /**
  * Story 9.1: Data Library (数据资源库)
+ * Story 9.5: Data Upload & Node Linking
  * Data Management Module - Encapsulates data library functionality
  *
  * GR-2 Compliance: Services and repositories extracted to separate files
@@ -17,8 +18,10 @@ import {
 } from './data-asset.repository';
 import { DataLibrarySeedService } from './mock-data';
 import { DataManagementAuthGuard } from './guards/data-management-auth.guard';
+import { FileModule } from '../file/file.module';
 
 @Module({
+  imports: [FileModule],
   controllers: [DataAssetController],
   providers: [
     // Services

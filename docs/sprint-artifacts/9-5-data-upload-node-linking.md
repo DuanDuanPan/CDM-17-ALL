@@ -1,6 +1,6 @@
 # Story 9.5: 数据上传与节点关联 (Data Upload & Node Linking)
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -225,7 +225,7 @@ export function getDataAssetFormatFromFilename(filename: string): DataAssetForma
 
 ### 测试惯例（沿用现有 E2E harness）
 
-- 扩展 `apps/web/e2e/data-library.spec.ts`
+- 新增 `apps/web/e2e/data-upload-node-linking.spec.ts`（沿用现有 E2E harness）
 - 复用 `createTestGraph` / `makeTestGraphUrl`
 - 打开 Drawer 方式沿用现有用例：`page.getByTitle('数据资源库').click()`
 
@@ -282,103 +282,103 @@ export function getDataAssetFormatFromFilename(filename: string): DataAssetForma
 
 ### Phase 1: 后端 API 实现 (AC: #1, #2, #3, #5)
 
-- [ ] Task 1.1: 上传 API 实现
-  - [ ] 1.1.1 在 `apps/api/src/modules/data-management/` 扩展 `data-asset.controller.ts`
-  - [ ] 1.1.2 实现 `POST /api/data-assets:upload` (multipart/form-data: `file`, `graphId`, optional `folderId`)
-  - [ ] 1.1.3 复用 `FileService` 存储文件（`apps/api/src/modules/file/file.service.ts`；DataManagementModule 需要 import `FileModule`）
-  - [ ] 1.1.4 创建 `apps/api/src/modules/data-management/utils/format-detection.ts` 实现 `getDataAssetFormatFromFilename`
-  - [ ] 1.1.5 创建 `DataAsset` 记录：`name`=原始文件名，`format`=映射结果，`fileSize`=bytes，`storagePath`=可被前端访问的 URL（推荐 `${API_BASE}/api/files/:fileId`）
-  - [ ] 1.1.6 基础安全护栏：MAX_FILE_SIZE（参考 `file.controller.ts`）、失败回滚（DB 创建失败要清理已写入文件）
+- [x] Task 1.1: 上传 API 实现
+  - [x] 1.1.1 在 `apps/api/src/modules/data-management/` 扩展 `data-asset.controller.ts`
+  - [x] 1.1.2 实现 `POST /api/data-assets:upload` (multipart/form-data: `file`, `graphId`, optional `folderId`)
+  - [x] 1.1.3 复用 `FileService` 存储文件（`apps/api/src/modules/file/file.service.ts`；DataManagementModule 需要 import `FileModule`）
+  - [x] 1.1.4 创建 `apps/api/src/modules/data-management/utils/format-detection.ts` 实现 `getDataAssetFormatFromFilename`
+  - [x] 1.1.5 创建 `DataAsset` 记录：`name`=原始文件名，`format`=映射结果，`fileSize`=bytes，`storagePath`=可被前端访问的 URL（推荐 `${API_BASE}/api/files/:fileId`）
+  - [x] 1.1.6 基础安全护栏：MAX_FILE_SIZE（参考 `file.controller.ts`）、失败回滚（DB 创建失败要清理已写入文件）
 
-- [ ] Task 1.2: 关联 API 实现
-  - [ ] 1.2.1 复用/扩展现有 `POST /api/data-assets/links` 创建关联（`linkType`: `input`/`output`/`reference`）
-  - [ ] 1.2.2 新增 `GET /api/data-assets/links:detail?nodeId=...` 返回 links（包含 `asset` + `linkType`）用于节点详情面板（不要破坏现有 `GET /api/data-assets/links` 响应结构）
-  - [ ] 1.2.3 复用现有 `DELETE /api/data-assets/links:destroy?nodeId=...&assetId=...` 解除关联
-  - [ ] 1.2.4 校验：nodeId 存在、assetId 存在，且 node.graphId === asset.graphId（阻止跨图关联）+ 权限（最小保证）
-  - [ ] 1.2.5 同步更新 `DataLinkType` 与 `DATA_LINK_TYPES`（见 Must Follow），确保 DTO 校验允许 `input/output/reference`
+- [x] Task 1.2: 关联 API 实现
+  - [x] 1.2.1 复用/扩展现有 `POST /api/data-assets/links` 创建关联（`linkType`: `input`/`output`/`reference`）
+  - [x] 1.2.2 新增 `GET /api/data-assets/links:detail?nodeId=...` 返回 links（包含 `asset` + `linkType`）用于节点详情面板（不要破坏现有 `GET /api/data-assets/links` 响应结构）
+  - [x] 1.2.3 复用现有 `DELETE /api/data-assets/links:destroy?nodeId=...&assetId=...` 解除关联
+  - [x] 1.2.4 校验：nodeId 存在、assetId 存在，且 node.graphId === asset.graphId（阻止跨图关联）+ 权限（最小保证）
+  - [x] 1.2.5 同步更新 `DataLinkType` 与 `DATA_LINK_TYPES`（见 Must Follow），确保 DTO 校验允许 `input/output/reference`
 
-- [ ] Task 1.3: Service/Repository 层（复用现有 Repository）
-  - [ ] 1.3.1 在 `DataAssetService` 添加 `uploadAsset(file, graphId, creatorId?, folderId?)`
-  - [ ] 1.3.2 在 `NodeDataLinkService` 添加 `getNodeAssetLinks(nodeId)`（供 `links:detail` 使用，返回 link + asset + folder）
-  - [ ] 1.3.3 如需扩展查询：复用/扩展现有 `NodeDataLinkRepository.findByNode`（已 include asset+folder）
+- [x] Task 1.3: Service/Repository 层（复用现有 Repository）
+  - [x] 1.3.1 在 `DataAssetService` 添加 `uploadAsset(file, graphId, creatorId?, folderId?)`
+  - [x] 1.3.2 在 `NodeDataLinkService` 添加 `getNodeAssetLinks(nodeId)`（供 `links:detail` 使用，返回 link + asset + folder）
+  - [x] 1.3.3 如需扩展查询：复用/扩展现有 `NodeDataLinkRepository.findByNode`（已 include asset+folder）
 
 ### Phase 2: 前端上传组件 (AC: #1, #2)
 
-- [ ] Task 2.1: 创建上传组件
-  - [ ] 2.1.1 创建 `apps/web/features/data-library/components/UploadButton.tsx`
-  - [ ] 2.1.2 使用 `@cdm/ui` Button + Input[type=file]
-  - [ ] 2.1.3 支持点击选择 + 拖拽区域
-  - [ ] 2.1.4 调用上传 API + 处理响应
-  - [ ] 2.1.5 上传成功后刷新资产列表
-  - [ ] 2.1.6 **控制文件行数 ≤ 150 LOC**
+- [x] Task 2.1: 创建上传组件
+  - [x] 2.1.1 创建 `apps/web/features/data-library/components/UploadButton.tsx`
+  - [x] 2.1.2 使用 `@cdm/ui` Button + Input[type=file]
+  - [x] 2.1.3 支持点击选择 + 拖拽区域
+  - [x] 2.1.4 调用上传 API + 处理响应
+  - [x] 2.1.5 上传成功后刷新资产列表
+  - [x] 2.1.6 **控制文件行数 ≤ 150 LOC**
 
-- [ ] Task 2.2: 创建上传 Hook
-  - [ ] 2.2.1 创建 `apps/web/features/data-library/hooks/useDataUpload.ts`
-  - [ ] 2.2.2 封装上传逻辑 (FormData + fetch)
-  - [ ] 2.2.3 返回 `{ upload, isUploading, error }`
-  - [ ] 2.2.4 **控制文件行数 ≤ 80 LOC**
+- [x] Task 2.2: 创建上传 Hook
+  - [x] 2.2.1 创建 `apps/web/features/data-library/hooks/useDataUpload.ts`
+  - [x] 2.2.2 封装上传逻辑 (FormData + fetch)
+  - [x] 2.2.3 返回 `{ upload, isUploading, error }`
+  - [x] 2.2.4 **控制文件行数 ≤ 80 LOC**
 
 ### Phase 3: 资产关联功能 (AC: #3, #4, #5)
 
-- [ ] Task 3.1: 创建关联 Dialog
-  - [ ] 3.1.1 创建 `apps/web/features/data-library/components/LinkAssetDialog.tsx`
-  - [ ] 3.1.2 实现节点搜索/选择（数据源：`GraphContext.graph.getNodes()`；仅允许 `NodeType.TASK`/`NodeType.DATA`；按 label 搜索）
-  - [ ] 3.1.3 实现关联类型选择（Radio：输入/输出/参考 → `input`/`output`/`reference`）
-  - [ ] 3.1.4 调用关联 API
-  - [ ] 3.1.5 **控制文件行数 ≤ 180 LOC**
+- [x] Task 3.1: 创建关联 Dialog
+  - [x] 3.1.1 创建 `apps/web/features/data-library/components/LinkAssetDialog.tsx`
+  - [x] 3.1.2 实现节点搜索/选择（数据源：`GraphContext.graph.getNodes()`；仅允许 `NodeType.TASK`/`NodeType.DATA`；按 label 搜索）
+  - [x] 3.1.3 实现关联类型选择（Radio：输入/输出/参考 → `input`/`output`/`reference`）
+  - [x] 3.1.4 调用关联 API
+  - [x] 3.1.5 **控制文件行数 ≤ 180 LOC**
 
-- [ ] Task 3.2: 创建关联 Hook
-  - [ ] 3.2.1 创建 `apps/web/features/data-library/hooks/useAssetLinks.ts`
-  - [ ] 3.2.2 封装 CRUD 操作
-  - [ ] 3.2.3 返回 `{ linkAsset, unlinkAsset, isLinking }`
+- [x] Task 3.2: 创建关联 Hook
+  - [x] 3.2.1 创建 `apps/web/features/data-library/hooks/useAssetLinks.ts`
+  - [x] 3.2.2 封装 CRUD 操作
+  - [x] 3.2.3 返回 `{ linkAsset, unlinkAsset, isLinking }`
 
-- [ ] Task 3.3: 节点详情面板集成
-  - [ ] 3.3.1 创建 `apps/web/components/PropertyPanel/LinkedAssetsSection.tsx`
-  - [ ] 3.3.2 显示关联资产列表
-  - [ ] 3.3.3 实现预览按钮 (复用 ModelViewerModal/ContourViewerModal)
-  - [ ] 3.3.4 实现解除关联按钮
-  - [ ] 3.3.5 集成到 `TaskForm.tsx` 与 `DataForm.tsx`（RightSidebar 当前渲染链路：`RightSidebar → PropertyPanel → {TaskForm|DataForm}`）
-  - [ ] 3.3.6 **每个文件控制行数 ≤ 150 LOC**
+- [x] Task 3.3: 节点详情面板集成
+  - [x] 3.3.1 创建 `apps/web/components/PropertyPanel/LinkedAssetsSection.tsx`
+  - [x] 3.3.2 显示关联资产列表
+  - [x] 3.3.3 实现预览按钮 (复用 ModelViewerModal/ContourViewerModal)
+  - [x] 3.3.4 实现解除关联按钮
+  - [x] 3.3.5 集成到 `TaskForm.tsx` 与 `DataForm.tsx`（RightSidebar 当前渲染链路：`RightSidebar → PropertyPanel → {TaskForm|DataForm}`）
+  - [x] 3.3.6 **每个文件控制行数 ≤ 150 LOC**
 
 ### Phase 4: 集成与更新 (AC: #3)
 
-- [ ] Task 4.1: 更新 AssetCard/AssetList
-  - [ ] 4.1.1 添加“关联到节点”入口（建议：卡片/列表 hover actions 或行内按钮；可选再补右键菜单）
-  - [ ] 4.1.2 入口触发 LinkAssetDialog（传入当前 assetId）
-  - [ ] 4.1.3 触发 LinkAssetDialog
+- [x] Task 4.1: 更新 AssetCard/AssetList
+  - [x] 4.1.1 添加“关联到节点”入口（建议：卡片/列表 hover actions 或行内按钮；可选再补右键菜单）
+  - [x] 4.1.2 入口触发 LinkAssetDialog（传入当前 assetId）
+  - [x] 4.1.3 触发 LinkAssetDialog
 
-- [ ] Task 4.2: 更新 DataLibraryDrawer
-  - [ ] 4.2.1 集成 UploadButton 到顶部工具栏（`DataLibraryDrawerToolbar.tsx`）
-  - [ ] 4.2.2 集成 LinkAssetDialog (状态管理)
-  - [ ] 4.2.3 上传成功后自动刷新列表
+- [x] Task 4.2: 更新 DataLibraryDrawer
+  - [x] 4.2.1 集成 UploadButton 到顶部工具栏（`DataLibraryDrawerToolbar.tsx`）
+  - [x] 4.2.2 集成 LinkAssetDialog (状态管理)
+  - [x] 4.2.3 上传成功后自动刷新列表
 
 ### Phase 5: 测试与验证 (All ACs)
 
-- [ ] Task 5.1: 单元测试
-  - [ ] 5.1.1 创建 `UploadButton.test.tsx` (4个用例)
-  - [ ] 5.1.2 创建 `useDataUpload.test.ts` (5个用例)
-  - [ ] 5.1.3 创建 `LinkAssetDialog.test.tsx` (6个用例)
-  - [ ] 5.1.4 创建 `LinkedAssetsSection.test.tsx` (5个用例)
-  - [ ] 5.1.5 创建 `useAssetLinks.test.ts` (5个用例)
+- [x] Task 5.1: 单元测试
+  - [x] 5.1.1 创建 `UploadButton.test.tsx` (4个用例)
+  - [x] 5.1.2 创建 `useDataUpload.test.ts` (5个用例)
+  - [x] 5.1.3 创建 `LinkAssetDialog.test.tsx` (6个用例)
+  - [x] 5.1.4 创建 `LinkedAssetsSection.test.tsx` (5个用例)
+  - [x] 5.1.5 创建 `useAssetLinks.test.ts` (5个用例)
 
-- [ ] Task 5.2: E2E 测试 (扩展 `data-library.spec.ts`)
-  - [ ] 5.2.1 AC1: 点击上传按钮选择文件
-  - [ ] 5.2.2 AC2: 上传 STEP 文件验证 format=STEP
-  - [ ] 5.2.3 AC2: 上传 STL 文件验证 format=STL
-  - [ ] 5.2.4 AC2: 上传 VTK 文件验证 format=OTHER，并可打开 `contour-viewer-modal`
-  - [ ] 5.2.5 AC2: 上传 PDF 文件验证 format=PDF
-  - [ ] 5.2.6 AC2: 上传未知格式验证 format=OTHER
-  - [ ] 5.2.7 AC3: 选中资产点击关联到节点，验证 Dialog 显示
-  - [ ] 5.2.8 AC3: 选择节点并以 input 类型关联
-  - [ ] 5.2.9 AC3: 选择节点并以 output 类型关联
-  - [ ] 5.2.10 AC4: 节点详情面板显示资产名称、格式、关联类型
-  - [ ] 5.2.11 AC4: 点击预览按钮打开预览模态框
-  - [ ] 5.2.12 AC5: 解除关联后资产从列表移除
+- [x] Task 5.2: E2E 测试 (新增 `data-upload-node-linking.spec.ts`)
+  - [x] 5.2.1 AC1: 点击上传按钮选择文件
+  - [x] 5.2.2 AC2: 上传 STEP 文件验证 format=STEP
+  - [x] 5.2.3 AC2: 上传 STL 文件验证 format=STL
+  - [x] 5.2.4 AC2: 上传 VTK 文件验证 format=OTHER，并可打开 `contour-viewer-modal`
+  - [x] 5.2.5 AC2: 上传 PDF 文件验证 format=PDF
+  - [x] 5.2.6 AC2: 上传未知格式验证 format=OTHER
+  - [x] 5.2.7 AC3: 选中资产点击关联到节点，验证 Dialog 显示
+  - [x] 5.2.8 AC3: 选择节点并以 input 类型关联
+  - [x] 5.2.9 AC3: 选择节点并以 output 类型关联
+  - [x] 5.2.10 AC4: 节点详情面板显示资产名称、格式、关联类型
+  - [x] 5.2.11 AC4: 点击预览按钮打开预览模态框
+  - [x] 5.2.12 AC5: 解除关联后资产从列表移除
 
-- [ ] Task 5.3: 后端测试
-  - [ ] 5.3.1 创建 `data-asset.controller.spec.ts` (8个用例)
-  - [ ] 5.3.2 创建 `data-asset.repository.spec.ts` (6个用例)
-  - [ ] 5.3.3 创建 `format-detection.spec.ts` (10个用例) - `DataAssetFormat` 格式识别测试
+- [x] Task 5.3: 后端测试
+  - [x] 5.3.1 创建 `data-asset.controller.spec.ts` (8个用例)
+  - [x] 5.3.2 创建 `data-asset.repository.spec.ts` (6个用例)
+  - [x] 5.3.3 创建 `format-detection.spec.ts` (10个用例) - `DataAssetFormat` 格式识别测试
 
 ---
 
@@ -431,11 +431,11 @@ await fetch('/api/data-assets:upload', { ... });
 
 | 文件                      | 预估行数 | 状态 |
 | ------------------------- | -------- | ---- |
-| `UploadButton.tsx`        | ~150 LOC | ✅    |
-| `useDataUpload.ts`        | ~80 LOC  | ✅    |
-| `LinkAssetDialog.tsx`     | ~180 LOC | ✅    |
-| `useAssetLinks.ts`        | ~100 LOC | ✅    |
-| `LinkedAssetsSection.tsx` | ~150 LOC | ✅    |
+| `UploadButton.tsx`        | 141 LOC | ✅    |
+| `useDataUpload.ts`        | 76 LOC  | ✅    |
+| `LinkAssetDialog.tsx`     | 180 LOC | ✅    |
+| `useAssetLinks.ts`        | 138 LOC | ✅    |
+| `LinkedAssetsSection.tsx` | 148 LOC | ✅    |
 
 **来源**: `project-context.md:93`
 
@@ -569,11 +569,11 @@ apps/web/components/layout/
 
 | AC  | 验收标准         | E2E测试   | 单元测试  | 后端测试          | 验证方式                         |
 | --- | ---------------- | --------- | --------- | ----------------- | -------------------------------- |
-| AC1 | 数据上传         | ✅ #1      | ✅ 9 用例  | ✅ controller.spec | 文件选择 + API 响应              |
-| AC2 | 格式识别         | ✅ #2-#6   | -         | ✅ 10 用例         | 5 种格式类型验证                 |
-| AC3 | 资产关联到节点   | ✅ #7-#9   | ✅ 11 用例 | ✅ controller.spec | Dialog 交互 + 3 种关联类型       |
+| AC1 | 数据上传         | ✅ #1      | ✅ 9 用例  | ✅ data-asset.controller.spec.ts | 文件选择 + API 响应              |
+| AC2 | 格式识别         | ✅ #2-#6   | -         | ✅ format-detection.spec.ts   | 5 种格式类型验证                 |
+| AC3 | 资产关联到节点   | ✅ #7-#9   | ✅ 11 用例 | ✅ data-asset.controller.spec.ts | Dialog 交互 + 3 种关联类型       |
 | AC4 | 详情面板显示关联 | ✅ #10-#11 | ✅ 5 用例  | -                 | 资产名称/格式/类型 + 预览功能    |
-| AC5 | 解除关联         | ✅ #12     | ✅ 5 用例  | ✅ controller.spec | unlink 后列表更新 + 资产保留验证 |
+| AC5 | 解除关联         | ✅ #12     | ✅ 5 用例  | ✅ data-asset.controller.spec.ts | unlink 后列表更新 + 资产保留验证 |
 
 ---
 
@@ -684,10 +684,150 @@ describe('getDataAssetFormatFromFilename', () => {
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+GPT-5.2 (Codex CLI)
 
 ### Debug Log References
 
+- `pnpm --filter @cdm/api test`（当前仓库存在与本 Story 无关的既有失败：`apps/api/src/plugin-migration.cleanup.spec.ts`）
+- `pnpm --filter @cdm/api test -- data-asset.controller.spec.ts data-asset.repository.spec.ts`
+- `pnpm --filter @cdm/web test`
+- `pnpm --filter @cdm/web test:e2e -- data-upload-node-linking.spec.ts`
+
 ### Completion Notes List
 
+- ✅ 已实现上传端点并增加基础护栏：`MAX_FILE_SIZE`（可用 `DATA_ASSET_MAX_FILE_SIZE` 覆盖）+ ParseFilePipe 校验
+- ✅ 已实现 `links:detail`（link + asset + folder + linkType）并在属性面板展示/预览/解除关联
+- ✅ 已补齐跨图关联拦截：强制 `node.graphId === asset.graphId`（否则 `CROSS_GRAPH_LINK_NOT_ALLOWED`）
+- ✅ 修复上传资产的云图预览判定：`storagePath` 无扩展名时改用 `asset.name` 推断（VTK / *.scalar.json）
+- ✅ 后端补充单测：`data-asset.controller.spec.ts`、`data-asset.repository.spec.ts`、`format-detection.spec.ts`、`node-data-link.service.spec.ts`，并修复 `data-asset.service.spec.ts` 以匹配当前依赖注入结构
+- ✅ 已补齐前端单测（Vitest）与 Playwright E2E（覆盖 STEP/STL/VTK/PDF/未知格式 + 关联/预览/解除关联）
+- ✅ 已将 LinkedAssetsSection 集成到 `TaskForm.tsx` 与 `DataForm.tsx`，并通过 `PropertyPanel` 传递 `onAssetPreview`
+- ✅ LOC 护栏达标：`UploadButton.tsx` ≤150、`useDataUpload.ts` ≤80、`LinkAssetDialog.tsx` ≤180、`LinkedAssetsSection.tsx` ≤150
+
 ### File List
+
+apps/api/scripts/create-story-9-data.ts
+apps/api/src/modules/data-management/data-asset.controller.ts
+apps/api/src/modules/data-management/data-asset.service.ts
+apps/api/src/modules/data-management/data-management.module.ts
+apps/api/src/modules/data-management/dto/constants.ts
+apps/api/src/modules/data-management/dto/index.ts
+apps/api/src/modules/data-management/dto/upload-asset.dto.ts
+apps/api/src/modules/data-management/node-data-link.repository.ts
+apps/api/src/modules/data-management/node-data-link.service.ts
+apps/api/src/modules/data-management/utils/format-detection.ts
+apps/api/src/modules/data-management/__tests__/data-asset.controller.spec.ts
+apps/api/src/modules/data-management/__tests__/data-asset.service.spec.ts
+apps/api/src/modules/data-management/__tests__/data-asset.repository.spec.ts
+apps/api/src/modules/data-management/__tests__/format-detection.spec.ts
+apps/api/src/modules/data-management/__tests__/node-data-link.service.spec.ts
+
+packages/types/src/data-library-types.ts
+
+apps/web/features/data-library/api/data-assets.ts
+apps/web/features/data-library/components/AssetCard.tsx
+apps/web/features/data-library/components/AssetGrid.tsx
+apps/web/features/data-library/components/AssetList.tsx
+apps/web/features/data-library/components/DataLibraryDrawer.tsx
+apps/web/features/data-library/components/LinkAssetDialog.tsx
+apps/web/features/data-library/components/UploadButton.tsx
+apps/web/features/data-library/components/data-library-drawer/DataLibraryDrawerContent.tsx
+apps/web/features/data-library/components/data-library-drawer/DataLibraryDrawerPanel.tsx
+apps/web/features/data-library/components/data-library-drawer/DataLibraryDrawerToolbar.tsx
+apps/web/features/data-library/components/index.ts
+apps/web/features/data-library/hooks/index.ts
+apps/web/features/data-library/hooks/useAssetLinks.ts
+apps/web/features/data-library/hooks/useDataUpload.ts
+apps/web/features/data-library/hooks/useAssetPreview.ts
+apps/web/features/data-library/utils/linkAssetDialog.ts
+
+apps/web/components/PropertyPanel/index.tsx
+apps/web/components/PropertyPanel/LinkedAssetsSection.tsx
+apps/web/components/PropertyPanel/TaskForm.tsx
+apps/web/components/PropertyPanel/DataForm.tsx
+
+apps/web/__tests__/components/PropertyPanel/TaskForm.knowledge.test.tsx
+apps/web/__tests__/features/data-library/UploadButton.test.tsx
+apps/web/__tests__/features/data-library/useDataUpload.test.tsx
+apps/web/__tests__/features/data-library/LinkAssetDialog.test.tsx
+apps/web/__tests__/features/data-library/LinkedAssetsSection.test.tsx
+apps/web/__tests__/features/data-library/useAssetLinks.test.tsx
+
+apps/web/e2e/data-upload-node-linking.spec.ts
+apps/web/e2e/fixtures/upload-sample.step
+apps/web/e2e/fixtures/upload-sample.stl
+apps/web/e2e/fixtures/upload-sample.vtk
+apps/web/e2e/fixtures/upload-sample.pdf
+apps/web/e2e/fixtures/upload-sample.unknown
+
+docs/sprint-artifacts/sprint-status.yaml
+
+---
+
+## Code Review
+
+### Review Date: 2026-01-12
+
+### Reviewer: Claude Opus 4.5 (BMAD code-review workflow)
+
+### Review Status: ✅ APPROVED (No blocking issues)
+
+### Acceptance Criteria Validation
+
+| AC | 验收标准 | 状态 | 说明 |
+|----|---------|------|------|
+| AC1 | 数据上传 | ✅ PASS | POST :upload 端点完整，含 rollback 机制 |
+| AC2 | 格式识别 | ✅ PASS | 15+ 格式映射，大小写无关，单元测试覆盖 |
+| AC3 | 资产关联节点 | ✅ PASS | LinkAssetDialog + linkType (input/output/reference) |
+| AC4 | 节点面板显示关联 | ✅ PASS | LinkedAssetsSection 集成到 TaskForm/DataForm |
+| AC5 | 解除关联 | ✅ PASS | unlinkAsset API + UI 按钮，资产不删除 |
+
+### Engineering Guardrails Validation
+
+| 护栏 | 状态 | 说明 |
+|------|------|------|
+| GR-1 Repository Pattern | ✅ PASS | 所有数据访问通过 Repository 层 |
+| GR-2 Hook-First | ✅ PASS | useDataUpload + useAssetLinks 封装业务逻辑 |
+| GR-3 LOC 限制 | ✅ PASS | 所有新文件 < 200 LOC |
+| GR-4 UI 组件来源 | ✅ PASS | Button/Input/Badge 来自 @cdm/ui |
+| GR-5 代码审查清单 | ✅ PASS | 所有检查项通过 |
+
+### Issues Found
+
+#### ISSUE-1: [MEDIUM] LinkedAssetsSection 缺少 "添加" 按钮回调
+
+**位置**: `TaskForm.tsx:208-211`, `DataForm.tsx:209-212`
+
+**问题**: 组件有 `onAddClick` prop，但渲染时未传递，导致"添加"按钮不显示。
+
+**影响**: 用户无法从节点属性面板直接添加资产关联。
+
+**建议**: 后续迭代添加 onAddClick 实现以打开 LinkAssetDialog。
+
+#### ISSUE-2: [LOW] 跨图关联错误消息可改进
+
+**位置**: `node-data-link.service.ts:52-57`
+
+**问题**: 错误消息为英文，可考虑本地化。
+
+**影响**: 用户体验。非阻塞。
+
+#### ISSUE-3: [LOW] VTK 格式缺少显式枚举值
+
+**位置**: `format-detection.ts`
+
+**问题**: VTK 返回 `OTHER`，依赖 storagePath 扩展名判断预览类型。
+
+**影响**: 未来按格式过滤 VTK 资产需额外逻辑。非阻塞。
+
+### Commendable Patterns
+
+1. **GR-1.1.6 Rollback 实现** - uploadAsset 在 DB 失败时删除已上传文件 ✓
+2. **类型安全** - @cdm/types 作为单一来源，前后端同步
+3. **E2E 测试** - 214 行覆盖完整用户流程
+4. **防御性编程** - fetchNodeAssetsByNodes 空数组检查避免后端 400
+5. **跨图防护** - node.graphId !== asset.graphId 校验 (BadRequest)
+
+### Review Decision
+
+**APPROVED** - Story 9.5 实现完整，所有 AC 通过，无阻塞性问题。MEDIUM/LOW 问题可作为后续迭代改进。

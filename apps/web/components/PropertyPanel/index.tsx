@@ -3,9 +3,11 @@
 /**
  * Story 2.1: Dynamic Property Panel
  * Main component that renders type-specific forms based on node type
+ * Story 9.5: Added LinkedAssetsSection for TASK and DATA nodes
  */
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { Archive, ChevronDown, RotateCcw, X } from 'lucide-react';
 import { NodeType, type EnhancedNodeData, type NodeProps, type TaskProps, type Deliverable, type ApprovalPipeline } from '@cdm/types';
 import { CommonHeader } from './CommonHeader';
@@ -15,6 +17,18 @@ import { useConfirmDialog } from '@cdm/ui';
 import { KnowledgeRecommendation } from '@/components/Knowledge'; // Story 2.8
 import { ApprovalStatusPanel } from './ApprovalStatusPanel'; // Story 4.1
 import { useCurrentUserId } from '@/contexts'; // Story 4.1: FIX-9
+import { useAssetPreview } from '@/features/data-library/hooks/useAssetPreview'; // Story 9.5
+
+// Story 9.5: Lazy load preview modals to avoid SSR issues
+const ModelViewerModal = dynamic(
+  () => import('@/features/industrial-viewer').then((mod) => mod.ModelViewerModal),
+  { ssr: false }
+);
+
+const ContourViewerModal = dynamic(
+  () => import('@/features/industrial-viewer').then((mod) => mod.ContourViewerModal),
+  { ssr: false }
+);
 
 export interface PropertyPanelProps {
   nodeId: string | null;
@@ -42,6 +56,9 @@ export function PropertyPanel({
   const currentUserId = useCurrentUserId();
   const [currentType, setCurrentType] = useState<NodeType>(nodeData?.type || NodeType.ORDINARY);
   const { showConfirm } = useConfirmDialog();
+
+  // Story 9.5: Asset preview state
+  const { previewAsset, previewType, handleAssetPreview, handleClosePreview } = useAssetPreview();
 
   useEffect(() => {
     if (nodeData?.type) {
@@ -179,6 +196,7 @@ export function PropertyPanel({
               nodeId={nodeId}
               initialData={nodeData.props}
               onUpdate={handlePropsUpdate}
+              onAssetPreview={handleAssetPreview}
             />
           </div>
 
@@ -215,6 +233,25 @@ export function PropertyPanel({
           节点 ID: <span className="font-mono">{nodeId}</span>
         </p>
       </div>
+
+      {/* Story 9.5: Preview modals based on asset type */}
+      {previewAsset && previewAsset.storagePath && previewType === 'model' && (
+        <ModelViewerModal
+          isOpen={!!previewAsset}
+          onClose={handleClosePreview}
+          assetUrl={previewAsset.storagePath}
+          assetName={previewAsset.name}
+        />
+      )}
+
+      {previewAsset && previewAsset.storagePath && previewType === 'contour' && (
+        <ContourViewerModal
+          isOpen={!!previewAsset}
+          onClose={handleClosePreview}
+          assetUrl={previewAsset.storagePath}
+          assetName={previewAsset.name}
+        />
+      )}
     </aside>
   );
 }

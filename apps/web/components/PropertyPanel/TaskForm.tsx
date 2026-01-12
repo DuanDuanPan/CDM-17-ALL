@@ -15,19 +15,23 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Calendar, Flag } from 'lucide-react';
-import type { TaskProps } from '@cdm/types';
+import { useToast } from '@cdm/ui';
+import type { DataAssetWithFolder, TaskProps } from '@cdm/types';
 import { TaskDispatchSection } from './TaskDispatchSection';
 import { KnowledgeResourcesSection } from './KnowledgeResourcesSection';
 import { UserSelector } from '../UserSelector'; // Story 4.1: FIX-8
+import { LinkedAssetsSection } from './LinkedAssetsSection'; // Story 9.5
 
 export interface TaskFormProps {
   nodeId: string;
   initialData?: TaskProps;
   onUpdate?: (data: TaskProps) => void;
+  /** Story 9.5: Open asset preview modal in parent PropertyPanel */
+  onAssetPreview?: (asset: DataAssetWithFolder) => void;
 }
 
 // Story 4.1: FIX-9 - currentUserId removed from props (now uses context in child components)
-export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
+export function TaskForm({ nodeId, initialData, onUpdate, onAssetPreview }: TaskFormProps) {
   const [formData, setFormData] = useState<TaskProps>({
     status: initialData?.status || 'todo',
     priority: initialData?.priority || 'medium',
@@ -44,6 +48,16 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { addToast } = useToast();
+
+  // Story 9.5: Guide user to Data Library for asset linking
+  const handleAddAssetClick = useCallback(() => {
+    addToast({
+      type: 'info',
+      title: '关联数据资产',
+      description: '请在右侧"数据资产库"中选择资产，通过右键菜单关联到当前节点',
+    });
+  }, [addToast]);
 
   useEffect(() => {
     setFormData({
@@ -199,6 +213,13 @@ export function TaskForm({ nodeId, initialData, onUpdate }: TaskFormProps) {
       <KnowledgeResourcesSection
         knowledgeRefs={formData.knowledgeRefs || []}
         onKnowledgeRefsChange={(refs) => handleFieldChange('knowledgeRefs', refs)}
+      />
+
+      {/* Story 9.5: Linked assets section */}
+      <LinkedAssetsSection
+        nodeId={nodeId}
+        onAddClick={handleAddAssetClick}
+        onPreview={(link) => onAssetPreview?.(link.asset)}
       />
     </div>
   );

@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * Story 9.1: Data Library Drawer Panel
+ * Story 9.5: Added graphId prop for upload functionality
+ */
+
 import { Database, X } from 'lucide-react';
 import { DataLibraryDrawerContent, type DataLibraryDrawerContentProps } from './DataLibraryDrawerContent';
 import { DataLibraryDrawerFooter } from './DataLibraryDrawerFooter';

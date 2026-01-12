@@ -6,6 +6,7 @@
  * AC#3: List view for data assets
  * Story 9.2: Migrated to @dnd-kit for high-fidelity drag preview
  * Story 9.3: Added preview support for 3D models
+ * Story 9.5: Added link-to-node action button
  */
 
 import { forwardRef } from 'react';
@@ -19,6 +20,7 @@ import {
   File,
   Cuboid,
   Eye,
+  Link2,
 } from 'lucide-react';
 import { cn } from '@cdm/ui';
 import type { DataAssetWithFolder, DataAssetFormat } from '@cdm/types';
@@ -32,6 +34,8 @@ interface AssetListProps {
   onAssetClick?: (asset: DataAssetWithFolder) => void;
   /** Story 9.3: Preview callback for 3D models */
   onAssetPreview?: (asset: DataAssetWithFolder) => void;
+  /** Story 9.5: Link-to-node callback */
+  onAssetLink?: (asset: DataAssetWithFolder) => void;
   /** Story 9.2: Enable drag for folder organization */
   draggable?: boolean;
 }
@@ -105,11 +109,13 @@ interface AssetListRowInnerProps {
   asset: DataAssetWithFolder;
   onClick?: () => void;
   onPreview?: () => void;
+  /** Story 9.5: Link-to-node callback */
+  onLink?: () => void;
   isDragging?: boolean;
 }
 
 const AssetListRowInner = forwardRef<HTMLDivElement, AssetListRowInnerProps & React.HTMLAttributes<HTMLDivElement>>(
-  function AssetListRowInner({ asset, onClick, onPreview, isDragging, className, style, ...props }, ref) {
+  function AssetListRowInner({ asset, onClick, onPreview, onLink, isDragging, className, style, ...props }, ref) {
     const Icon = getFormatIcon(asset.format);
     const colorClass = getFormatColor(asset.format);
     const canPreview = getAssetPreviewType(asset) !== null && !!asset.storagePath && !!onPreview;
@@ -117,6 +123,11 @@ const AssetListRowInner = forwardRef<HTMLDivElement, AssetListRowInnerProps & Re
     const handlePreviewClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       onPreview?.();
+    };
+
+    const handleLinkClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onLink?.();
     };
 
     const handleDoubleClick = (e: React.MouseEvent) => {
@@ -178,8 +189,21 @@ const AssetListRowInner = forwardRef<HTMLDivElement, AssetListRowInnerProps & Re
           {format(new Date(asset.updatedAt), 'yyyy-MM-dd')}
         </div>
 
-        {/* Actions Column (Story 9.3) */}
-        <div className="col-span-1 flex items-center">
+        {/* Actions Column (Story 9.3, 9.5) */}
+        <div className="col-span-1 flex items-center gap-1">
+          {onLink && (
+            <button
+              type="button"
+              onClick={handleLinkClick}
+              className="p-1.5 text-gray-400 hover:text-green-500 hover:bg-green-50
+                       dark:hover:bg-green-900/30 rounded-md transition-colors
+                       opacity-0 group-hover:opacity-100"
+              title="关联到节点"
+              data-testid="link-button"
+            >
+              <Link2 className="w-4 h-4" />
+            </button>
+          )}
           {canPreview && (
             <button
               type="button"
@@ -207,9 +231,11 @@ interface DraggableAssetListRowProps {
   asset: DataAssetWithFolder;
   onAssetClick?: (asset: DataAssetWithFolder) => void;
   onAssetPreview?: (asset: DataAssetWithFolder) => void;
+  /** Story 9.5: Link-to-node callback */
+  onAssetLink?: (asset: DataAssetWithFolder) => void;
 }
 
-function DraggableAssetListRow({ asset, onAssetClick, onAssetPreview }: DraggableAssetListRowProps) {
+function DraggableAssetListRow({ asset, onAssetClick, onAssetPreview, onAssetLink }: DraggableAssetListRowProps) {
   const dragData: AssetDragData = {
     type: 'asset',
     asset,
@@ -228,6 +254,7 @@ function DraggableAssetListRow({ asset, onAssetClick, onAssetPreview }: Draggabl
       asset={asset}
       onClick={() => onAssetClick?.(asset)}
       onPreview={onAssetPreview ? () => onAssetPreview(asset) : undefined}
+      onLink={onAssetLink ? () => onAssetLink(asset) : undefined}
       isDragging={isDragging}
       {...listeners}
       {...attributes}
@@ -239,8 +266,9 @@ function DraggableAssetListRow({ asset, onAssetClick, onAssetPreview }: Draggabl
  * Asset List Component
  * Story 9.2: Migrated to @dnd-kit for high-fidelity drag preview
  * Story 9.3: Added preview support for 3D models
+ * Story 9.5: Added link-to-node action button
  */
-export function AssetList({ assets, onAssetClick, onAssetPreview, draggable = false }: AssetListProps) {
+export function AssetList({ assets, onAssetClick, onAssetPreview, onAssetLink, draggable = false }: AssetListProps) {
   return (
     <div data-testid="asset-list" className="space-y-1">
       {/* Header */}
@@ -261,6 +289,7 @@ export function AssetList({ assets, onAssetClick, onAssetPreview, draggable = fa
               asset={asset}
               onAssetClick={onAssetClick}
               onAssetPreview={onAssetPreview}
+              onAssetLink={onAssetLink}
             />
           );
         }
@@ -271,6 +300,7 @@ export function AssetList({ assets, onAssetClick, onAssetPreview, draggable = fa
             asset={asset}
             onClick={() => onAssetClick?.(asset)}
             onPreview={onAssetPreview ? () => onAssetPreview(asset) : undefined}
+            onLink={onAssetLink ? () => onAssetLink(asset) : undefined}
           />
         );
       })}

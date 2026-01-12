@@ -17,6 +17,7 @@ export type DataAssetFormat =
   | 'OBJ'
   | 'FBX'
   | 'GLTF'
+  | 'VTK'
   | 'PDF'
   | 'DOCX'
   | 'XLSX'
@@ -29,8 +30,9 @@ export type DataAssetFormat =
 
 /**
  * Link type between node and data asset
+ * Story 9.5: Updated to support input/output/reference for data traceability
  */
-export type DataLinkType = 'reference' | 'attachment' | 'source';
+export type DataLinkType = 'input' | 'output' | 'reference';
 
 /**
  * Secret level for classification
@@ -139,6 +141,14 @@ export interface NodeDataLink {
   linkType: DataLinkType;
   note?: string | null;
   createdAt: string;
+}
+
+/**
+ * Story 9.5: Link with asset details for node property panel
+ * Used by GET /data-assets/links:detail endpoint
+ */
+export interface NodeDataLinkWithAsset extends NodeDataLink {
+  asset: DataAssetWithFolder;
 }
 
 /**

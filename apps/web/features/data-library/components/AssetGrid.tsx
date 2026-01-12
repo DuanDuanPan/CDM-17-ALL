@@ -6,6 +6,7 @@
  * AC#3: Grid view for data assets
  * Story 9.2: Added draggable support for folder organization
  * Story 9.3: Added preview callback for 3D models
+ * Story 9.5: Added link-to-node action
  */
 
 import { AssetCard } from './AssetCard';
@@ -16,14 +17,17 @@ interface AssetGridProps {
   onAssetClick?: (asset: DataAssetWithFolder) => void;
   /** Story 9.3: Preview callback for 3D models */
   onAssetPreview?: (asset: DataAssetWithFolder) => void;
+  /** Story 9.5: Link-to-node callback */
+  onAssetLink?: (asset: DataAssetWithFolder) => void;
   /** Story 9.2: Enable drag for folder organization */
   draggable?: boolean;
 }
 
 /**
  * Asset Grid Component
+ * Story 9.5: Added link-to-node action
  */
-export function AssetGrid({ assets, onAssetClick, onAssetPreview, draggable = false }: AssetGridProps) {
+export function AssetGrid({ assets, onAssetClick, onAssetPreview, onAssetLink, draggable = false }: AssetGridProps) {
   return (
     <div
       data-testid="asset-grid"
@@ -35,6 +39,7 @@ export function AssetGrid({ assets, onAssetClick, onAssetPreview, draggable = fa
           asset={asset}
           onClick={() => onAssetClick?.(asset)}
           onPreview={onAssetPreview ? () => onAssetPreview(asset) : undefined}
+          onLink={onAssetLink ? () => onAssetLink(asset) : undefined}
           draggable={draggable}
         />
       ))}

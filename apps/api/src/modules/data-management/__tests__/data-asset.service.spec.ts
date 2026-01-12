@@ -1,9 +1,9 @@
 /**
- * Story 9.1: Data Library (数据资源库)
- * Unit tests for DataAssetService
+ * Story 9.1 & 9.5: Data Library / Upload
+ * Unit tests for DataAssetService (Repository + delegated services mocked)
  */
 
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { DataAssetService } from '../data-asset.service';
 
 describe('DataAssetService', () => {
@@ -16,29 +16,48 @@ describe('DataAssetService', () => {
     delete: jest.fn(),
   };
 
-  const folderRepo = {
-    create: jest.fn(),
-    findById: jest.fn(),
-    findByGraphWithAssetCount: jest.fn(),
-    hasAssets: jest.fn(),
-    hasChildren: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+  const folderService = {
+    createFolder: jest.fn(),
+    getFolderTree: jest.fn(),
+    updateFolder: jest.fn(),
+    deleteFolder: jest.fn(),
+    toFolderResponse: jest.fn(),
   };
 
-  const linkRepo = {
-    findByNodeAndAsset: jest.fn(),
-    create: jest.fn(),
-    findByNode: jest.fn(),
-    findByNodeIds: jest.fn(),
-    deleteByNodeAndAsset: jest.fn(),
+  const linkService = {
+    linkNodeToAsset: jest.fn(),
+    getNodeAssets: jest.fn(),
+    getNodeAssetsByNodes: jest.fn(),
+    getNodeAssetLinks: jest.fn(),
+    unlinkNodeFromAsset: jest.fn(),
+  };
+
+  const fileService = {
+    storeFile: jest.fn(),
+    deleteFile: jest.fn(),
   };
 
   let service: DataAssetService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new DataAssetService(assetRepo as any, folderRepo as any, linkRepo as any);
+
+    folderService.toFolderResponse.mockImplementation((folder: any) => ({
+      id: folder.id,
+      name: folder.name,
+      description: folder.description,
+      parentId: folder.parentId,
+      graphId: folder.graphId,
+      createdAt: folder.createdAt.toISOString(),
+      updatedAt: folder.updatedAt.toISOString(),
+    }));
+
+    service = new DataAssetService(
+      assetRepo as any,
+      folderService as any,
+      linkService as any,
+      fileService as any
+    );
   });
 
   it('findMany: forwards filters to repository (including date range)', async () => {
@@ -213,31 +232,23 @@ describe('DataAssetService', () => {
     expect(result.folder).toBeNull();
   });
 
-  it('linkNodeToAsset: throws ConflictException when link exists', async () => {
-    linkRepo.findByNodeAndAsset.mockResolvedValueOnce({ id: 'link-1' });
-
-    await expect(
-      service.linkNodeToAsset({ nodeId: 'node-1', assetId: 'asset-1' })
-    ).rejects.toBeInstanceOf(ConflictException);
-  });
-
-  it('unlinkNodeFromAsset: throws NotFoundException when link does not exist', async () => {
-    linkRepo.deleteByNodeAndAsset.mockResolvedValueOnce(null);
-
-    await expect(
-      service.unlinkNodeFromAsset('node-1', 'asset-1')
-    ).rejects.toBeInstanceOf(NotFoundException);
-  });
-
-  it('getNodeAssetsByNodes: returns deduplicated assets', async () => {
+  it('uploadAsset: creates asset with detected format and /api/files storagePath', async () => {
     const now = new Date('2026-01-01T00:00:00.000Z');
-    const assetA = {
-      id: 'asset-a',
-      name: 'Asset A',
+    fileService.storeFile.mockResolvedValueOnce({
+      id: 'file-1',
+      originalName: 'test.vtk',
+      mimeType: 'application/octet-stream',
+      size: 10,
+      uploadedAt: now.toISOString(),
+    });
+
+    assetRepo.create.mockResolvedValueOnce({
+      id: 'asset-1',
+      name: 'test.vtk',
       description: null,
       format: 'OTHER',
-      fileSize: null,
-      storagePath: null,
+      fileSize: 10,
+      storagePath: '/api/files/file-1',
       thumbnail: null,
       version: 'v1.0.0',
       tags: [],
@@ -247,39 +258,56 @@ describe('DataAssetService', () => {
       secretLevel: 'internal',
       createdAt: now,
       updatedAt: now,
-      folder: null,
-    };
+    });
 
-    linkRepo.findByNodeIds.mockResolvedValueOnce([
-      { id: 'l1', nodeId: 'n1', assetId: 'asset-a', asset: assetA },
-      { id: 'l2', nodeId: 'n2', assetId: 'asset-a', asset: assetA },
-    ]);
+    const result = await service.uploadAsset(
+      {
+        originalname: 'test.vtk',
+        size: 10,
+        buffer: Buffer.from('x'),
+      } as any,
+      'graph-1'
+    );
 
-    const result = await service.getNodeAssetsByNodes(['n1', 'n2']);
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('asset-a');
-  });
+    expect(fileService.storeFile).toHaveBeenCalled();
+    expect(assetRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'test.vtk',
+        format: 'OTHER',
+        fileSize: 10,
+        storagePath: '/api/files/file-1',
+        graph: { connect: { id: 'graph-1' } },
+      })
+    );
 
-  it('updateFolder: throws BadRequestException when no fields provided', async () => {
-    folderRepo.findById.mockResolvedValueOnce({ id: 'folder-1' });
-
-    await expect(service.updateFolder('folder-1', {} as any)).rejects.toBeInstanceOf(
-      BadRequestException
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'asset-1',
+        name: 'test.vtk',
+        format: 'OTHER',
+        storagePath: '/api/files/file-1',
+      })
     );
   });
 
-  it('deleteFolder: blocks deleting non-empty folder (assets)', async () => {
-    folderRepo.findById.mockResolvedValueOnce({ id: 'folder-1' });
-    folderRepo.hasAssets.mockResolvedValueOnce(true);
+  it('uploadAsset: rolls back stored file when db create fails', async () => {
+    fileService.storeFile.mockResolvedValueOnce({
+      id: 'file-rollback',
+      originalName: 'fail.pdf',
+      mimeType: 'application/pdf',
+      size: 10,
+      uploadedAt: new Date('2026-01-01T00:00:00.000Z').toISOString(),
+    });
+    assetRepo.create.mockRejectedValueOnce(new Error('db down'));
 
-    await expect(service.deleteFolder('folder-1')).rejects.toBeInstanceOf(BadRequestException);
-  });
+    await expect(
+      service.uploadAsset(
+        { originalname: 'fail.pdf', size: 10, buffer: Buffer.from('x') } as any,
+        'graph-1'
+      )
+    ).rejects.toBeInstanceOf(InternalServerErrorException);
 
-  it('deleteFolder: blocks deleting folder with children', async () => {
-    folderRepo.findById.mockResolvedValueOnce({ id: 'folder-1' });
-    folderRepo.hasAssets.mockResolvedValueOnce(false);
-    folderRepo.hasChildren.mockResolvedValueOnce(true);
-
-    await expect(service.deleteFolder('folder-1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(fileService.deleteFile).toHaveBeenCalledWith('file-rollback');
   });
 });
+

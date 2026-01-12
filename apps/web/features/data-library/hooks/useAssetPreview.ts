@@ -30,7 +30,9 @@ export interface UseAssetPreviewResult {
  */
 export function getAssetPreviewType(asset: DataAssetWithFolder): PreviewType {
     const format = asset.format?.toUpperCase();
-    const path = (asset.storagePath || asset.name || '').toLowerCase();
+    // Uploaded assets often have storagePath like `/api/files/:id` (no extension).
+    // Use both storagePath and name to infer preview type.
+    const pathCandidates = [asset.storagePath, asset.name].filter(Boolean).map((v) => String(v).toLowerCase());
     const tags = asset.tags?.map((t) => t.toUpperCase()) ?? [];
 
     // Mesh formats (Story 9.4): Use ModelViewer
@@ -49,13 +51,13 @@ export function getAssetPreviewType(asset: DataAssetWithFolder): PreviewType {
 
     // VTK formats (Story 9.4 AC#3): Use ContourViewer
     const vtkExtensions = ['.vtk', '.vtp', '.vtu', '.vti'];
-    if (vtkExtensions.some((ext) => path.endsWith(ext))) {
+    if (pathCandidates.some((p) => vtkExtensions.some((ext) => p.endsWith(ext)))) {
         return 'contour';
     }
 
     // JSON Scalar field (Story 9.4 AC#3): *.scalar.json or *.contour.json or tags contain CONTOUR
     if (format === 'JSON') {
-        if (path.endsWith('.scalar.json') || path.endsWith('.contour.json')) {
+        if (pathCandidates.some((p) => p.endsWith('.scalar.json') || p.endsWith('.contour.json'))) {
             return 'contour';
         }
         if (tags.includes('CONTOUR')) {
@@ -65,7 +67,7 @@ export function getAssetPreviewType(asset: DataAssetWithFolder): PreviewType {
 
     // OTHER format with VTK-like patterns in path
     if (format === 'OTHER') {
-        if (vtkExtensions.some((ext) => path.endsWith(ext))) {
+        if (pathCandidates.some((p) => vtkExtensions.some((ext) => p.endsWith(ext)))) {
             return 'contour';
         }
         if (tags.includes('CONTOUR')) {

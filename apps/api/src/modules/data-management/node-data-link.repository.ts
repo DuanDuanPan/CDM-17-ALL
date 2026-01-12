@@ -28,6 +28,24 @@ export class NodeDataLinkRepository {
         });
     }
 
+    async getNodeGraphId(nodeId: string): Promise<string | null> {
+        const node = await prisma.node.findUnique({
+            where: { id: nodeId },
+            select: { graphId: true },
+        });
+
+        return node?.graphId ?? null;
+    }
+
+    async getAssetGraphId(assetId: string): Promise<string | null> {
+        const asset = await prisma.dataAsset.findUnique({
+            where: { id: assetId },
+            select: { graphId: true },
+        });
+
+        return asset?.graphId ?? null;
+    }
+
     /**
      * Find all links for a node with asset + folder info
      * Story 9.2: Updated to include folder info for PBS/Task views
