@@ -1,6 +1,6 @@
 # Story 9.8: 节点视图合并（PBS+任务） (Node View Merge - PBS+Task)
 
-Status: in-progress
+Status: done
 
 ## Story
 
