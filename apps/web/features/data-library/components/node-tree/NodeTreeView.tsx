@@ -10,7 +10,7 @@
 
 import { useMemo, useCallback } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
-import { cn, Button } from '@cdm/ui';
+import { cn } from '@cdm/ui';
 import { useNodeTreeProjection, type ProjectedNode } from '@/features/data-library/hooks/useNodeTreeProjection';
 import { NodeType } from '@cdm/types';
 import { escapeRegex } from './DualSearch';
@@ -37,15 +37,29 @@ export interface NodeTreeViewProps {
 }
 
 // ========================================
-// Helper: Node Icon by Type
+// Helper: Node Icon by Type (green badge style per prototype)
 // ========================================
 
 function NodeTypeIcon({ nodeType }: { nodeType: NodeType }) {
     if (nodeType === NodeType.PBS) {
-        return <span className="text-sm mr-1" title="PBS">📦</span>;
+        return (
+            <span
+                className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-500 text-white text-xs font-bold"
+                title="PBS"
+            >
+                📦
+            </span>
+        );
     }
     if (nodeType === NodeType.TASK) {
-        return <span className="text-sm mr-1" title="任务">✅</span>;
+        return (
+            <span
+                className="inline-flex items-center justify-center w-5 h-5 rounded bg-green-500 text-white text-xs"
+                title="任务"
+            >
+                ✓
+            </span>
+        );
     }
     return null;
 }
@@ -122,53 +136,50 @@ function NodeTreeItem({
         >
             <div
                 className={cn(
-                    'flex items-center gap-1 py-1.5 px-2 rounded-md cursor-pointer transition-colors',
-                    'hover:bg-gray-100 dark:hover:bg-gray-700',
-                    isActive && 'bg-blue-50 dark:bg-blue-900/30',
+                    'flex items-center gap-2 py-2 px-3 cursor-pointer transition-colors',
+                    'hover:bg-gray-50 dark:hover:bg-gray-800',
+                    isSelected && 'bg-blue-50 dark:bg-blue-900/30',
                 )}
-                style={{ paddingLeft: `${level * 16 + 8}px` }}
+                style={{ paddingLeft: `${level * 20 + 12}px` }}
                 onClick={() => onActiveChange(node.id)}
             >
-                {/* Expand/Collapse */}
-                <button
-                    onClick={handleExpandClick}
-                    className="w-4 h-4 flex items-center justify-center"
-                    disabled={!hasChildren}
-                    type="button"
-                >
-                    {hasChildren ? (
-                        isExpanded ? (
-                            <ChevronDown className="w-3 h-3 text-gray-400" />
-                        ) : (
-                            <ChevronRight className="w-3 h-3 text-gray-400" />
-                        )
-                    ) : (
-                        <span className="w-3" />
-                    )}
-                </button>
-
-                {/* Checkbox for multi-select - using native input */}
+                {/* Checkbox for multi-select - blue filled style per prototype */}
                 <input
                     type="checkbox"
                     checked={isSelected}
                     onChange={handleCheckboxChange}
                     onClick={(e: React.MouseEvent<HTMLInputElement>) => e.stopPropagation()}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="w-5 h-5 rounded border-2 border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2 cursor-pointer"
                     aria-label={`选择 ${node.label}`}
                 />
 
-                {/* Node Type Icon */}
+                {/* Node Type Icon (green badge) */}
                 <NodeTypeIcon nodeType={node.nodeType} />
 
                 {/* Label */}
                 <span
                     className={cn(
                         'text-sm truncate flex-1',
-                        isActive ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-700 dark:text-gray-300'
+                        isSelected ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-700 dark:text-gray-300'
                     )}
                 >
                     {highlightedLabel}
                 </span>
+
+                {/* Expand/Collapse arrow at end (optional, only if has children) */}
+                {hasChildren && (
+                    <button
+                        onClick={handleExpandClick}
+                        className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600"
+                        type="button"
+                    >
+                        {isExpanded ? (
+                            <ChevronDown className="w-4 h-4" />
+                        ) : (
+                            <ChevronRight className="w-4 h-4" />
+                        )}
+                    </button>
+                )}
             </div>
 
             {/* Children */}
@@ -301,26 +312,6 @@ export function NodeTreeView({
 
     return (
         <div className="flex flex-col h-full overflow-hidden">
-            {/* Selection bar */}
-            {selectedNodeIds.size > 0 && (
-                <div
-                    className="flex items-center justify-between px-3 py-2 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-100 dark:border-blue-800"
-                    data-testid="node-selection-bar"
-                >
-                    <span className="text-sm text-blue-600 dark:text-blue-400">
-                        已选 {selectedNodeIds.size} 个节点
-                    </span>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleClearSelection}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-700"
-                    >
-                        清空选择
-                    </Button>
-                </div>
-            )}
-
             {/* Tree content */}
             <div className="flex-1 overflow-y-auto py-2">
                 {filteredTree.map((node: ProjectedNode) => (

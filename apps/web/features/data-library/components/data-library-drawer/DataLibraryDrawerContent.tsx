@@ -480,6 +480,37 @@ export function DataLibraryDrawerContent({
           <div className="flex-1 min-h-0 overflow-hidden">
             {orgView === 'node' && (
               <div className="flex flex-col h-full">
+                {/* Secondary Tabs: 节点/资产 */}
+                <div className="flex border-b border-gray-200 dark:border-gray-700">
+                  <button
+                    type="button"
+                    onClick={() => onSearchModeChange('node')}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-colors',
+                      searchMode === 'node'
+                        ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50 dark:bg-blue-900/20'
+                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                    )}
+                  >
+                    <span>🔗</span>
+                    <span>节点</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onSearchModeChange('asset')}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-colors',
+                      searchMode === 'asset'
+                        ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50 dark:bg-blue-900/20'
+                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                    )}
+                  >
+                    <span>📄</span>
+                    <span>资产</span>
+                  </button>
+                </div>
+
+                {/* Search bar */}
                 <div className="p-3 border-b border-gray-100 dark:border-gray-800">
                   <DualSearch
                     mode={searchMode}
@@ -487,7 +518,29 @@ export function DataLibraryDrawerContent({
                     query={searchQuery}
                     onQueryChange={onSearchQueryChange}
                   />
+                  {/* Help text */}
+                  <p className="mt-2 text-xs text-blue-500 dark:text-blue-400">
+                    在 PBS 和任务节点中搜索
+                  </p>
                 </div>
+
+                {/* Selection bar - moved to top per prototype */}
+                {selectedNodeIds.size > 0 && (
+                  <div className="flex items-center justify-between px-3 py-2 bg-blue-50 dark:bg-blue-900/30 border-b border-blue-100 dark:border-blue-800">
+                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                      已选 {selectedNodeIds.size} 个节点
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onSelectedNodeIdsChange(new Set())}
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium"
+                    >
+                      清空选择
+                    </button>
+                  </div>
+                )}
+
+                {/* Tree content */}
                 <div className="flex-1 min-h-0 overflow-hidden">
                   <NodeTreeView
                     activeNodeId={activeNodeId}
@@ -498,6 +551,13 @@ export function DataLibraryDrawerContent({
                     onToggleExpand={onToggleNodeExpand}
                     searchQuery={isNodeSearchMode ? searchQuery : ''}
                   />
+                </div>
+
+                {/* Bottom stats bar per prototype */}
+                <div className="border-t border-gray-200 dark:border-gray-700 px-3 py-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    共 {visibleAssets.length} 个数据资产
+                  </span>
                 </div>
               </div>
             )}

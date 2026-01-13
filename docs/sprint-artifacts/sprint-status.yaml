@@ -123,3 +123,5 @@ development_status:
   9-4-lightweight-viewer-mesh-contour: in-progress  # Contour viewer integrated; VTU + tests pending
   9-5-data-upload-node-linking: done  # Upload + node linking + tests (2026-01-12)
   9-7-context-aware-data-asset-interaction: in-progress  # Context-aware upload + grouped links (Story 9.7)
+  9-8-node-view-merge: done  # Tab merge + projection algorithm + breadcrumb + multi-select (2026-01-13)
+  9-9-toolbar-redesign: ready-for-dev  # Toolbar simplification + Asset Filter Bar (2026-01-13)
