@@ -340,36 +340,36 @@ function findTargetNode(graph: Graph, draggedId: string, x: number, y: number) {
 }
 
 /**
- * Normalize sibling order based on position: right-to-left (X desc), top-to-bottom (Y asc)
- * This ensures consistent ordering after drag-drop operations
+ * Normalize sibling order after drag-drop re-parenting.
+ * 
+ * Story 8.6 Fix: Sort by existing `data.order` values (not position coordinates) to preserve
+ * the user's intended order across layout mode switches. Only the newly inserted node
+ * (which was given a fractional order like X.5) will be repositioned; existing siblings
+ * retain their relative order.
+ * 
+ * Layout mode parameter is kept for API compatibility but no longer affects sorting.
  */
-function normalizeSiblingOrder(graph: Graph, parentId: string | undefined, mode: LayoutMode) {
+function normalizeSiblingOrder(graph: Graph, parentId: string | undefined, _mode: LayoutMode) {
   const siblings = graph.getNodes().filter((n) => {
     const data = n.getData() || {};
     const pid = data.parentId ?? (data.type === 'root' ? undefined : undefined);
     return pid === parentId;
   });
 
-  // Sort by position based on layout mode
-  const sortByPosition = (a: Node, b: Node) => {
-    const posA = a.getPosition();
-    const posB = b.getPosition();
+  // Sort by existing order values (preserves user's intended order across layout switches)
+  const sortByOrder = (a: Node, b: Node) => {
+    const dataA = a.getData() || {};
+    const dataB = b.getData() || {};
+    const orderA = typeof dataA.order === 'number' ? dataA.order : Infinity;
+    const orderB = typeof dataB.order === 'number' ? dataB.order : Infinity;
 
-    if (mode === 'logic') {
-      // Vertical logic layout: left-to-right (X asc), then top-to-bottom (Y asc)
-      if (posA.x !== posB.x) return posA.x - posB.x;
-      if (posA.y !== posB.y) return posA.y - posB.y;
-      return a.id.localeCompare(b.id);
-    }
-
-    // Default: right-to-left (X desc), top-to-bottom (Y asc)
-    if (posA.x !== posB.x) return posB.x - posA.x;
-    if (posA.y !== posB.y) return posA.y - posB.y;
+    if (orderA !== orderB) return orderA - orderB;
+    // Fallback to id for stable sorting when order is equal or both missing
     return a.id.localeCompare(b.id);
   };
 
   siblings
-    .sort(sortByPosition)
+    .sort(sortByOrder)
     .forEach((n, idx) => {
       const data = n.getData() || {};
       n.setData({ ...data, order: idx });

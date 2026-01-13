@@ -112,16 +112,13 @@ test.describe('Data Library Organization Views (Story 9.2)', () => {
     await expect(page.getByTitle('数据资源库')).toBeVisible();
   });
 
-  test('AC6: shows empty states for PBS/Task/Folder views', async ({ page }) => {
+  test('AC6: shows empty states for Node/Folder views', async ({ page }) => {
     await openDataLibraryDrawer(page);
 
-    // Default PBS view
+    // Default Node view
     await expect(page.getByTestId('organization-tabs')).toBeVisible();
-    await expect(page.getByTestId('empty-state-pbs')).toBeVisible();
-
-    // Task view
-    await page.getByTestId('org-tab-task').click();
-    await expect(page.getByTestId('empty-state-task')).toBeVisible();
+    await expect(page.getByTestId('org-tab-node')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByText('请选择一个节点查看关联资产')).toBeVisible();
 
     // Folder view (no folders yet)
     await page.getByTestId('org-tab-folder').click();
@@ -211,10 +208,10 @@ test.describe('Data Library Organization Views (Story 9.2)', () => {
 
     await openDataLibraryDrawer(page);
 
-    // PBS view: select a PBS node and verify grouped panel toggle exists.
-    await expect(page.getByTestId('pbs-tree')).toBeVisible();
-    await expect(page.getByTestId(`pbs-tree-node-${pbsNode.nodeId}`)).toBeVisible();
-    await page.getByTestId(`pbs-tree-node-${pbsNode.nodeId}`).click();
+    // Node view: select a PBS node and verify grouped panel toggle exists.
+    await page.getByTestId('org-tab-node').click();
+    await expect(page.getByTestId(`node-tree-item-${pbsNode.nodeId}`)).toBeVisible();
+    await page.getByTestId(`node-tree-item-${pbsNode.nodeId}`).locator('div').first().click();
 
     await expect(page.getByTestId('toggle-empty-groups')).toBeVisible();
     await page.getByTestId('toggle-empty-groups').click();
@@ -227,11 +224,9 @@ test.describe('Data Library Organization Views (Story 9.2)', () => {
     await page.getByTestId('upload-type-dropdown').selectOption('input');
     await expect(page.getByTestId('upload-type-dropdown')).toHaveValue('input');
 
-    // Switch to Task view, select task node, and ensure type resets to output.
-    await page.getByTestId('org-tab-task').click();
-    await expect(page.getByTestId('task-group-view')).toBeVisible();
-    await expect(page.getByTestId(`task-item-${taskNode.nodeId}`)).toBeVisible();
-    await page.getByTestId(`task-item-${taskNode.nodeId}`).click();
+    // Select task node, and ensure type resets to output.
+    await expect(page.getByTestId(`node-tree-item-${taskNode.nodeId}`)).toBeVisible();
+    await page.getByTestId(`node-tree-item-${taskNode.nodeId}`).locator('div').first().click();
 
     await expect(page.getByTestId('upload-type-dropdown')).toHaveValue('output');
 

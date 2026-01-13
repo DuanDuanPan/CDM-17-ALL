@@ -182,6 +182,55 @@ export class NodeDataLinkService {
         }));
     }
 
+    /**
+     * Story 9.8 Task 4.0: Get links with asset details for multiple nodes (batch)
+     * Returns nodeId + asset + linkType for each link (no deduplication - preserves provenance)
+     */
+    async getNodeAssetLinksByNodes(nodeIds: string[]): Promise<NodeDataLinkWithAsset[]> {
+        if (nodeIds.length === 0) return [];
+
+        const links = await this.linkRepo.findByNodeIds(nodeIds);
+        return links.map((link) => ({
+            id: link.id,
+            nodeId: link.nodeId,
+            assetId: link.assetId,
+            linkType: link.linkType as DataLinkType,
+            note: link.note,
+            createdAt: link.createdAt.toISOString(),
+            asset: this.toAssetResponse(link.asset),
+        }));
+    }
+
+    /**
+     * Story 9.8 Task 7.0: Batch unlink nodes from assets
+     * Removes NodeDataLink records where nodeId IN nodeIds AND assetId IN assetIds
+     * Returns unlinked items for undo capability
+     */
+    async unlinkNodesByAssets(
+        nodeIds: string[],
+        assetIds: string[]
+    ): Promise<Array<{ nodeId: string; assetId: string; linkType: string }>> {
+        if (nodeIds.length === 0 || assetIds.length === 0) return [];
+
+        // Find existing links that match the criteria
+        const linksToDelete = await this.linkRepo.findByNodeIdsAndAssetIds(nodeIds, assetIds);
+
+        if (linksToDelete.length === 0) return [];
+
+        // Store link info for undo before deleting
+        const unlinked = linksToDelete.map((link) => ({
+            nodeId: link.nodeId,
+            assetId: link.assetId,
+            linkType: link.linkType,
+        }));
+
+        // Delete the links
+        await this.linkRepo.deleteManyByNodeIdsAndAssetIds(nodeIds, assetIds);
+
+        this.logger.log(`Batch unlinked ${unlinked.length} link(s)`);
+        return unlinked;
+    }
+
     private toLinkResponse(link: PrismaNodeDataLink): NodeDataLink {
         return {
             id: link.id,

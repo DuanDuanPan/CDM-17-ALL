@@ -54,7 +54,7 @@
 | 🧪 Murat   | 增加投影算法边界测试用例（全 PBS、全 TASK、交叉嵌套）     | ✅ 已更新测试策略  |
 | 🧪 Murat   | 用 MSW 替代 jest.mock 进行 API 测试                       | ✅ 已更新测试策略  |
 | 💻 Amelia  | `findSemanticAncestor` 添加 depth limit (100) 防止长链    | ✅ 已更新 Task 2   |
-| 💻 Amelia  | 新增批量查询 API `POST /links:batch`                      | ✅ 已增加 Task 4.0 |
+| 💻 Amelia  | 新增批量详情查询 API `POST /api/data-assets/links:detailByNodes` | ✅ 已增加 Task 4.0 |
 | 💻 Amelia  | `NodeTreeView` 拆分为子目录结构                           | ✅ 已更新文件结构  |
 
 ### Advanced Elicitation Feedback
@@ -90,37 +90,37 @@
 ### Files to Reference
 
 #### 现有组件（需修改）
-| File                                                                                                                                                            | Purpose                         |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| [OrganizationTabs.tsx](file:///Users/enjoyjavapan163.com/Code/ALT/Prototype/CDM-17/CDM-17-ALL/apps/web/features/data-library/components/OrganizationTabs.tsx)   | Tab 配置，需从 3 Tab 改为 2 Tab |
-| [DataLibraryDrawer.tsx](file:///Users/enjoyjavapan163.com/Code/ALT/Prototype/CDM-17/CDM-17-ALL/apps/web/features/data-library/components/DataLibraryDrawer.tsx) | 主容器，需集成新的 NodeTreeView |
+| File                                                                              | Purpose                         |
+| --------------------------------------------------------------------------------- | ------------------------------- |
+| [OrganizationTabs.tsx](../../apps/web/features/data-library/components/OrganizationTabs.tsx)   | Tab 配置，需从 3 Tab 改为 2 Tab |
+| [DataLibraryDrawer.tsx](../../apps/web/features/data-library/components/DataLibraryDrawer.tsx) | 主容器，需集成新的 NodeTreeView |
 
 #### 现有组件（参考/复用）
-| File                                                                                                                                                    | Purpose               |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| [PbsTreeView.tsx](file:///Users/enjoyjavapan163.com/Code/ALT/Prototype/CDM-17/CDM-17-ALL/apps/web/features/data-library/components/PbsTreeView.tsx)     | 树渲染模式参考        |
-| [TaskGroupView.tsx](file:///Users/enjoyjavapan163.com/Code/ALT/Prototype/CDM-17/CDM-17-ALL/apps/web/features/data-library/components/TaskGroupView.tsx) | Task 节点数据结构参考 |
-| [usePbsNodes.ts](file:///Users/enjoyjavapan163.com/Code/ALT/Prototype/CDM-17/CDM-17-ALL/apps/web/features/data-library/hooks/usePbsNodes.ts)            | Hook 模式参考         |
+| File                                                                          | Purpose               |
+| ----------------------------------------------------------------------------- | --------------------- |
+| [PbsTreeView.tsx](../../apps/web/features/data-library/components/PbsTreeView.tsx)     | 树渲染模式参考        |
+| [TaskGroupView.tsx](../../apps/web/features/data-library/components/TaskGroupView.tsx) | Task 节点数据结构参考 |
+| [usePbsNodes.ts](../../apps/web/features/data-library/hooks/usePbsNodes.ts)            | Hook 模式参考         |
 
 #### 类型定义
-| File                                                                                                                                     | Types                           |
-| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| [node-types.ts](file:///Users/enjoyjavapan163.com/Code/ALT/Prototype/CDM-17/CDM-17-ALL/packages/types/src/node-types.ts)                 | `NodeType.PBS`, `NodeType.TASK` |
-| [data-library-types.ts](file:///Users/enjoyjavapan163.com/Code/ALT/Prototype/CDM-17/CDM-17-ALL/packages/types/src/data-library-types.ts) | `NodeDataLink`, `DataLinkType`  |
+| File                                                           | Types                           |
+| -------------------------------------------------------------- | ------------------------------- |
+| [node-types.ts](../../packages/types/src/node-types.ts)                 | `NodeType.PBS`, `NodeType.TASK` |
+| [data-library-types.ts](../../packages/types/src/data-library-types.ts) | `NodeDataLink`, `DataLinkType`  |
 
 ### Technical Decisions
 
 | Decision         | Choice                   | Rationale                       |
 | ---------------- | ------------------------ | ------------------------------- |
 | **投影算法位置** | 纯前端 Hook              | 规模 ≤1k 节点，无需后端         |
-| **多选状态**     | `Set<nodeId>`            | 高效查询/增删                   |
+| **多选状态**     | `activeNodeId` + `Set<nodeId>` | 区分“单节点焦点”与“多选并集”    |
 | **虚拟列表**     | 可选（视性能）           | 初期用 useMemo 缓存             |
 | **搜索防抖**     | 300ms debounce           | 避免请求风暴                    |
 | **路径计算**     | 惰性 `getOriginalPath()` | 避免 1k 节点 × 5 深度的存储开销 |
 | **祖先遍历**     | depth limit = 100        | 防止意外长链导致性能问题        |
-| **批量查询**     | `POST /links:batch`      | 减少 N 次请求为 1 次            |
+| **批量查询**     | `POST /api/data-assets/links:detailByNodes` | 并集/溯源需要 linkType + asset |
 | **节点类型图标** | 📦 PBS / ✅ TASK           | SCAMPER: 提高视觉区分度         |
-| **解绑确认**     | Undo Toast               | SCAMPER: 减少弹窗打断           |
+| **解绑确认**     | Sonner Undo Toast        | 立即解绑 + 可撤销（撤销时重新关联） |
 | **搜索模式**     | 统一输入框 + `@` 前缀    | SCAMPER: 参考 VS Code UX        |
 
 ---
@@ -179,6 +179,52 @@
 +className="grid grid-cols-2 gap-1 ..."
 ```
 
+##### 1.1.1 localStorage 迁移处理
+
+> [!WARNING]
+> 需要处理用户 localStorage 中已存储的旧值 (`'pbs'` 或 `'task'`)，否则会导致默认回退。
+
+**修改 `useOrganizationView` hook:**
+
+```typescript
+export function useOrganizationView(graphId: string): [OrganizationView, (view: OrganizationView) => void] {
+  const storageKey = `${STORAGE_KEY_PREFIX}-${graphId}`;
+
+  const [view, setViewState] = useState<OrganizationView>(() => {
+    if (typeof window === 'undefined') return 'node'; // 默认改为 'node'
+
+    try {
+      const stored = localStorage.getItem(storageKey);
+      
+      // 迁移逻辑: 旧值 'pbs' 或 'task' 自动迁移为 'node'
+      if (stored === 'pbs' || stored === 'task') {
+        localStorage.setItem(storageKey, 'node');
+        return 'node';
+      }
+      
+      // 验证存储值
+      if (stored && ['node', 'folder'].includes(stored)) {
+        return stored as OrganizationView;
+      }
+    } catch {
+      // localStorage not available
+    }
+    return 'node'; // 默认改为 'node'
+  });
+
+  const setView = (newView: OrganizationView) => {
+    setViewState(newView);
+    try {
+      localStorage.setItem(storageKey, newView);
+    } catch {
+      // localStorage not available
+    }
+  };
+
+  return [view, setView];
+}
+```
+
 ##### 1.2 更新 DataLibraryDrawer 视图切换
 
 **File:** `apps/web/features/data-library/components/DataLibraryDrawer.tsx`
@@ -197,6 +243,10 @@
 ---
 
 #### Task 2: 节点树投影算法实现 (AC: #2)
+
+> [!NOTE]
+> **数据来源确认**: TASK 节点与 PBS 节点一样，都存储在图谱中（通过 `NodeType.TASK` 标识），可通过 `graph.getNodes()` 获取。
+> 现有 `TaskGroupView` 按状态分组展示任务，但其数据源也是图谱。投影算法统一处理 PBS 和 TASK 两种 `nodeType`。
 
 ##### 2.1 创建 useNodeTreeProjection Hook
 
@@ -348,6 +398,10 @@ export function useNodeTreeProjection() {
 **新建文件:** `apps/web/features/data-library/components/NodeBreadcrumb.tsx`
 
 ```typescript
+import { Fragment, useMemo } from 'react';
+import { ChevronRight } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@cdm/ui';
+
 interface NodeBreadcrumbProps {
   path: string[];                    // 完整路径 ID 数组
   nodeLabels: Map<string, string>;   // ID -> label 映射
@@ -368,24 +422,50 @@ export function NodeBreadcrumb({
     ? [path[0], '...', ...path.slice(-2)]
     : path;
   
+  // AC9: 计算被折叠的节点路径用于 tooltip 显示
+  const collapsedPath = useMemo(() => {
+    if (!shouldCollapse) return [];
+    return path.slice(1, -2); // 跳过 root 和最后两个节点
+  }, [path, shouldCollapse]);
+  
+  const collapsedLabels = useMemo(() => {
+    return collapsedPath.map(id => nodeLabels.get(id) || id).join(' → ');
+  }, [collapsedPath, nodeLabels]);
+  
   return (
-    <nav className="flex items-center gap-1 text-sm text-gray-500">
-      {visiblePath.map((nodeId, idx) => (
-        <Fragment key={idx}>
-          {idx > 0 && <ChevronRight className="w-3 h-3" />}
-          {nodeId === '...' ? (
-            <span className="text-gray-400">…</span>
-          ) : (
-            <button
-              onClick={() => onNodeClick?.(nodeId)}
-              className="hover:text-blue-600 hover:underline"
-            >
-              {nodeLabels.get(nodeId) || nodeId}
-            </button>
-          )}
-        </Fragment>
-      ))}
-    </nav>
+    <TooltipProvider>
+      <nav className="flex items-center gap-1 text-sm text-gray-500">
+        {visiblePath.map((nodeId, idx) => (
+          <Fragment key={idx}>
+            {idx > 0 && <ChevronRight className="w-3 h-3" />}
+            {nodeId === '...' ? (
+              // AC9: hover 折叠区显示完整路径 tooltip
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span 
+                    className="text-gray-400 cursor-help px-1 hover:bg-gray-100 rounded"
+                    role="button"
+                    aria-label="展开查看完整路径"
+                  >
+                    …
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  <p className="text-xs break-words">{collapsedLabels}</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <button
+                onClick={() => onNodeClick?.(nodeId)}
+                className="hover:text-blue-600 hover:underline"
+              >
+                {nodeLabels.get(nodeId) || nodeId}
+              </button>
+            )}
+          </Fragment>
+        ))}
+      </nav>
+    </TooltipProvider>
   );
 }
 ```
@@ -396,25 +476,76 @@ export function NodeBreadcrumb({
 
 ##### 4.0 新增批量查询 API (Amelia 建议)
 
-**后端新增:** `apps/api/src/modules/data-library/data-asset.controller.ts`
+> [!IMPORTANT]
+> 新增 API 需要完整的类型定义、Service 层实现、Controller 和路由注册。
+
+**类型定义 (新增到 `packages/types/src/data-library-types.ts`):**
 
 ```typescript
-@Post('links:batch')
-async batchGetNodeAssetLinks(
-  @Body() dto: { nodeIds: string[] }
-): Promise<NodeDataLinkWithAsset[]> {
-  return this.dataAssetService.findLinksByNodeIds(dto.nodeIds);
+/**
+ * Story 9.8: 批量查询「链接详情」DTO（多节点）
+ */
+export interface NodeAssetLinksDetailByNodesDto {
+  nodeIds: string[];
+}
+
+/**
+ * Story 9.8: 批量查询「链接详情」响应（多节点）
+ * - 需要包含 nodeId + linkType + asset 详情，才能做并集分栏 + 溯源
+ */
+export interface NodeAssetLinksDetailByNodesResponse {
+  links: NodeDataLinkWithAsset[];
 }
 ```
 
+**Service 层（新增到 `apps/api/src/modules/data-management/node-data-link.service.ts`，并由 `data-asset.service.ts` 委托暴露）：**
+
+```typescript
+/**
+ * Story 9.8: 批量查询多个节点的链接详情（含 asset + linkType）
+ * @param nodeIds 节点 ID 数组
+ * @returns 所有关联的链接（每条含 asset 详情）
+ */
+async getNodeAssetLinksByNodes(nodeIds: string[]): Promise<NodeDataLinkWithAsset[]> {
+  if (!nodeIds || nodeIds.length === 0) return [];
+
+  const links = await this.linkRepo.findByNodeIds(nodeIds);
+  return links.map((link) => ({
+    id: link.id,
+    nodeId: link.nodeId,
+    assetId: link.assetId,
+    linkType: link.linkType as DataLinkType,
+    note: link.note,
+    createdAt: link.createdAt.toISOString(),
+    asset: this.toAssetResponse(link.asset),
+  }));
+}
+```
+
+**Controller（修改 `apps/api/src/modules/data-management/data-asset.controller.ts`）：**
+
+```typescript
+@Post('data-assets/links\\:detailByNodes')
+async getLinksDetailByNodes(
+  @Body() dto: NodeAssetLinksDetailByNodesDto
+): Promise<NodeAssetLinksDetailByNodesResponse> {
+  const links = await this.service.getNodeAssetLinksByNodes(dto.nodeIds);
+  return { links };
+}
+```
+
+**API 路由:** `POST /api/data-assets/links:detailByNodes`
+
 **前端调用:**
 ```typescript
-const fetchNodeAssetLinksBatch = async (nodeIds: string[]) => {
-  const response = await fetch('/api/data-assets/links:batch', {
+const fetchNodeAssetLinksDetailByNodes = async (nodeIds: string[]): Promise<NodeDataLinkWithAsset[]> => {
+  const response = await fetch('/api/data-assets/links:detailByNodes', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ nodeIds }),
   });
-  return response.json();
+  const data = await response.json();
+  return data.links;
 };
 ```
 
@@ -440,7 +571,7 @@ export function useSelectedNodesAssets({
   selectedNodeIds,
   graphId,
 }: UseSelectedNodesAssetsOptions) {
-  // 查询所有选中节点的资产 (使用批量 API)
+  // 查询所有选中节点的链接详情（含 asset + linkType）
   const { data: allLinks } = useQuery({
     queryKey: ['node-assets-batch', [...selectedNodeIds].sort().join(',')],
     queryFn: async () => {
@@ -448,7 +579,7 @@ export function useSelectedNodesAssets({
       if (nodeIds.length === 0) return [];
       
       // 单次批量查询 (Task 4.0 新增 API)
-      return fetchNodeAssetLinksBatch(nodeIds);
+      return fetchNodeAssetLinksDetailByNodes(nodeIds);
     },
     enabled: selectedNodeIds.size > 0,
   });
@@ -679,34 +810,113 @@ export function DualSearch({ mode, onModeChange, query, onQueryChange }: DualSea
 
 #### Task 7: 解绑语义实现 (AC: #7)
 
-修改 AssetCard 中的删除按钮逻辑：
+> [!IMPORTANT]
+> 解绑操作需要后端 API 支持，并使用 Undo Toast 替代确认弹窗 (SCAMPER 建议)。
+
+##### 7.0 后端解绑 API
+
+**类型定义 (新增到 `packages/types/src/data-library-types.ts`):**
 
 ```typescript
-// 在 NodeTreeView 场景下
-const handleUnlink = async (assetId: string) => {
-  // 确认对话框
-  const confirmed = await confirm({
-    title: '解除关联',
-    description: '确定要解除该资产与节点的关联吗？资产本身不会被删除。',
+/**
+ * Story 9.8: 批量解绑 DTO（nodeIds × assetIds）
+ */
+export interface NodeAssetLinksDestroyByNodesDto {
+  nodeIds: string[];
+  assetIds: string[];
+}
+
+export interface NodeAssetLinksDestroyByNodesResponse {
+  success: boolean;
+  deletedCount: number;
+}
+```
+
+**Service 层（新增到 `apps/api/src/modules/data-management/node-data-link.{repository,service}.ts`，并由 `data-asset.service.ts` 委托暴露）：**
+
+```typescript
+/**
+ * Story 9.8: 批量解绑（仅删除 NodeDataLink，不删除资产）
+ */
+async unlinkNodeAssetsByNodes(nodeIds: string[], assetIds: string[]): Promise<number> {
+  if (nodeIds.length === 0 || assetIds.length === 0) return 0;
+  return this.linkRepo.deleteManyByNodeIdsAndAssetIds(nodeIds, assetIds);
+}
+```
+
+**Controller（修改 `apps/api/src/modules/data-management/data-asset.controller.ts`）：**
+
+```typescript
+@Post('data-assets/links\\:destroyByNodes')
+@HttpCode(HttpStatus.OK)
+async destroyLinksByNodes(
+  @Body() dto: NodeAssetLinksDestroyByNodesDto
+): Promise<NodeAssetLinksDestroyByNodesResponse> {
+  const deletedCount = await this.service.unlinkNodeAssetsByNodes(dto.nodeIds, dto.assetIds);
+  return { success: true, deletedCount };
+}
+```
+
+**API 路由:**
+- 单个解绑（已存在）: `DELETE /api/data-assets/links:destroy?nodeId=...&assetId=...`
+- 批量解绑（新增）: `POST /api/data-assets/links:destroyByNodes`
+
+##### 7.1 前端解绑实现 (使用 Undo Toast)
+
+修改 AssetCard 中的删除按钮逻辑，使用 Undo Toast 替代确认弹窗：
+
+```typescript
+import { toast } from 'sonner';
+
+// 在 NodeTreeView 场景下 - 使用 Undo Toast (SCAMPER)
+// linksToRemove 需从当前 UI 状态构造：
+// - 单节点模式：[{ nodeId: activeNodeId, assetId, linkType }]
+// - 多选模式：从 provenance 过滤出 (selectedNodeIds × selectedAssetIds) 的链接集合
+const handleUnlink = async (
+  linksToRemove: Array<{ nodeId: string; assetId: string; linkType: DataLinkType }>,
+  label: string
+) => {
+  // 乐观更新: 立即从 UI 移除（或触发 refetch 前先隐藏）
+  const previousAssets = [...assets];
+  setAssets(assets.filter(a => !linksToRemove.some(l => l.assetId === a.id)));
+
+  // 立即解绑（成功后 toast 提供“撤销”= 重新关联）
+  try {
+    await destroyLinksByNodes({
+      nodeIds: [...new Set(linksToRemove.map(l => l.nodeId))],
+      assetIds: [...new Set(linksToRemove.map(l => l.assetId))],
+    });
+  } catch (error) {
+    setAssets(previousAssets);
+    toast.error('解绑失败');
+    return;
+  }
+
+  toast.success(`已解除「${label}」的关联`, {
+    action: {
+      label: '撤销',
+      onClick: async () => {
+        try {
+          await Promise.all(
+            linksToRemove.map((l) =>
+              createNodeAssetLink({ nodeId: l.nodeId, assetId: l.assetId, linkType: l.linkType })
+            )
+          );
+          // TODO: refetch links/assets，确保 UI 与服务端一致
+        } catch (e) {
+          toast.error('撤销失败');
+        }
+      },
+    },
+    duration: 5000,
   });
-  
-  if (!confirmed) return;
-  
-  // 调用解绑 API (删除 NodeDataLink)
-  await unlinkAsset({
-    nodeId: selectedNodeId,
-    assetId,
-  });
-  
-  toast.success('已解除关联');
-  refetchAssets();
 };
 
 // 按钮渲染
 <Button
   variant="ghost"
   size="icon"
-  onClick={() => handleUnlink(asset.id)}
+  onClick={() => handleUnlink(linksToRemove, asset.name)}
   title="解除关联"
 >
   <Unlink className="w-4 h-4 text-gray-400" />

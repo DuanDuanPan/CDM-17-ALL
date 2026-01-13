@@ -335,6 +335,26 @@ export class DataAssetService {
     return this.linkService.unlinkNodeFromAsset(nodeId, assetId);
   }
 
+  /**
+   * Story 9.8 Task 4.0: Get links with details for multiple nodes (batch)
+   * Returns nodeId + asset + linkType for each link
+   */
+  async getNodeAssetLinksByNodes(nodeIds: string[]): Promise<NodeDataLinkWithAsset[]> {
+    return this.linkService.getNodeAssetLinksByNodes(nodeIds);
+  }
+
+  /**
+   * Story 9.8 Task 7.0: Batch unlink nodes from assets
+   * Only removes NodeDataLink records, does NOT delete assets
+   * Returns unlinked items for undo capability
+   */
+  async unlinkNodesByAssets(
+    nodeIds: string[],
+    assetIds: string[]
+  ): Promise<Array<{ nodeId: string; assetId: string; linkType: string }>> {
+    return this.linkService.unlinkNodesByAssets(nodeIds, assetIds);
+  }
+
   // ========================================
   // Helper Methods
   // ========================================

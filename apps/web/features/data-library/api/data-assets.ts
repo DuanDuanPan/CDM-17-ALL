@@ -357,6 +357,57 @@ export async function fetchNodeAssetLinks(
 }
 
 /**
+ * Story 9.8: Fetch link details for multiple nodes (batch)
+ * Returns links including nodeId + asset + linkType for union/provenance UI.
+ */
+export async function fetchNodeAssetLinksByNodes(
+  nodeIds: string[]
+): Promise<{ links: NodeDataLinkWithAsset[] }> {
+  if (!nodeIds || nodeIds.length === 0) {
+    return { links: [] };
+  }
+
+  const response = await fetch(`${API_BASE}/api/data-assets/links:detailByNodes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nodeIds }),
+  });
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to fetch node asset links');
+  }
+
+  return response.json();
+}
+
+/**
+ * Story 9.8: Batch unlink nodes and assets.
+ * Only removes NodeDataLink records; does NOT delete the DataAsset entity.
+ */
+export async function deleteNodeAssetLinksByNodes(data: {
+  nodeIds: string[];
+  assetIds: string[];
+}): Promise<{ success: boolean; unlinked: Array<{ nodeId: string; assetId: string; linkType: DataLinkType }> }> {
+  if (!data.nodeIds?.length || !data.assetIds?.length) {
+    return { success: true, unlinked: [] };
+  }
+
+  const response = await fetch(`${API_BASE}/api/data-assets/links:destroyByNodes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to batch unlink node asset links');
+  }
+
+  return response.json();
+}
+
+/**
  * Create link between node and asset
  * AC#3: Link asset to node with linkType
  */

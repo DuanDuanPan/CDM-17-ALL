@@ -1,11 +1,13 @@
 /**
  * Story 9.7: useContextAwareUpload Hook Unit Tests
- * Task 4.2: Test upload mode detection for PBS/Task/Folder views
+ * Story 9.8: Updated for merged node view (PBS+Task combined)
+ * Task 4.2: Test upload mode detection for Node/Folder views
  */
 
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { useContextAwareUpload } from '@/features/data-library/hooks/useContextAwareUpload';
+import { NodeType } from '@cdm/types';
 
 describe('useContextAwareUpload', () => {
     describe('Folder mode (AC2)', () => {
@@ -13,8 +15,8 @@ describe('useContextAwareUpload', () => {
             const { result } = renderHook(() =>
                 useContextAwareUpload({
                     orgView: 'folder',
-                    selectedPbsId: null,
-                    selectedTaskId: null,
+                    activeNodeId: null,
+                    activeNodeType: null,
                     selectedFolderId: 'folder-1',
                 })
             );
@@ -29,8 +31,8 @@ describe('useContextAwareUpload', () => {
             const { result } = renderHook(() =>
                 useContextAwareUpload({
                     orgView: 'folder',
-                    selectedPbsId: null,
-                    selectedTaskId: null,
+                    activeNodeId: null,
+                    activeNodeType: null,
                     selectedFolderId: null,
                 })
             );
@@ -40,13 +42,13 @@ describe('useContextAwareUpload', () => {
         });
     });
 
-    describe('Task mode (AC3)', () => {
-        it('returns node-link mode with output default when task is selected', () => {
+    describe('Node mode - TASK node (Story 9.8)', () => {
+        it('returns node-link mode with output default when TASK node is active', () => {
             const { result } = renderHook(() =>
                 useContextAwareUpload({
-                    orgView: 'task',
-                    selectedPbsId: null,
-                    selectedTaskId: 'task-1',
+                    orgView: 'node',
+                    activeNodeId: 'task-1',
+                    activeNodeType: NodeType.TASK,
                     selectedFolderId: null,
                 })
             );
@@ -55,28 +57,15 @@ describe('useContextAwareUpload', () => {
             expect(result.current.nodeId).toBe('task-1');
             expect(result.current.defaultLinkType).toBe('output');
         });
-
-        it('returns unlinked mode when no task selected', () => {
-            const { result } = renderHook(() =>
-                useContextAwareUpload({
-                    orgView: 'task',
-                    selectedPbsId: null,
-                    selectedTaskId: null,
-                    selectedFolderId: null,
-                })
-            );
-
-            expect(result.current.mode).toBe('unlinked');
-        });
     });
 
-    describe('PBS mode (AC4)', () => {
-        it('returns node-link mode with reference default when PBS node is selected', () => {
+    describe('Node mode - PBS node (Story 9.8)', () => {
+        it('returns node-link mode with reference default when PBS node is active', () => {
             const { result } = renderHook(() =>
                 useContextAwareUpload({
-                    orgView: 'pbs',
-                    selectedPbsId: 'pbs-1',
-                    selectedTaskId: null,
+                    orgView: 'node',
+                    activeNodeId: 'pbs-1',
+                    activeNodeType: NodeType.PBS,
                     selectedFolderId: null,
                 })
             );
@@ -86,12 +75,12 @@ describe('useContextAwareUpload', () => {
             expect(result.current.defaultLinkType).toBe('reference');
         });
 
-        it('returns unlinked mode when no PBS node selected', () => {
+        it('returns unlinked mode when no node is active in node view', () => {
             const { result } = renderHook(() =>
                 useContextAwareUpload({
-                    orgView: 'pbs',
-                    selectedPbsId: null,
-                    selectedTaskId: null,
+                    orgView: 'node',
+                    activeNodeId: null,
+                    activeNodeType: null,
                     selectedFolderId: null,
                 })
             );
@@ -101,12 +90,12 @@ describe('useContextAwareUpload', () => {
     });
 
     describe('Unlinked mode (AC5)', () => {
-        it('returns unlinked mode when orgView is pbs but no node selected', () => {
+        it('returns unlinked mode when orgView is node but no node selected', () => {
             const { result } = renderHook(() =>
                 useContextAwareUpload({
-                    orgView: 'pbs',
-                    selectedPbsId: null,
-                    selectedTaskId: null,
+                    orgView: 'node',
+                    activeNodeId: null,
+                    activeNodeType: null,
                     selectedFolderId: null,
                 })
             );
@@ -118,27 +107,24 @@ describe('useContextAwareUpload', () => {
         });
     });
 
-    describe('Cross-tab state isolation (State Matrix Edge Cases)', () => {
-        it('PBS view ignores selectedTaskId - uses PBS node', () => {
+    describe('Legacy props backward compatibility (Story 9.8)', () => {
+        it('uses legacy selectedPbsId when activeNodeId not provided', () => {
             const { result } = renderHook(() =>
                 useContextAwareUpload({
-                    orgView: 'pbs',
+                    orgView: 'node',
                     selectedPbsId: 'pbs-1',
-                    selectedTaskId: 'task-1', // Should be ignored
                     selectedFolderId: null,
                 })
             );
 
             expect(result.current.mode).toBe('node-link');
             expect(result.current.nodeId).toBe('pbs-1');
-            expect(result.current.defaultLinkType).toBe('reference');
         });
 
-        it('Task view ignores selectedPbsId - uses task node', () => {
+        it('uses legacy selectedTaskId when activeNodeId not provided', () => {
             const { result } = renderHook(() =>
                 useContextAwareUpload({
-                    orgView: 'task',
-                    selectedPbsId: 'pbs-1', // Should be ignored
+                    orgView: 'node',
                     selectedTaskId: 'task-1',
                     selectedFolderId: null,
                 })
@@ -146,15 +132,31 @@ describe('useContextAwareUpload', () => {
 
             expect(result.current.mode).toBe('node-link');
             expect(result.current.nodeId).toBe('task-1');
-            expect(result.current.defaultLinkType).toBe('output');
         });
 
-        it('PBS view with selectedFolderId returns node-link (ignores folderId)', () => {
+        it('prefers activeNodeId over legacy props', () => {
             const { result } = renderHook(() =>
                 useContextAwareUpload({
-                    orgView: 'pbs',
-                    selectedPbsId: 'pbs-1',
-                    selectedTaskId: null,
+                    orgView: 'node',
+                    activeNodeId: 'node-new',
+                    activeNodeType: NodeType.PBS,
+                    selectedPbsId: 'pbs-legacy',
+                    selectedTaskId: 'task-legacy',
+                    selectedFolderId: null,
+                })
+            );
+
+            expect(result.current.nodeId).toBe('node-new');
+        });
+    });
+
+    describe('Cross-tab state isolation (State Matrix Edge Cases)', () => {
+        it('Node view ignores selectedFolderId', () => {
+            const { result } = renderHook(() =>
+                useContextAwareUpload({
+                    orgView: 'node',
+                    activeNodeId: 'pbs-1',
+                    activeNodeType: NodeType.PBS,
                     selectedFolderId: 'folder-1', // Should be ignored
                 })
             );
@@ -164,27 +166,12 @@ describe('useContextAwareUpload', () => {
             expect(result.current.folderId).toBeUndefined();
         });
 
-        it('Folder view ignores selectedPbsId - uses folder mode', () => {
+        it('Folder view ignores activeNodeId - uses folder mode', () => {
             const { result } = renderHook(() =>
                 useContextAwareUpload({
                     orgView: 'folder',
-                    selectedPbsId: 'pbs-1', // Should be ignored
-                    selectedTaskId: null,
-                    selectedFolderId: 'folder-1',
-                })
-            );
-
-            expect(result.current.mode).toBe('folder');
-            expect(result.current.folderId).toBe('folder-1');
-            expect(result.current.nodeId).toBeUndefined();
-        });
-
-        it('Folder view ignores selectedTaskId - uses folder mode', () => {
-            const { result } = renderHook(() =>
-                useContextAwareUpload({
-                    orgView: 'folder',
-                    selectedPbsId: null,
-                    selectedTaskId: 'task-1', // Should be ignored
+                    activeNodeId: 'pbs-1', // Should be ignored
+                    activeNodeType: NodeType.PBS,
                     selectedFolderId: 'folder-1',
                 })
             );

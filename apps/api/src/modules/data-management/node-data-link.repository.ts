@@ -133,4 +133,41 @@ export class NodeDataLinkRepository {
             return null;
         }
     }
+
+    /**
+     * Story 9.8 Task 7.0: Find links matching nodeIds AND assetIds
+     * Used for batch unlink with undo capability
+     */
+    async findByNodeIdsAndAssetIds(
+        nodeIds: string[],
+        assetIds: string[]
+    ): Promise<NodeDataLink[]> {
+        if (nodeIds.length === 0 || assetIds.length === 0) return [];
+
+        return prisma.nodeDataLink.findMany({
+            where: {
+                nodeId: { in: nodeIds },
+                assetId: { in: assetIds },
+            },
+        });
+    }
+
+    /**
+     * Story 9.8 Task 7.0: Delete links matching nodeIds AND assetIds (batch)
+     */
+    async deleteManyByNodeIdsAndAssetIds(
+        nodeIds: string[],
+        assetIds: string[]
+    ): Promise<number> {
+        if (nodeIds.length === 0 || assetIds.length === 0) return 0;
+
+        const result = await prisma.nodeDataLink.deleteMany({
+            where: {
+                nodeId: { in: nodeIds },
+                assetId: { in: assetIds },
+            },
+        });
+
+        return result.count;
+    }
 }

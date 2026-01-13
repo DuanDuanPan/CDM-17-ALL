@@ -2,13 +2,14 @@
 
 /**
  * Story 9.7: Context-Aware Upload Hook
+ * Story 9.8: Updated for merged node view (PBS+Task combined)
  * Task 2.1: Determines upload mode and default link type based on organization view context
  *
- * AC2-5: Upload behavior changes based on current view (PBS/Task/Folder)
+ * AC2-5: Upload behavior changes based on current view (Node/Folder)
  */
 
 import { useMemo } from 'react';
-import type { DataLinkType } from '@cdm/types';
+import type { DataLinkType, NodeType } from '@cdm/types';
 import type { OrganizationView } from '../components/OrganizationTabs';
 
 // ========================================
@@ -20,7 +21,7 @@ export type UploadMode = 'folder' | 'node-link' | 'unlinked';
 export interface ContextAwareUploadConfig {
     /** Upload mode based on context */
     mode: UploadMode;
-    /** Node ID for node-link mode (PBS or Task ID) */
+    /** Node ID for node-link mode */
     nodeId?: string;
     /** Folder ID for folder mode */
     folderId?: string;
@@ -31,13 +32,25 @@ export interface ContextAwareUploadConfig {
 export interface UseContextAwareUploadOptions {
     /** Current organization view */
     orgView: OrganizationView;
-    /** Selected PBS node ID (null if none) */
-    selectedPbsId: string | null;
-    /** Selected Task node ID (null if none) */
-    selectedTaskId: string | null;
+    /** Story 9.8: Active node ID (from merged node view) */
+    activeNodeId?: string | null;
+    /** Story 9.8: Node type of active node (PBS or TASK) */
+    activeNodeType?: NodeType | null;
     /** Selected Folder ID (null if none) */
     selectedFolderId: string | null;
+    // Legacy props for backward compatibility
+    /** @deprecated Use activeNodeId instead */
+    selectedPbsId?: string | null;
+    /** @deprecated Use activeNodeId instead */
+    selectedTaskId?: string | null;
 }
+
+// ========================================
+// Constants
+// ========================================
+
+const NODE_TYPE_PBS = 'PBS' as const;
+const NODE_TYPE_TASK = 'TASK' as const;
 
 // ========================================
 // Hook
@@ -46,20 +59,24 @@ export interface UseContextAwareUploadOptions {
 /**
  * Hook to determine context-aware upload configuration
  *
- * Returns upload mode and configuration based on current organization view:
- * - PBS view + node selected → node-link mode, default linkType = 'reference'
- * - Task view + node selected → node-link mode, default linkType = 'output'
- * - Folder view → folder mode (direct upload to folder)
+ * Story 9.8 update: Merged node view logic
+ * - Node view + node selected → node-link mode
+ *   - PBS node: default linkType = 'reference'
+ *   - TASK node: default linkType = 'output'
+ * - Folder view → folder mode
  * - No selection → unlinked mode
  */
 export function useContextAwareUpload({
     orgView,
+    activeNodeId,
+    activeNodeType,
+    selectedFolderId,
+    // Legacy props
     selectedPbsId,
     selectedTaskId,
-    selectedFolderId,
 }: UseContextAwareUploadOptions): ContextAwareUploadConfig {
     return useMemo(() => {
-        // AC2: Folder view - direct upload to folder
+        // Folder view - direct upload to folder
         if (orgView === 'folder') {
             return {
                 mode: 'folder' as const,
@@ -67,29 +84,34 @@ export function useContextAwareUpload({
             };
         }
 
-        // AC3: Task view with node selected - output link
-        if (orgView === 'task' && selectedTaskId) {
-            return {
-                mode: 'node-link' as const,
-                nodeId: selectedTaskId,
-                defaultLinkType: 'output' as const,
-            };
+        // Story 9.8: Merged node view
+        if (orgView === 'node') {
+            // Prefer new activeNodeId, fallback to legacy props
+            const nodeId = activeNodeId ?? selectedPbsId ?? selectedTaskId;
+
+            if (nodeId) {
+                // Determine link type based on node type
+                let defaultLinkType: DataLinkType = 'reference';
+
+                if (activeNodeType === NODE_TYPE_TASK) {
+                    defaultLinkType = 'output';
+                }
+                // PBS and other types default to 'reference'
+
+                return {
+                    mode: 'node-link' as const,
+                    nodeId,
+                    defaultLinkType,
+                };
+            }
         }
 
-        // AC4: PBS view with node selected - reference link
-        if (orgView === 'pbs' && selectedPbsId) {
-            return {
-                mode: 'node-link' as const,
-                nodeId: selectedPbsId,
-                defaultLinkType: 'reference' as const,
-            };
-        }
-
-        // AC5: No selection - unlinked mode
+        // No selection - unlinked mode
         return {
             mode: 'unlinked' as const,
         };
-    }, [orgView, selectedPbsId, selectedTaskId, selectedFolderId]);
+    }, [orgView, activeNodeId, activeNodeType, selectedFolderId, selectedPbsId, selectedTaskId]);
 }
 
 export default useContextAwareUpload;
+

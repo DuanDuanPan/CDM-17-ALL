@@ -20,21 +20,21 @@ import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import { useOrganizationView } from './OrganizationTabs';
+import type { SearchMode } from './node-tree';
 import { DataLibraryDrawerView } from './data-library-drawer/DataLibraryDrawerView';
 import { filterAssets } from './data-library-drawer/filterAssets';
 import { getDataLibraryEmptyStateMessage } from './data-library-drawer/emptyState';
 import { useDrawerResize } from './data-library-drawer/useDrawerResize';
 import { LinkAssetDialog } from './LinkAssetDialog';
 import { useDataAssets } from '../hooks/useDataAssets';
-import { usePbsNodes } from '../hooks/usePbsNodes';
-import { usePbsAssets } from '../hooks/usePbsAssets';
-import { useTaskAssets } from '../hooks/useTaskAssets';
 import { useDataFolders } from '../hooks/useDataFolders';
 import { useAssetPreview } from '../hooks/useAssetPreview';
 import { useDataLibraryDrawerOrgState } from '../hooks/useDataLibraryDrawerOrgState';
 import { useContextAwareUpload } from '../hooks/useContextAwareUpload';
 import { useAssetDelete } from '../hooks/useAssetDelete';
 import { useAssetSelection } from '../hooks/useAssetSelection';
+import { useNodeTreeProjection } from '../hooks/useNodeTreeProjection';
+import { useNodeAssetUnlink } from '../hooks/useNodeAssetUnlink';
 import type { DataAssetFormat, DataAssetWithFolder } from '@cdm/types';
 import type { ViewMode } from './data-library-drawer/types';
 import { TrashDrawer } from './TrashDrawer';
@@ -73,6 +73,7 @@ export function DataLibraryDrawer({
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [searchMode, setSearchMode] = useState<SearchMode>('node');
   const [formatFilter, setFormatFilter] = useState<DataAssetFormat | ''>('');
   const [createdAfter, setCreatedAfter] = useState('');
   const [createdBefore, setCreatedBefore] = useState('');
@@ -97,18 +98,46 @@ export function DataLibraryDrawer({
     toggleTaskGroup,
     folderExpandedIds,
     toggleFolderExpand,
-  } = useDataLibraryDrawerOrgState();
+    nodeExpandedIds,
+    toggleNodeExpand,
+  } = useDataLibraryDrawerOrgState(graphId);
 
   // Story 9.4: Preview state using useAssetPreview hook
   const { previewAsset, previewType, handleAssetPreview, handleClosePreview } = useAssetPreview();
 
   // Story 9.7: Context-aware upload configuration
+  // Story 9.8: Updated for merged node view with active node from legacy state
+  const activeNodeId = selectedPbsId ?? selectedTaskId;
+  const { getNodeType } = useNodeTreeProjection();
+  const activeNodeType = activeNodeId ? getNodeType(activeNodeId) : null;
   const uploadConfig = useContextAwareUpload({
     orgView,
+    activeNodeId,
+    activeNodeType,
+    selectedFolderId,
+    // Legacy props for backward compatibility
     selectedPbsId,
     selectedTaskId,
-    selectedFolderId,
   });
+
+  // Story 9.8: Node view multi-selection state
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+
+  const handleActiveNodeChange = useCallback((nodeId: string | null) => {
+    // When active node changes in the merged view, update appropriate legacy state
+    if (nodeId) {
+      // For now, treat all as PBS-like selection (backward compatibility)
+      setSelectedPbsId(nodeId);
+      setSelectedTaskId(null);
+    } else {
+      setSelectedPbsId(null);
+      setSelectedTaskId(null);
+    }
+  }, [setSelectedPbsId, setSelectedTaskId]);
+
+  const handleSelectedNodeIdsChange = useCallback((ids: Set<string>) => {
+    setSelectedNodeIds(ids);
+  }, []);
 
   // Story 9.5: Link-to-node dialog state
   const [linkingAsset, setLinkingAsset] = useState<DataAssetWithFolder | null>(null);
@@ -119,31 +148,7 @@ export function DataLibraryDrawer({
   // Story 9.8: Batch selection + delete hooks
   const selection = useAssetSelection();
   const assetDelete = useAssetDelete(graphId);
-
-  // Story 9.2: PBS nodes hook for descendant IDs
-  const { getDescendantIds } = usePbsNodes();
-
-  // Story 9.2: PBS assets hook
-  const {
-    assets: pbsAssets,
-    isLoading: pbsAssetsLoading,
-    error: pbsAssetsError,
-    refetch: refetchPbsAssets,
-  } = usePbsAssets({
-    selectedNodeId: selectedPbsId,
-    includeSubNodes: pbsIncludeSubNodes,
-    getDescendantIds,
-  });
-
-  // Story 9.2: Task assets hook
-  const {
-    assets: taskAssets,
-    isLoading: taskAssetsLoading,
-    error: taskAssetsError,
-    refetch: refetchTaskAssets,
-  } = useTaskAssets({
-    selectedTaskId,
-  });
+  const nodeAssetUnlink = useNodeAssetUnlink();
 
   // Story 9.2: Folder operations hook
   const { moveAsset, isMovingAsset } = useDataFolders({ graphId, enabled: isOpen });
@@ -154,8 +159,9 @@ export function DataLibraryDrawer({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const isSelectionScopedView =
-    (orgView === 'pbs' && !!selectedPbsId) || (orgView === 'task' && !!selectedTaskId);
+  const effectiveSearchMode: SearchMode = orgView === 'folder' ? 'asset' : searchMode;
+  const shouldFetchGlobalAssets =
+    orgView === 'folder' || (orgView === 'node' && effectiveSearchMode === 'asset');
 
   // Data fetching hook
   const {
@@ -165,26 +171,21 @@ export function DataLibraryDrawer({
     refetch,
   } = useDataAssets({
     graphId,
-    search: debouncedSearchQuery,
-    format: formatFilter || undefined,
+    search: shouldFetchGlobalAssets ? debouncedSearchQuery : undefined,
+    format: shouldFetchGlobalAssets ? (formatFilter || undefined) : undefined,
     folderId: orgView === 'folder' && selectedFolderId ? selectedFolderId : undefined,
-    createdAfter: createdAfter || undefined,
-    createdBefore: createdBefore || undefined,
-    enabled: isOpen && !isSelectionScopedView,
+    createdAfter: shouldFetchGlobalAssets ? (createdAfter || undefined) : undefined,
+    createdBefore: shouldFetchGlobalAssets ? (createdBefore || undefined) : undefined,
+    enabled: isOpen && shouldFetchGlobalAssets,
   });
 
-  const baseAssets =
-    orgView === 'pbs' && selectedPbsId
-      ? pbsAssets
-      : orgView === 'task' && selectedTaskId
-        ? taskAssets
-        : assets;
+  const baseAssets = shouldFetchGlobalAssets ? assets : [];
 
   const visibleAssets = filterAssets(baseAssets, {
-    search: debouncedSearchQuery,
-    format: formatFilter,
-    createdAfter,
-    createdBefore,
+    search: shouldFetchGlobalAssets ? debouncedSearchQuery : '',
+    format: shouldFetchGlobalAssets ? formatFilter : '',
+    createdAfter: shouldFetchGlobalAssets ? createdAfter : '',
+    createdBefore: shouldFetchGlobalAssets ? createdBefore : '',
   });
 
   // Story 9.2: Handle asset drop to folder
@@ -212,26 +213,6 @@ export function DataLibraryDrawer({
     setLinkingAsset(null);
     toast.success('已关联到节点');
   }, []);
-
-  // Story 9.2: Check if assets are loading from organization hooks
-  const orgAssetsLoading = Boolean(
-    (orgView === 'pbs' && selectedPbsId && pbsAssetsLoading) ||
-    (orgView === 'task' && selectedTaskId && taskAssetsLoading)
-  );
-
-  const activeError =
-    orgView === 'pbs' && selectedPbsId
-      ? pbsAssetsError
-      : orgView === 'task' && selectedTaskId
-        ? taskAssetsError
-        : error;
-
-  const activeRefetch =
-    orgView === 'pbs' && selectedPbsId
-      ? refetchPbsAssets
-      : orgView === 'task' && selectedTaskId
-        ? refetchTaskAssets
-        : refetch;
 
   // Mount effect for portal
   useEffect(() => setMounted(true), []);
@@ -267,25 +248,63 @@ export function DataLibraryDrawer({
 
   const handleAssetDelete = useCallback(
     (asset: DataAssetWithFolder) => {
+      if (orgView === 'node') {
+        if (!activeNodeId) {
+          toast.error('请先选择一个节点');
+          return;
+        }
+
+        const nodeIds = selectedNodeIds.size > 0 ? Array.from(selectedNodeIds) : [activeNodeId];
+
+        void nodeAssetUnlink
+          .batchUnlink({ nodeIds, assetIds: [asset.id] })
+          .then(() => selection.remove([asset.id]))
+          .catch(() => {
+            // Error toast is handled inside hook
+          });
+
+        return;
+      }
+
       assetDelete.confirmSoftDelete(asset, {
         onSuccess: () => selection.remove([asset.id]),
       });
     },
-    [assetDelete, selection.remove]
+    [activeNodeId, assetDelete, nodeAssetUnlink, orgView, selectedNodeIds, selection.remove]
   );
 
   const handleBatchDelete = useCallback(() => {
+    if (selection.selectedIdList.length === 0) return;
+
+    if (orgView === 'node') {
+      if (!activeNodeId) {
+        toast.error('请先选择一个节点');
+        return;
+      }
+
+      const nodeIds = selectedNodeIds.size > 0 ? Array.from(selectedNodeIds) : [activeNodeId];
+
+      void nodeAssetUnlink
+        .batchUnlink({ nodeIds, assetIds: selection.selectedIdList })
+        .then(() => selection.clearSelection())
+        .catch(() => {
+          // Error toast is handled inside hook
+        });
+
+      return;
+    }
+
     assetDelete.confirmSoftDeleteBatch(selection.selectedIdList, {
       onSuccess: selection.clearSelection,
     });
-  }, [assetDelete, selection.selectedIdList, selection.clearSelection]);
+  }, [activeNodeId, assetDelete, nodeAssetUnlink, orgView, selectedNodeIds, selection.selectedIdList, selection.clearSelection]);
 
   if (!isOpen || !mounted) return null;
 
   const emptyStateMessage =
-    searchQuery || formatFilter || createdAfter || createdBefore
+    ((searchQuery && shouldFetchGlobalAssets) || formatFilter || createdAfter || createdBefore)
       ? '无匹配资产'
-      : getDataLibraryEmptyStateMessage({ orgView, selectedPbsId, selectedTaskId, selectedFolderId });
+      : getDataLibraryEmptyStateMessage({ orgView, activeNodeId, selectedPbsId, selectedTaskId, selectedFolderId });
 
   return (
     <>
@@ -304,11 +323,21 @@ export function DataLibraryDrawer({
         onCreatedBeforeChange={setCreatedBefore}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
+        searchMode={searchMode}
+        onSearchModeChange={setSearchMode}
         showOrgPanel={showOrgPanel}
         onToggleOrgPanel={() => setShowOrgPanel((prev) => !prev)}
         orgView={orgView}
         onOrgViewChange={setOrgView}
         graphId={graphId}
+        // Story 9.8: New node view props
+        activeNodeId={activeNodeId}
+        onActiveNodeChange={handleActiveNodeChange}
+        selectedNodeIds={selectedNodeIds}
+        onSelectedNodeIdsChange={handleSelectedNodeIdsChange}
+        nodeExpandedIds={nodeExpandedIds}
+        onToggleNodeExpand={toggleNodeExpand}
+        // Legacy props for backward compatibility
         selectedPbsId={selectedPbsId}
         onSelectPbs={setSelectedPbsId}
         pbsExpandedIds={pbsExpandedIds}
@@ -324,9 +353,9 @@ export function DataLibraryDrawer({
         folderExpandedIds={folderExpandedIds}
         onToggleFolderExpand={toggleFolderExpand}
         onAssetDrop={handleAssetDrop}
-        isLoading={isLoading || orgAssetsLoading}
-        error={activeError}
-        onRetry={activeRefetch}
+        isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
         visibleAssets={visibleAssets}
         baseAssetCount={baseAssets.length}
         emptyStateMessage={emptyStateMessage}

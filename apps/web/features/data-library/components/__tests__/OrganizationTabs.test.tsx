@@ -1,5 +1,6 @@
 /**
  * Story 9.2: Organization Tabs Component Tests
+ * Story 9.8: Updated for merged node view (PBS+Task combined)
  */
 
 import React from 'react';
@@ -10,7 +11,7 @@ import { renderHook, act } from '@testing-library/react';
 
 describe('OrganizationTabs', () => {
   const defaultProps = {
-    activeView: 'pbs' as const,
+    activeView: 'node' as const,
     onViewChange: vi.fn(),
   };
 
@@ -18,26 +19,22 @@ describe('OrganizationTabs', () => {
     vi.clearAllMocks();
   });
 
-  it('renders all three tabs', () => {
+  // Story 9.8: Updated - now only 2 tabs (node + folder)
+  it('renders both tabs (node and folder)', () => {
     render(<OrganizationTabs {...defaultProps} />);
 
-    expect(screen.getByTestId('org-tab-pbs')).toBeTruthy();
-    expect(screen.getByTestId('org-tab-task')).toBeTruthy();
+    expect(screen.getByTestId('org-tab-node')).toBeTruthy();
     expect(screen.getByTestId('org-tab-folder')).toBeTruthy();
+    // PBS and Task tabs should no longer exist
+    expect(screen.queryByTestId('org-tab-pbs')).toBeNull();
+    expect(screen.queryByTestId('org-tab-task')).toBeNull();
   });
 
-  it('shows PBS tab as active when activeView is pbs', () => {
-    render(<OrganizationTabs {...defaultProps} activeView="pbs" />);
+  it('shows Node tab as active when activeView is node', () => {
+    render(<OrganizationTabs {...defaultProps} activeView="node" />);
 
-    const pbsTab = screen.getByTestId('org-tab-pbs');
-    expect(pbsTab.getAttribute('aria-pressed')).toBe('true');
-  });
-
-  it('shows Task tab as active when activeView is task', () => {
-    render(<OrganizationTabs {...defaultProps} activeView="task" />);
-
-    const taskTab = screen.getByTestId('org-tab-task');
-    expect(taskTab.getAttribute('aria-pressed')).toBe('true');
+    const nodeTab = screen.getByTestId('org-tab-node');
+    expect(nodeTab.getAttribute('aria-pressed')).toBe('true');
   });
 
   it('shows Folder tab as active when activeView is folder', () => {
@@ -51,18 +48,18 @@ describe('OrganizationTabs', () => {
     const onViewChange = vi.fn();
     render(<OrganizationTabs {...defaultProps} onViewChange={onViewChange} />);
 
-    fireEvent.click(screen.getByTestId('org-tab-task'));
-    expect(onViewChange).toHaveBeenCalledWith('task');
-
     fireEvent.click(screen.getByTestId('org-tab-folder'));
     expect(onViewChange).toHaveBeenCalledWith('folder');
+
+    fireEvent.click(screen.getByTestId('org-tab-node'));
+    expect(onViewChange).toHaveBeenCalledWith('node');
   });
 
+  // Story 9.8: Updated labels
   it('displays correct labels in Chinese', () => {
     render(<OrganizationTabs {...defaultProps} />);
 
-    expect(screen.getByText('PBS')).toBeTruthy();
-    expect(screen.getByText('任务')).toBeTruthy();
+    expect(screen.getByText('节点（PBS+任务）')).toBeTruthy();
     expect(screen.getByText('文件夹')).toBeTruthy();
   });
 });
@@ -73,21 +70,22 @@ describe('useOrganizationView', () => {
     localStorage.clear();
   });
 
-  it('returns pbs as default view', () => {
+  // Story 9.8: Updated - default is now 'node'
+  it('returns node as default view', () => {
     const { result } = renderHook(() => useOrganizationView('test-graph'));
 
-    expect(result.current[0]).toBe('pbs');
+    expect(result.current[0]).toBe('node');
   });
 
   it('persists view to localStorage', () => {
     const { result } = renderHook(() => useOrganizationView('test-graph'));
 
     act(() => {
-      result.current[1]('task');
+      result.current[1]('folder');
     });
 
-    expect(result.current[0]).toBe('task');
-    expect(localStorage.getItem('cdm-data-library-org-view-test-graph')).toBe('task');
+    expect(result.current[0]).toBe('folder');
+    expect(localStorage.getItem('cdm-data-library-org-view-test-graph')).toBe('folder');
   });
 
   it('restores view from localStorage', () => {
@@ -103,7 +101,27 @@ describe('useOrganizationView', () => {
 
     const { result } = renderHook(() => useOrganizationView('test-graph'));
 
-    expect(result.current[0]).toBe('pbs');
+    expect(result.current[0]).toBe('node');
+  });
+
+  // Story 9.8: Migration test - old 'pbs' value should migrate to 'node'
+  it('migrates old pbs value to node', () => {
+    localStorage.setItem('cdm-data-library-org-view-test-graph', 'pbs');
+
+    const { result } = renderHook(() => useOrganizationView('test-graph'));
+
+    expect(result.current[0]).toBe('node');
+    expect(localStorage.getItem('cdm-data-library-org-view-test-graph')).toBe('node');
+  });
+
+  // Story 9.8: Migration test - old 'task' value should migrate to 'node'
+  it('migrates old task value to node', () => {
+    localStorage.setItem('cdm-data-library-org-view-test-graph', 'task');
+
+    const { result } = renderHook(() => useOrganizationView('test-graph'));
+
+    expect(result.current[0]).toBe('node');
+    expect(localStorage.getItem('cdm-data-library-org-view-test-graph')).toBe('node');
   });
 
   it('uses different storage keys for different graphs', () => {
@@ -111,10 +129,10 @@ describe('useOrganizationView', () => {
     const { result: result2 } = renderHook(() => useOrganizationView('graph-2'));
 
     act(() => {
-      result1.current[1]('task');
+      result1.current[1]('folder');
     });
 
-    expect(result1.current[0]).toBe('task');
-    expect(result2.current[0]).toBe('pbs');
+    expect(result1.current[0]).toBe('folder');
+    expect(result2.current[0]).toBe('node');
   });
 });

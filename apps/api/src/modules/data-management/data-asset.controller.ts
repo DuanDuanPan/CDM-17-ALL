@@ -42,10 +42,11 @@ import {
   CreateDataFolderDto,
   CreateNodeDataLinkDto,
   UpdateDataFolderDto,
-  LinksByNodesDto,
-  UploadAssetDto,
-  SoftDeleteBatchDto,
-} from './dto';
+	  LinksByNodesDto,
+	  DestroyLinksByNodesDto,
+	  UploadAssetDto,
+	  SoftDeleteBatchDto,
+	} from './dto';
 import type {
   DataAssetQueryDto,
   DataAssetListResponse,
@@ -71,7 +72,7 @@ const MAX_FILE_SIZE = (() => {
 @Controller()
 @UseGuards(DataManagementAuthGuard)
 export class DataAssetController {
-  constructor(private readonly service: DataAssetService) {}
+  constructor(private readonly service: DataAssetService) { }
 
   // ========================================
   // Data Asset Endpoints
@@ -362,4 +363,31 @@ export class DataAssetController {
     await this.service.unlinkNodeFromAsset(nodeId, assetId);
     return { success: true };
   }
+
+  /**
+   * Story 9.8 Task 4.0: POST /data-assets/links:detailByNodes - Get link details for multiple nodes
+   * Returns nodeId + asset + linkType for each link, used for:
+   * - Multi-node asset union display
+   * - Asset provenance tracking (which nodes link to this asset)
+   */
+  @Post('data-assets/links\\:detailByNodes')
+  @HttpCode(HttpStatus.OK)
+  async getLinksDetailByNodes(@Body() dto: LinksByNodesDto): Promise<{ links: NodeDataLinkWithAsset[] }> {
+    const links = await this.service.getNodeAssetLinksByNodes(dto.nodeIds);
+    return { links };
+  }
+
+  /**
+   * Story 9.8 Task 7.0: POST /data-assets/links:destroyByNodes - Batch unlink nodes and assets
+   * Only removes NodeDataLink records, does NOT delete the DataAsset entity
+   * Returns the list of unlinked items for undo capability
+   */
+  @Post('data-assets/links\\:destroyByNodes')
+  @HttpCode(HttpStatus.OK)
+	  async destroyLinksByNodes(
+	    @Body() dto: DestroyLinksByNodesDto
+	  ): Promise<{ success: boolean; unlinked: Array<{ nodeId: string; assetId: string; linkType: string }> }> {
+	    const unlinked = await this.service.unlinkNodesByAssets(dto.nodeIds, dto.assetIds);
+	    return { success: true, unlinked };
+	  }
 }

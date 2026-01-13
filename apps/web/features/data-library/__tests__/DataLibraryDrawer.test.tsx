@@ -245,7 +245,7 @@ describe('DataLibraryDrawer', () => {
         wrapper: createWrapper(),
       });
 
-      expect(screen.getByText('暂无数据资产')).toBeDefined();
+      expect(screen.getByText('请选择一个节点查看关联资产')).toBeDefined();
     });
 
     it('should show asset count in footer', () => {

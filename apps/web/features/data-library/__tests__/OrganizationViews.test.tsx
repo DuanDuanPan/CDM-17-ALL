@@ -89,29 +89,25 @@ describe('Organization Views (Story 9.2)', () => {
     localStorage.clear();
   });
 
-  it('renders tabs and shows PBS empty state by default', () => {
+  it('renders tabs and shows Node empty state by default', () => {
     render(createElement(DataLibraryDrawer, defaultProps), { wrapper: createWrapper() });
 
     expect(screen.getByTestId('organization-tabs')).toBeDefined();
-    expect(screen.getByTestId('org-tab-pbs').getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByTestId('empty-state-pbs')).toBeDefined();
+    expect(screen.getByTestId('org-tab-node').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText('请选择一个节点查看关联资产')).toBeDefined();
   });
 
-  it('switches between PBS/Task/Folder views and keeps view state during tab switching (AC5)', async () => {
+  it('switches between Node/Folder views and keeps view state during tab switching (AC5)', async () => {
     const user = userEvent.setup();
     render(createElement(DataLibraryDrawer, defaultProps), { wrapper: createWrapper() });
-
-    await user.click(screen.getByTestId('org-tab-task'));
-    expect(screen.getByTestId('org-tab-task').getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByTestId('empty-state-task')).toBeDefined();
 
     await user.click(screen.getByTestId('org-tab-folder'));
     expect(screen.getByTestId('org-tab-folder').getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByTestId('empty-state-folder')).toBeDefined();
 
-    await user.click(screen.getByTestId('org-tab-pbs'));
-    expect(screen.getByTestId('org-tab-pbs').getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByTestId('empty-state-pbs')).toBeDefined();
+    await user.click(screen.getByTestId('org-tab-node'));
+    expect(screen.getByTestId('org-tab-node').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText('请选择一个节点查看关联资产')).toBeDefined();
   });
 
   it('renders asset cards with @dnd-kit integration in folder view (AC4)', async () => {

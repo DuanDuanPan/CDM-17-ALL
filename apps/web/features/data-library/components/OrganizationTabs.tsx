@@ -1,19 +1,20 @@
 /**
  * Story 9.2: Organization Tabs Component
- * Provides tabs to switch between PBS, Task, and Folder organization views
+ * Story 9.8: Merged PBS and Task tabs into single Node tab
+ * Provides tabs to switch between Node (PBS+Task) and Folder organization views
  * AC#5: Remembers last selected tab via localStorage
  */
 
 'use client';
 
 import { useState } from 'react';
-import { Box, ListTodo, Folder } from 'lucide-react';
+import { GitBranch, Folder } from 'lucide-react';
 import { cn, Button } from '@cdm/ui';
 
 /**
- * Organization view type
+ * Story 9.8: Organization view type - merged PBS+Task into 'node'
  */
-export type OrganizationView = 'pbs' | 'task' | 'folder';
+export type OrganizationView = 'node' | 'folder';
 
 interface OrganizationTabsProps {
   /** Current active view */
@@ -23,7 +24,7 @@ interface OrganizationTabsProps {
 }
 
 /**
- * Tab configuration
+ * Story 9.8: Tab configuration - 2 tabs instead of 3
  */
 const TABS: Array<{
   id: OrganizationView;
@@ -32,16 +33,10 @@ const TABS: Array<{
   description: string;
 }> = [
     {
-      id: 'pbs',
-      label: 'PBS',
-      icon: Box,
-      description: '按产品结构组织',
-    },
-    {
-      id: 'task',
-      label: '任务',
-      icon: ListTodo,
-      description: '按任务状态分组',
+      id: 'node',
+      label: '节点（PBS+任务）',
+      icon: GitBranch,
+      description: '按图谱结构组织',
     },
     {
       id: 'folder',
@@ -54,7 +49,7 @@ const TABS: Array<{
 const STORAGE_KEY_PREFIX = 'cdm-data-library-org-view';
 
 /**
- * Organization Tabs - switches between PBS, Task, and Folder views
+ * Organization Tabs - switches between Node (PBS+Task) and Folder views
  */
 export function OrganizationTabs({
   activeView,
@@ -64,7 +59,7 @@ export function OrganizationTabs({
     <div className="px-3 py-3 border-b border-gray-100 dark:border-gray-800">
       <div
         data-testid="organization-tabs"
-        className="grid grid-cols-3 gap-1 p-1 bg-gray-100/60 dark:bg-gray-800/60 rounded-lg"
+        className="grid grid-cols-2 gap-1 p-1 bg-gray-100/60 dark:bg-gray-800/60 rounded-lg"
       >
         {TABS.map((tab) => {
           const Icon = tab.icon;
@@ -97,23 +92,31 @@ export function OrganizationTabs({
 
 /**
  * Hook to persist organization view selection
+ * Story 9.8: Added migration from 'pbs'/'task' to 'node'
  * AC#5: State persistence using localStorage
  */
 export function useOrganizationView(graphId: string): [OrganizationView, (view: OrganizationView) => void] {
   const storageKey = `${STORAGE_KEY_PREFIX}-${graphId}`;
 
   const [view, setViewState] = useState<OrganizationView>(() => {
-    if (typeof window === 'undefined') return 'pbs';
+    if (typeof window === 'undefined') return 'node';
 
     try {
       const stored = localStorage.getItem(storageKey);
-      if (stored && ['pbs', 'task', 'folder'].includes(stored)) {
+
+      // Story 9.8: Migration - convert old 'pbs' or 'task' to 'node'
+      if (stored === 'pbs' || stored === 'task') {
+        localStorage.setItem(storageKey, 'node');
+        return 'node';
+      }
+
+      if (stored && ['node', 'folder'].includes(stored)) {
         return stored as OrganizationView;
       }
     } catch {
       // localStorage not available
     }
-    return 'pbs';
+    return 'node';
   });
 
   const setView = (newView: OrganizationView) => {
