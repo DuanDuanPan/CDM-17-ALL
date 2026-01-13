@@ -45,6 +45,8 @@ interface FlattenedNode {
   parentTempId?: string;
   offsetX: number;
   offsetY: number;
+  // Story 8.6: Include siblingIndex for order persistence
+  siblingIndex: number;
 }
 
 /**
@@ -73,6 +75,8 @@ function flattenTemplateNodes(
     parentTempId,
     offsetX,
     offsetY,
+    // Story 8.6: Track sibling index for order persistence
+    siblingIndex,
   });
 
   if (node.children) {
@@ -236,6 +240,8 @@ export function useTemplateInsert({
               graphId,
               createdAt: now,
               updatedAt: now,
+              // Story 8.6: Include order for stable sibling sorting across layout modes
+              order: node.siblingIndex,
             });
           });
 
