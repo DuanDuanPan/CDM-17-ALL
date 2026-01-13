@@ -114,6 +114,24 @@ export class NodeDataLinkService {
         this.logger.log(`Unlinked node ${nodeId} from asset ${assetId}`);
     }
 
+    /**
+     * Count nodes linked to a data asset
+     */
+    async getLinkedNodeCount(assetId: string): Promise<number> {
+        return this.linkRepo.countByAsset(assetId);
+    }
+
+    /**
+     * Delete all links for a data asset (unlink from all nodes)
+     */
+    async deleteLinksByAsset(assetId: string): Promise<number> {
+        const deletedCount = await this.linkRepo.deleteManyByAsset(assetId);
+        if (deletedCount > 0) {
+            this.logger.log(`Unlinked asset ${assetId} from ${deletedCount} node(s)`);
+        }
+        return deletedCount;
+    }
+
     private toAssetResponse(asset: PrismaDataAsset & { folder?: PrismaDataFolder | null }): DataAssetWithFolder {
         return {
             id: asset.id,

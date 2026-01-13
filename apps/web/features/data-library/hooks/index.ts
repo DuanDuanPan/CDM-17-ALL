@@ -12,3 +12,4 @@ export { useDataFolders } from './useDataFolders';
 export { useDataAssets } from './useDataAssets';
 export { useDataUpload } from './useDataUpload';
 export { useAssetLinks } from './useAssetLinks';
+export { useContextAwareUpload, type ContextAwareUploadConfig, type UploadMode } from './useContextAwareUpload';

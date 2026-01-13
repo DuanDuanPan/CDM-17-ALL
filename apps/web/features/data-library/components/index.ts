@@ -15,3 +15,7 @@ export { TaskItemDetails } from './TaskItemDetails';
 export { FolderTreeView } from './FolderTreeView';
 export { UploadButton } from './UploadButton';
 export { LinkAssetDialog } from './LinkAssetDialog';
+export { GroupedAssetList } from './GroupedAssetList';
+export { UploadTypeDropdown } from './UploadTypeDropdown';
+export { QuickTypePicker } from './QuickTypePicker';
+export { ContextAwareUploadButton } from './ContextAwareUploadButton';

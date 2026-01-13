@@ -38,8 +38,8 @@ export class NodeDataLinkRepository {
     }
 
     async getAssetGraphId(assetId: string): Promise<string | null> {
-        const asset = await prisma.dataAsset.findUnique({
-            where: { id: assetId },
+        const asset = await prisma.dataAsset.findFirst({
+            where: { id: assetId, isDeleted: false },
             select: { graphId: true },
         });
 
@@ -52,7 +52,7 @@ export class NodeDataLinkRepository {
      */
     async findByNode(nodeId: string): Promise<(NodeDataLink & { asset: DataAsset & { folder: DataFolder | null } })[]> {
         return prisma.nodeDataLink.findMany({
-            where: { nodeId },
+            where: { nodeId, asset: { isDeleted: false } },
             include: {
                 asset: {
                     include: { folder: true }
@@ -70,7 +70,7 @@ export class NodeDataLinkRepository {
         if (nodeIds.length === 0) return [];
 
         return prisma.nodeDataLink.findMany({
-            where: { nodeId: { in: nodeIds } },
+            where: { nodeId: { in: nodeIds }, asset: { isDeleted: false } },
             include: {
                 asset: {
                     include: { folder: true }
@@ -88,6 +88,26 @@ export class NodeDataLinkRepository {
             where: { assetId },
             orderBy: { createdAt: 'desc' },
         });
+    }
+
+    /**
+     * Count links for an asset
+     */
+    async countByAsset(assetId: string): Promise<number> {
+        return prisma.nodeDataLink.count({
+            where: { assetId },
+        });
+    }
+
+    /**
+     * Delete all links for an asset
+     */
+    async deleteManyByAsset(assetId: string): Promise<number> {
+        const result = await prisma.nodeDataLink.deleteMany({
+            where: { assetId },
+        });
+
+        return result.count;
     }
 
     /**

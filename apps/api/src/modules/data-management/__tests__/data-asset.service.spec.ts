@@ -14,6 +14,12 @@ describe('DataAssetService', () => {
     findMany: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
+    softDelete: jest.fn(),
+    softDeleteBatch: jest.fn(),
+    restore: jest.fn(),
+    findDeleted: jest.fn(),
+    hardDelete: jest.fn(),
+    emptyTrash: jest.fn(),
   };
 
   const folderService = {
@@ -30,6 +36,7 @@ describe('DataAssetService', () => {
     getNodeAssetsByNodes: jest.fn(),
     getNodeAssetLinks: jest.fn(),
     unlinkNodeFromAsset: jest.fn(),
+    deleteLinksByAsset: jest.fn(),
   };
 
   const fileService = {
@@ -246,7 +253,7 @@ describe('DataAssetService', () => {
       id: 'asset-1',
       name: 'test.vtk',
       description: null,
-      format: 'OTHER',
+      format: 'VTK', // VTK format is correctly detected from .vtk extension
       fileSize: 10,
       storagePath: '/api/files/file-1',
       thumbnail: null,
@@ -273,7 +280,7 @@ describe('DataAssetService', () => {
     expect(assetRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'test.vtk',
-        format: 'OTHER',
+        format: 'VTK', // VTK format is correctly detected from .vtk extension
         fileSize: 10,
         storagePath: '/api/files/file-1',
         graph: { connect: { id: 'graph-1' } },
@@ -284,7 +291,7 @@ describe('DataAssetService', () => {
       expect.objectContaining({
         id: 'asset-1',
         name: 'test.vtk',
-        format: 'OTHER',
+        format: 'VTK', // VTK format is correctly detected from .vtk extension
         storagePath: '/api/files/file-1',
       })
     );
@@ -309,5 +316,88 @@ describe('DataAssetService', () => {
 
     expect(fileService.deleteFile).toHaveBeenCalledWith('file-rollback');
   });
-});
 
+  it('softDeleteAsset: sets isDeleted and deletedAt via repository', async () => {
+    assetRepo.findById.mockResolvedValueOnce({ id: 'asset-1' });
+    assetRepo.softDelete.mockResolvedValueOnce({ id: 'asset-1' });
+
+    await service.softDeleteAsset('asset-1');
+
+    expect(assetRepo.softDelete).toHaveBeenCalledWith('asset-1');
+  });
+
+  it('restoreAsset: clears deleted fields and returns asset with folder', async () => {
+    const now = new Date('2026-01-01T00:00:00.000Z');
+    const folder = {
+      id: 'folder-1',
+      name: '结构设计',
+      description: null,
+      parentId: null,
+      graphId: 'graph-1',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    assetRepo.findById.mockResolvedValueOnce({ id: 'asset-1' });
+    assetRepo.restore.mockResolvedValueOnce({ id: 'asset-1' });
+    assetRepo.findByIdWithFolder.mockResolvedValueOnce({
+      id: 'asset-1',
+      name: '卫星总体结构',
+      description: null,
+      format: 'STEP',
+      fileSize: 123,
+      storagePath: null,
+      thumbnail: null,
+      version: 'v1.0.0',
+      tags: ['卫星'],
+      graphId: 'graph-1',
+      folderId: 'folder-1',
+      creatorId: null,
+      secretLevel: 'internal',
+      createdAt: now,
+      updatedAt: now,
+      folder,
+    });
+
+    const result = await service.restoreAsset('asset-1');
+
+    expect(assetRepo.restore).toHaveBeenCalledWith('asset-1');
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'asset-1',
+        name: '卫星总体结构',
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        folder: expect.objectContaining({ id: 'folder-1' }),
+      })
+    );
+  });
+
+  it('hardDeleteAsset: unlinks, deletes physical file, and deletes record', async () => {
+    assetRepo.findById.mockResolvedValueOnce({ id: 'asset-1', storagePath: '/api/files/file-1' });
+    linkService.deleteLinksByAsset.mockResolvedValueOnce(1);
+    fileService.deleteFile.mockResolvedValueOnce(undefined);
+    assetRepo.hardDelete.mockResolvedValueOnce({ id: 'asset-1' });
+
+    await service.hardDeleteAsset('asset-1');
+
+    expect(linkService.deleteLinksByAsset).toHaveBeenCalledWith('asset-1');
+    expect(fileService.deleteFile).toHaveBeenCalledWith('file-1');
+    expect(assetRepo.hardDelete).toHaveBeenCalledWith('asset-1');
+  });
+
+  it('emptyTrash: best-effort deletes files then deletes db records', async () => {
+    assetRepo.findDeleted.mockResolvedValueOnce([
+      { id: 'asset-1', storagePath: '/api/files/file-1' },
+      { id: 'asset-2', storagePath: null },
+    ]);
+    fileService.deleteFile.mockResolvedValueOnce(undefined);
+    assetRepo.emptyTrash.mockResolvedValueOnce(2);
+
+    const result = await service.emptyTrash('graph-1');
+
+    expect(fileService.deleteFile).toHaveBeenCalledWith('file-1');
+    expect(assetRepo.emptyTrash).toHaveBeenCalledWith('graph-1');
+    expect(result).toEqual({ deletedCount: 2 });
+  });
+});

@@ -32,8 +32,12 @@ import { useTaskAssets } from '../hooks/useTaskAssets';
 import { useDataFolders } from '../hooks/useDataFolders';
 import { useAssetPreview } from '../hooks/useAssetPreview';
 import { useDataLibraryDrawerOrgState } from '../hooks/useDataLibraryDrawerOrgState';
+import { useContextAwareUpload } from '../hooks/useContextAwareUpload';
+import { useAssetDelete } from '../hooks/useAssetDelete';
+import { useAssetSelection } from '../hooks/useAssetSelection';
 import type { DataAssetFormat, DataAssetWithFolder } from '@cdm/types';
 import type { ViewMode } from './data-library-drawer/types';
+import { TrashDrawer } from './TrashDrawer';
 
 // Story 9.3: Lazy load ModelViewerModal to avoid SSR issues with Online3DViewer
 const ModelViewerModal = dynamic(
@@ -98,8 +102,23 @@ export function DataLibraryDrawer({
   // Story 9.4: Preview state using useAssetPreview hook
   const { previewAsset, previewType, handleAssetPreview, handleClosePreview } = useAssetPreview();
 
+  // Story 9.7: Context-aware upload configuration
+  const uploadConfig = useContextAwareUpload({
+    orgView,
+    selectedPbsId,
+    selectedTaskId,
+    selectedFolderId,
+  });
+
   // Story 9.5: Link-to-node dialog state
   const [linkingAsset, setLinkingAsset] = useState<DataAssetWithFolder | null>(null);
+
+  // Story 9.8: Trash drawer state
+  const [isTrashOpen, setIsTrashOpen] = useState(false);
+
+  // Story 9.8: Batch selection + delete hooks
+  const selection = useAssetSelection();
+  const assetDelete = useAssetDelete(graphId);
 
   // Story 9.2: PBS nodes hook for descendant IDs
   const { getDescendantIds } = usePbsNodes();
@@ -222,6 +241,11 @@ export function DataLibraryDrawer({
     if (isOpen) refetch();
   }, [isOpen, refetch]);
 
+  // Close nested trash drawer when parent closes
+  useEffect(() => {
+    if (!isOpen) setIsTrashOpen(false);
+  }, [isOpen]);
+
   // AC#2: ESC key to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -233,6 +257,28 @@ export function DataLibraryDrawer({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  const handleAssetSelectChange = useCallback(
+    (asset: DataAssetWithFolder, selected: boolean) => {
+      selection.setSelected(asset.id, selected);
+    },
+    [selection.setSelected]
+  );
+
+  const handleAssetDelete = useCallback(
+    (asset: DataAssetWithFolder) => {
+      assetDelete.confirmSoftDelete(asset, {
+        onSuccess: () => selection.remove([asset.id]),
+      });
+    },
+    [assetDelete, selection.remove]
+  );
+
+  const handleBatchDelete = useCallback(() => {
+    assetDelete.confirmSoftDeleteBatch(selection.selectedIdList, {
+      onSuccess: selection.clearSelection,
+    });
+  }, [assetDelete, selection.selectedIdList, selection.clearSelection]);
 
   if (!isOpen || !mounted) return null;
 
@@ -288,7 +334,15 @@ export function DataLibraryDrawer({
         draggableAssets={orgView === 'folder'}
         onAssetPreview={handleAssetPreview}
         onAssetLink={handleAssetLink}
+        onAssetDelete={handleAssetDelete}
+        selectable
+        selectedIds={selection.selectedIds}
+        onAssetSelectChange={handleAssetSelectChange}
+        uploadConfig={uploadConfig}
         onUploadSuccess={refetch}
+        selectedCount={selection.selectedCount}
+        onBatchDelete={handleBatchDelete}
+        onOpenTrash={() => setIsTrashOpen(true)}
       />
 
       {/* Story 9.5: Link-to-node dialog */}
@@ -300,6 +354,12 @@ export function DataLibraryDrawer({
           onSuccess={handleLinkSuccess}
         />
       )}
+
+      <TrashDrawer
+        isOpen={isTrashOpen}
+        onClose={() => setIsTrashOpen(false)}
+        graphId={graphId}
+      />
 
       {/* Story 9.3/9.4: Preview modals based on asset type */}
       {previewAsset && previewAsset.storagePath && previewType === 'model' && (

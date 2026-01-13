@@ -403,3 +403,127 @@ export async function deleteNodeAssetLink(
 
   return response.json();
 }
+
+// ========================================
+// Story 9.8: Soft Delete / Trash API Functions
+// ========================================
+
+export type TrashAsset = DataAssetWithFolder & { linkedNodeCount: number };
+
+/**
+ * Soft delete a single data asset (move to trash)
+ */
+export async function softDeleteDataAsset(id: string): Promise<{ success: boolean }> {
+  const response = await fetch(
+    `${API_BASE}/api/data-assets:soft-delete?filterByTk=${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to delete asset');
+  }
+
+  return response.json();
+}
+
+/**
+ * Soft delete multiple data assets (move to trash)
+ */
+export async function softDeleteDataAssets(ids: string[]): Promise<{ success: boolean; deletedCount: number }> {
+  const response = await fetch(`${API_BASE}/api/data-assets:soft-delete-batch`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to delete assets');
+  }
+
+  return response.json();
+}
+
+/**
+ * Restore a soft-deleted data asset
+ */
+export async function restoreDataAsset(id: string): Promise<{ success: boolean; asset: DataAssetWithFolder }> {
+  const response = await fetch(
+    `${API_BASE}/api/data-assets:restore?filterByTk=${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to restore asset');
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetch trash assets for a graph
+ */
+export async function fetchTrashAssets(graphId: string): Promise<{ assets: TrashAsset[] }> {
+  const response = await fetch(
+    `${API_BASE}/api/data-assets/trash?graphId=${encodeURIComponent(graphId)}`,
+    {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to fetch trash assets');
+  }
+
+  return response.json();
+}
+
+/**
+ * Hard delete a data asset (permanent)
+ */
+export async function hardDeleteDataAsset(id: string): Promise<{ success: boolean }> {
+  const response = await fetch(
+    `${API_BASE}/api/data-assets:hard-delete?filterByTk=${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to permanently delete asset');
+  }
+
+  return response.json();
+}
+
+/**
+ * Empty trash for a graph (permanent delete all soft-deleted assets)
+ */
+export async function emptyTrash(graphId: string): Promise<{ success: boolean; deletedCount: number }> {
+  const response = await fetch(
+    `${API_BASE}/api/data-assets/trash:empty?graphId=${encodeURIComponent(graphId)}`,
+    {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to empty trash');
+  }
+
+  return response.json();
+}

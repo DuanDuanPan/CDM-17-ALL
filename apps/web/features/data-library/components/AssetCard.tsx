@@ -20,6 +20,7 @@ import {
   Cuboid,
   Eye,
   Link2,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@cdm/ui';
 import type { DataAssetWithFolder, DataAssetFormat } from '@cdm/types';
@@ -34,6 +35,12 @@ interface AssetCardProps {
   onPreview?: () => void;
   /** Story 9.5: Link-to-node callback */
   onLink?: () => void;
+  /** Story 9.8: Soft delete callback */
+  onDelete?: () => void;
+  /** Story 9.8: Batch selection support */
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectChange?: (selected: boolean) => void;
   /** Story 9.2: Enable drag for folder organization */
   draggable?: boolean;
 }
@@ -108,11 +115,18 @@ interface AssetCardInnerProps {
   onClick?: () => void;
   onPreview?: () => void;
   onLink?: () => void;
+  onDelete?: () => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectChange?: (selected: boolean) => void;
   isDragging?: boolean;
 }
 
 const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HTMLAttributes<HTMLDivElement>>(
-  function AssetCardInner({ asset, onClick, onPreview, onLink, isDragging, className, style, ...props }, ref) {
+  function AssetCardInner(
+    { asset, onClick, onPreview, onLink, onDelete, selectable, selected, onSelectChange, isDragging, className, style, ...props },
+    ref
+  ) {
     const Icon = getFormatIcon(asset.format);
     const colorClass = getFormatColor(asset.format);
     const canPreview = getAssetPreviewType(asset) !== null && !!asset.storagePath && !!onPreview;
@@ -136,6 +150,11 @@ const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HT
       onLink?.();
     };
 
+    const handleDeleteClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onDelete?.();
+    };
+
     return (
       <div
         ref={ref}
@@ -153,6 +172,22 @@ const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HT
         data-testid="asset-card"
         {...props}
       >
+        {/* Selection Checkbox (Story 9.8) */}
+        {selectable && (
+          <div className="absolute top-2 left-2 z-10">
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={(e) => onSelectChange?.(e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label={selected ? '取消选择' : '选择'}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shadow-sm"
+              data-testid="asset-select-checkbox"
+            />
+          </div>
+        )}
+
         {/* Thumbnail Area */}
         <div className="relative h-32 bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
           {asset.thumbnail ? (
@@ -177,6 +212,7 @@ const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HT
             <button
               type="button"
               onClick={handlePreviewClick}
+              onPointerDown={(e) => e.stopPropagation()}
               className="absolute bottom-2 right-2 p-2 bg-blue-500 text-white rounded-full
                          opacity-0 group-hover:opacity-100 transition-opacity shadow-lg
                          hover:bg-blue-600"
@@ -192,6 +228,7 @@ const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HT
             <button
               type="button"
               onClick={handleLinkClick}
+              onPointerDown={(e) => e.stopPropagation()}
               className={cn(
                 'absolute bottom-2 p-2 bg-green-500 text-white rounded-full',
                 'opacity-0 group-hover:opacity-100 transition-opacity shadow-lg',
@@ -202,6 +239,22 @@ const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HT
               data-testid="link-button"
             >
               <Link2 className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Delete Button (Story 9.8) - shown on hover */}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={handleDeleteClick}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute bottom-2 left-2 p-2 bg-red-500 text-white rounded-full
+                         opacity-0 group-hover:opacity-100 transition-opacity shadow-lg
+                         hover:bg-red-600"
+              title="删除"
+              data-testid="delete-button"
+            >
+              <Trash2 className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -251,7 +304,16 @@ const AssetCardInner = forwardRef<HTMLDivElement, AssetCardInnerProps & React.HT
  * Uses @dnd-kit for high-fidelity drag preview
  * Original card stays in place, only DragOverlay follows cursor
  */
-function DraggableAssetCard({ asset, onClick, onPreview, onLink }: Omit<AssetCardProps, 'draggable'>) {
+function DraggableAssetCard({
+  asset,
+  onClick,
+  onPreview,
+  onLink,
+  onDelete,
+  selectable,
+  selected,
+  onSelectChange,
+}: Omit<AssetCardProps, 'draggable'>) {
   const dragData: AssetDragData = {
     type: 'asset',
     asset,
@@ -271,6 +333,10 @@ function DraggableAssetCard({ asset, onClick, onPreview, onLink }: Omit<AssetCar
       onClick={onClick}
       onPreview={onPreview}
       onLink={onLink}
+      onDelete={onDelete}
+      selectable={selectable}
+      selected={selected}
+      onSelectChange={onSelectChange}
       isDragging={isDragging}
       {...listeners}
       {...attributes}
@@ -284,12 +350,44 @@ function DraggableAssetCard({ asset, onClick, onPreview, onLink }: Omit<AssetCar
  * Story 9.3: Added double-click preview and preview button for 3D models
  * Story 9.5: Added link-to-node action button
  */
-export function AssetCard({ asset, onClick, onPreview, onLink, draggable = false }: AssetCardProps) {
+export function AssetCard({
+  asset,
+  onClick,
+  onPreview,
+  onLink,
+  onDelete,
+  selectable,
+  selected,
+  onSelectChange,
+  draggable = false,
+}: AssetCardProps) {
   if (draggable) {
-    return <DraggableAssetCard asset={asset} onClick={onClick} onPreview={onPreview} onLink={onLink} />;
+    return (
+      <DraggableAssetCard
+        asset={asset}
+        onClick={onClick}
+        onPreview={onPreview}
+        onLink={onLink}
+        onDelete={onDelete}
+        selectable={selectable}
+        selected={selected}
+        onSelectChange={onSelectChange}
+      />
+    );
   }
 
-  return <AssetCardInner asset={asset} onClick={onClick} onPreview={onPreview} onLink={onLink} />;
+  return (
+    <AssetCardInner
+      asset={asset}
+      onClick={onClick}
+      onPreview={onPreview}
+      onLink={onLink}
+      onDelete={onDelete}
+      selectable={selectable}
+      selected={selected}
+      onSelectChange={onSelectChange}
+    />
+  );
 }
 
 export default AssetCard;

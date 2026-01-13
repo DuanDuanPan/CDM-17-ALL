@@ -13,7 +13,9 @@ jest.mock('@cdm/database', () => ({
       findMany: jest.fn(),
       count: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       delete: jest.fn(),
+      deleteMany: jest.fn(),
       groupBy: jest.fn(),
     },
   },
@@ -77,6 +79,7 @@ describe('DataAssetRepository', () => {
 
     const args = (mockPrisma.dataAsset.findMany as jest.Mock).mock.calls[0]?.[0] as any;
     expect(args.where.graphId).toBe('graph-1');
+    expect(args.where.isDeleted).toBe(false);
     expect(args.where.name).toEqual({ contains: 'sat', mode: 'insensitive' });
     expect(args.where.format).toBe('STEP');
     expect(args.where.folderId).toBeNull();
@@ -111,6 +114,75 @@ describe('DataAssetRepository', () => {
     expect(mockPrisma.dataAsset.delete).toHaveBeenCalledWith({ where: { id: 'asset-1' } });
   });
 
+  it('softDelete: updates isDeleted=true and sets deletedAt', async () => {
+    (mockPrisma.dataAsset.update as jest.Mock).mockResolvedValueOnce({ id: 'asset-1' });
+
+    const deletedAt = new Date('2026-01-01T00:00:00.000Z');
+    await repository.softDelete('asset-1', deletedAt);
+
+    expect(mockPrisma.dataAsset.update).toHaveBeenCalledWith({
+      where: { id: 'asset-1' },
+      data: { isDeleted: true, deletedAt },
+    });
+  });
+
+  it('softDeleteBatch: updateMany with ids + isDeleted=false and returns count', async () => {
+    (mockPrisma.dataAsset.updateMany as jest.Mock).mockResolvedValueOnce({ count: 2 });
+
+    const deletedAt = new Date('2026-01-01T00:00:00.000Z');
+    const count = await repository.softDeleteBatch(['a1', 'a2'], deletedAt);
+
+    expect(mockPrisma.dataAsset.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['a1', 'a2'] }, isDeleted: false },
+      data: { isDeleted: true, deletedAt },
+    });
+    expect(count).toBe(2);
+  });
+
+  it('restore: updates isDeleted=false and clears deletedAt', async () => {
+    (mockPrisma.dataAsset.update as jest.Mock).mockResolvedValueOnce({ id: 'asset-1' });
+
+    await repository.restore('asset-1');
+
+    expect(mockPrisma.dataAsset.update).toHaveBeenCalledWith({
+      where: { id: 'asset-1' },
+      data: { isDeleted: false, deletedAt: null },
+    });
+  });
+
+  it('findDeleted: queries isDeleted=true with folder + _count', async () => {
+    (mockPrisma.dataAsset.findMany as jest.Mock).mockResolvedValueOnce([
+      { id: 'asset-1', folder: null, _count: { nodeLinks: 1 } },
+    ]);
+
+    await repository.findDeleted('graph-1');
+
+    expect(mockPrisma.dataAsset.findMany).toHaveBeenCalledWith({
+      where: { graphId: 'graph-1', isDeleted: true },
+      include: { folder: true, _count: { select: { nodeLinks: true } } },
+      orderBy: { deletedAt: 'desc' },
+    });
+  });
+
+  it('hardDelete: calls prisma.dataAsset.delete with where.id', async () => {
+    (mockPrisma.dataAsset.delete as jest.Mock).mockResolvedValueOnce({ id: 'asset-1' });
+
+    await repository.hardDelete('asset-1');
+
+    expect(mockPrisma.dataAsset.delete).toHaveBeenCalledWith({ where: { id: 'asset-1' } });
+  });
+
+  it('emptyTrash: deleteMany with graphId + isDeleted=true and returns count', async () => {
+    (mockPrisma.dataAsset.deleteMany as jest.Mock).mockResolvedValueOnce({ count: 3 });
+
+    const count = await repository.emptyTrash('graph-1');
+
+    expect(mockPrisma.dataAsset.deleteMany).toHaveBeenCalledWith({
+      where: { graphId: 'graph-1', isDeleted: true },
+    });
+    expect(count).toBe(3);
+  });
+
   it('countByFormat: maps groupBy counts', async () => {
     (mockPrisma.dataAsset.groupBy as jest.Mock).mockResolvedValueOnce([
       { format: 'STEP', _count: { format: 2 } },
@@ -121,7 +193,7 @@ describe('DataAssetRepository', () => {
 
     expect(mockPrisma.dataAsset.groupBy).toHaveBeenCalledWith({
       by: ['format'],
-      where: { graphId: 'graph-1' },
+      where: { graphId: 'graph-1', isDeleted: false },
       _count: { format: true },
     });
     expect(result).toEqual([
@@ -130,4 +202,3 @@ describe('DataAssetRepository', () => {
     ]);
   });
 });
-

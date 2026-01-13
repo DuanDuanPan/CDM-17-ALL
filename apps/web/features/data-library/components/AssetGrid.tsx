@@ -19,6 +19,12 @@ interface AssetGridProps {
   onAssetPreview?: (asset: DataAssetWithFolder) => void;
   /** Story 9.5: Link-to-node callback */
   onAssetLink?: (asset: DataAssetWithFolder) => void;
+  /** Story 9.8: Delete callback */
+  onAssetDelete?: (asset: DataAssetWithFolder) => void;
+  /** Story 9.8: Selection support */
+  selectable?: boolean;
+  selectedIds?: Set<string>;
+  onAssetSelectChange?: (asset: DataAssetWithFolder, selected: boolean) => void;
   /** Story 9.2: Enable drag for folder organization */
   draggable?: boolean;
 }
@@ -27,7 +33,17 @@ interface AssetGridProps {
  * Asset Grid Component
  * Story 9.5: Added link-to-node action
  */
-export function AssetGrid({ assets, onAssetClick, onAssetPreview, onAssetLink, draggable = false }: AssetGridProps) {
+export function AssetGrid({
+  assets,
+  onAssetClick,
+  onAssetPreview,
+  onAssetLink,
+  onAssetDelete,
+  selectable,
+  selectedIds,
+  onAssetSelectChange,
+  draggable = false,
+}: AssetGridProps) {
   return (
     <div
       data-testid="asset-grid"
@@ -40,6 +56,12 @@ export function AssetGrid({ assets, onAssetClick, onAssetPreview, onAssetLink, d
           onClick={() => onAssetClick?.(asset)}
           onPreview={onAssetPreview ? () => onAssetPreview(asset) : undefined}
           onLink={onAssetLink ? () => onAssetLink(asset) : undefined}
+          onDelete={onAssetDelete ? () => onAssetDelete(asset) : undefined}
+          selectable={selectable}
+          selected={!!selectedIds?.has(asset.id)}
+          onSelectChange={
+            onAssetSelectChange ? (selected) => onAssetSelectChange(asset, selected) : undefined
+          }
           draggable={draggable}
         />
       ))}

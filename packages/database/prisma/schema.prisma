@@ -486,6 +486,10 @@ model DataAsset {
   // Classification
   secretLevel String          @default("internal") // public, internal, confidential, secret
 
+  // Soft delete fields
+  isDeleted   Boolean         @default(false)
+  deletedAt   DateTime?
+
   // Links to nodes
   nodeLinks   NodeDataLink[]
 
@@ -497,6 +501,7 @@ model DataAsset {
   @@index([format])
   @@index([tags])
   @@index([name])
+  @@index([graphId, isDeleted])  // Optimized for trash queries
 }
 
 // NodeDataLink - links between nodes and data assets (many-to-many)

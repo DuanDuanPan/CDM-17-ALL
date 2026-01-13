@@ -45,6 +45,8 @@ export function useDataUpload(options: UseDataUploadOptions): UseDataUploadResul
 
         // Invalidate data-assets queries to refresh list
         queryClient.invalidateQueries({ queryKey: ['data-assets', graphId] });
+        // Story 9.7: Also invalidate folders query to update folder tree counts
+        queryClient.invalidateQueries({ queryKey: ['data-folders', graphId] });
 
         onSuccess?.(asset);
         return asset;

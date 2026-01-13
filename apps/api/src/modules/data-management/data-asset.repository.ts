@@ -76,6 +76,7 @@ export class DataAssetRepository {
     // Build where clause
     const where: Prisma.DataAssetWhereInput = {
       graphId,
+      isDeleted: false,
     };
 
     // Search by name (case-insensitive)
@@ -135,6 +136,76 @@ export class DataAssetRepository {
   }
 
   /**
+   * Soft delete a data asset (move to trash)
+   */
+  async softDelete(id: string, deletedAt: Date = new Date()): Promise<DataAsset> {
+    return prisma.dataAsset.update({
+      where: { id },
+      data: { isDeleted: true, deletedAt },
+    });
+  }
+
+  /**
+   * Soft delete multiple data assets (move to trash)
+   */
+  async softDeleteBatch(ids: string[], deletedAt: Date = new Date()): Promise<number> {
+    const result = await prisma.dataAsset.updateMany({
+      where: { id: { in: ids }, isDeleted: false },
+      data: { isDeleted: true, deletedAt },
+    });
+
+    return result.count;
+  }
+
+  /**
+   * Restore a soft-deleted data asset
+   */
+  async restore(id: string): Promise<DataAsset> {
+    return prisma.dataAsset.update({
+      where: { id },
+      data: { isDeleted: false, deletedAt: null },
+    });
+  }
+
+  /**
+   * Find deleted assets (trash) for a graph
+   */
+  async findDeleted(
+    graphId: string
+  ): Promise<(DataAsset & { folder: DataFolder | null; _count: { nodeLinks: number } })[]> {
+    return prisma.dataAsset.findMany({
+      where: { graphId, isDeleted: true },
+      include: {
+        folder: true,
+        _count: {
+          select: { nodeLinks: true },
+        },
+      },
+      orderBy: { deletedAt: 'desc' },
+    });
+  }
+
+  /**
+   * Hard delete a data asset (permanent)
+   */
+  async hardDelete(id: string): Promise<DataAsset> {
+    return prisma.dataAsset.delete({
+      where: { id },
+    });
+  }
+
+  /**
+   * Empty trash for a graph (permanent delete all soft-deleted assets)
+   */
+  async emptyTrash(graphId: string): Promise<number> {
+    const result = await prisma.dataAsset.deleteMany({
+      where: { graphId, isDeleted: true },
+    });
+
+    return result.count;
+  }
+
+  /**
    * Update a data asset
    */
   async update(id: string, data: Prisma.DataAssetUpdateInput): Promise<DataAsset> {
@@ -159,7 +230,7 @@ export class DataAssetRepository {
   async countByFormat(graphId: string): Promise<{ format: string; count: number }[]> {
     const result = await prisma.dataAsset.groupBy({
       by: ['format'],
-      where: { graphId },
+      where: { graphId, isDeleted: false },
       _count: { format: true },
     });
 

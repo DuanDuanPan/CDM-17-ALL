@@ -5,3 +5,4 @@ export { CreateNodeDataLinkDto } from './create-node-data-link.dto';
 export { UpdateDataFolderDto } from './update-data-folder.dto';
 export { LinksByNodesDto } from './links-by-nodes.dto';
 export { UploadAssetDto } from './upload-asset.dto';
+export { SoftDeleteBatchDto } from './soft-delete-batch.dto';

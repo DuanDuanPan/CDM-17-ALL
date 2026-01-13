@@ -44,7 +44,7 @@ export class DataFolderRepository {
             where: { graphId },
             include: {
                 _count: {
-                    select: { assets: true },
+                    select: { assets: { where: { isDeleted: false } } },
                 },
             },
             orderBy: { name: 'asc' },
@@ -66,7 +66,7 @@ export class DataFolderRepository {
      */
     async hasAssets(id: string): Promise<boolean> {
         const count = await prisma.dataAsset.count({
-            where: { folderId: id },
+            where: { folderId: id, isDeleted: false },
         });
         return count > 0;
     }

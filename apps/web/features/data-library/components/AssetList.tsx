@@ -21,6 +21,7 @@ import {
   Cuboid,
   Eye,
   Link2,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@cdm/ui';
 import type { DataAssetWithFolder, DataAssetFormat } from '@cdm/types';
@@ -36,6 +37,12 @@ interface AssetListProps {
   onAssetPreview?: (asset: DataAssetWithFolder) => void;
   /** Story 9.5: Link-to-node callback */
   onAssetLink?: (asset: DataAssetWithFolder) => void;
+  /** Story 9.8: Delete callback */
+  onAssetDelete?: (asset: DataAssetWithFolder) => void;
+  /** Story 9.8: Selection support */
+  selectable?: boolean;
+  selectedIds?: Set<string>;
+  onAssetSelectChange?: (asset: DataAssetWithFolder, selected: boolean) => void;
   /** Story 9.2: Enable drag for folder organization */
   draggable?: boolean;
 }
@@ -111,11 +118,18 @@ interface AssetListRowInnerProps {
   onPreview?: () => void;
   /** Story 9.5: Link-to-node callback */
   onLink?: () => void;
+  onDelete?: () => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectChange?: (selected: boolean) => void;
   isDragging?: boolean;
 }
 
 const AssetListRowInner = forwardRef<HTMLDivElement, AssetListRowInnerProps & React.HTMLAttributes<HTMLDivElement>>(
-  function AssetListRowInner({ asset, onClick, onPreview, onLink, isDragging, className, style, ...props }, ref) {
+  function AssetListRowInner(
+    { asset, onClick, onPreview, onLink, onDelete, selectable, selected, onSelectChange, isDragging, className, style, ...props },
+    ref
+  ) {
     const Icon = getFormatIcon(asset.format);
     const colorClass = getFormatColor(asset.format);
     const canPreview = getAssetPreviewType(asset) !== null && !!asset.storagePath && !!onPreview;
@@ -128,6 +142,11 @@ const AssetListRowInner = forwardRef<HTMLDivElement, AssetListRowInnerProps & Re
     const handleLinkClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       onLink?.();
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onDelete?.();
     };
 
     const handleDoubleClick = (e: React.MouseEvent) => {
@@ -157,6 +176,18 @@ const AssetListRowInner = forwardRef<HTMLDivElement, AssetListRowInnerProps & Re
       >
         {/* Name Column */}
         <div className="col-span-5 flex items-center gap-3 min-w-0">
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={(e) => onSelectChange?.(e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label={selected ? '取消选择' : '选择'}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shadow-sm"
+              data-testid="asset-select-checkbox"
+            />
+          )}
           <div className={`w-9 h-9 ${colorClass} rounded-lg flex items-center justify-center shrink-0`}>
             <Icon className="w-5 h-5" />
           </div>
@@ -195,6 +226,7 @@ const AssetListRowInner = forwardRef<HTMLDivElement, AssetListRowInnerProps & Re
             <button
               type="button"
               onClick={handleLinkClick}
+              onPointerDown={(e) => e.stopPropagation()}
               className="p-1.5 text-gray-400 hover:text-green-500 hover:bg-green-50
                        dark:hover:bg-green-900/30 rounded-md transition-colors
                        opacity-0 group-hover:opacity-100"
@@ -208,6 +240,7 @@ const AssetListRowInner = forwardRef<HTMLDivElement, AssetListRowInnerProps & Re
             <button
               type="button"
               onClick={handlePreviewClick}
+              onPointerDown={(e) => e.stopPropagation()}
               className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50
                        dark:hover:bg-blue-900/30 rounded-md transition-colors
                        opacity-0 group-hover:opacity-100"
@@ -215,6 +248,20 @@ const AssetListRowInner = forwardRef<HTMLDivElement, AssetListRowInnerProps & Re
               data-testid="preview-button"
             >
               <Eye className="w-4 h-4" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={handleDeleteClick}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50
+                       dark:hover:bg-red-900/30 rounded-md transition-colors
+                       opacity-0 group-hover:opacity-100"
+              title="删除"
+              data-testid="delete-button"
+            >
+              <Trash2 className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -233,9 +280,23 @@ interface DraggableAssetListRowProps {
   onAssetPreview?: (asset: DataAssetWithFolder) => void;
   /** Story 9.5: Link-to-node callback */
   onAssetLink?: (asset: DataAssetWithFolder) => void;
+  /** Story 9.8: Delete callback */
+  onAssetDelete?: (asset: DataAssetWithFolder) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectChange?: (selected: boolean) => void;
 }
 
-function DraggableAssetListRow({ asset, onAssetClick, onAssetPreview, onAssetLink }: DraggableAssetListRowProps) {
+function DraggableAssetListRow({
+  asset,
+  onAssetClick,
+  onAssetPreview,
+  onAssetLink,
+  onAssetDelete,
+  selectable,
+  selected,
+  onSelectChange,
+}: DraggableAssetListRowProps) {
   const dragData: AssetDragData = {
     type: 'asset',
     asset,
@@ -255,6 +316,10 @@ function DraggableAssetListRow({ asset, onAssetClick, onAssetPreview, onAssetLin
       onClick={() => onAssetClick?.(asset)}
       onPreview={onAssetPreview ? () => onAssetPreview(asset) : undefined}
       onLink={onAssetLink ? () => onAssetLink(asset) : undefined}
+      onDelete={onAssetDelete ? () => onAssetDelete(asset) : undefined}
+      selectable={selectable}
+      selected={selected}
+      onSelectChange={onSelectChange}
       isDragging={isDragging}
       {...listeners}
       {...attributes}
@@ -268,7 +333,17 @@ function DraggableAssetListRow({ asset, onAssetClick, onAssetPreview, onAssetLin
  * Story 9.3: Added preview support for 3D models
  * Story 9.5: Added link-to-node action button
  */
-export function AssetList({ assets, onAssetClick, onAssetPreview, onAssetLink, draggable = false }: AssetListProps) {
+export function AssetList({
+  assets,
+  onAssetClick,
+  onAssetPreview,
+  onAssetLink,
+  onAssetDelete,
+  selectable,
+  selectedIds,
+  onAssetSelectChange,
+  draggable = false,
+}: AssetListProps) {
   return (
     <div data-testid="asset-list" className="space-y-1">
       {/* Header */}
@@ -282,6 +357,7 @@ export function AssetList({ assets, onAssetClick, onAssetPreview, onAssetLink, d
 
       {/* Rows */}
       {assets.map((asset) => {
+        const selected = !!selectedIds?.has(asset.id);
         if (draggable) {
           return (
             <DraggableAssetListRow
@@ -290,6 +366,12 @@ export function AssetList({ assets, onAssetClick, onAssetPreview, onAssetLink, d
               onAssetClick={onAssetClick}
               onAssetPreview={onAssetPreview}
               onAssetLink={onAssetLink}
+              onAssetDelete={onAssetDelete}
+              selectable={selectable}
+              selected={selected}
+              onSelectChange={
+                onAssetSelectChange ? (next) => onAssetSelectChange(asset, next) : undefined
+              }
             />
           );
         }
@@ -301,6 +383,12 @@ export function AssetList({ assets, onAssetClick, onAssetPreview, onAssetLink, d
             onClick={() => onAssetClick?.(asset)}
             onPreview={onAssetPreview ? () => onAssetPreview(asset) : undefined}
             onLink={onAssetLink ? () => onAssetLink(asset) : undefined}
+            onDelete={onAssetDelete ? () => onAssetDelete(asset) : undefined}
+            selectable={selectable}
+            selected={selected}
+            onSelectChange={
+              onAssetSelectChange ? (next) => onAssetSelectChange(asset, next) : undefined
+            }
           />
         );
       })}

@@ -5,7 +5,11 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
+import path from 'path';
 import { createTestGraph, makeTestGraphUrl } from './testUtils';
+
+const waitForApi = (page: Page, method: string, pathPart: string) =>
+  page.waitForResponse((res) => res.url().includes(pathPart) && res.request().method() === method && res.ok());
 
 async function seedDataAssets(page: Page, graphId: string) {
   const assetA = await page.request.post('/api/data-assets', {
@@ -54,6 +58,46 @@ async function createFolder(page: Page, graphId: string, name: string) {
 async function openDataLibraryDrawer(page: Page) {
   await page.getByTitle('数据资源库').click();
   await expect(page.getByRole('heading', { name: '数据资源库' })).toBeVisible();
+}
+
+async function createTypedNode(page: Page, label: string, type: 'PBS' | 'TASK') {
+  const centerNode = page.locator('.x6-node[data-cell-id="center-node"]').first();
+  await expect(centerNode).toBeVisible();
+
+  await centerNode.click();
+  await page.keyboard.press('Tab');
+
+  const editInput = page.locator('#graph-container input[placeholder="New Topic"]').first();
+  await expect(editInput).toBeVisible();
+  await editInput.fill(label);
+  await editInput.press('Enter');
+
+  const newNode = page.locator('.x6-node', { hasText: label }).first();
+  await expect(newNode).toBeVisible();
+
+  const nodeId = await newNode.getAttribute('data-cell-id');
+  if (!nodeId) throw new Error('Failed to resolve created node id');
+
+  await newNode.click();
+  const propertyPanel = page.locator('aside:has-text("属性面板")');
+  await expect(propertyPanel).toBeVisible();
+
+  // Ensure backend has created the node before switching type.
+  for (let i = 0; i < 20; i++) {
+    const res = await page.request.get(`/api/nodes/${encodeURIComponent(nodeId)}`);
+    if (res.ok()) break;
+    await page.waitForTimeout(200);
+  }
+
+  const typeSelect = propertyPanel.locator('select').first();
+  await expect(typeSelect).toBeVisible();
+
+  await Promise.all([
+    waitForApi(page, 'PATCH', '/type'),
+    typeSelect.selectOption(type),
+  ]);
+
+  return { nodeId, label };
 }
 
 test.describe('Data Library Organization Views (Story 9.2)', () => {
@@ -159,5 +203,58 @@ test.describe('Data Library Organization Views (Story 9.2)', () => {
 
     // Folder should no longer be visible in tree
     await expect(folderRow).not.toBeVisible();
+  });
+
+  test('Story 9.7: grouped links + context-aware upload resets on tab switch', async ({ page }, testInfo) => {
+    const pbsNode = await createTypedNode(page, `E2E PBS Node ${testInfo.testId}`, 'PBS');
+    const taskNode = await createTypedNode(page, `E2E Task Node ${testInfo.testId}`, 'TASK');
+
+    await openDataLibraryDrawer(page);
+
+    // PBS view: select a PBS node and verify grouped panel toggle exists.
+    await expect(page.getByTestId('pbs-tree')).toBeVisible();
+    await expect(page.getByTestId(`pbs-tree-node-${pbsNode.nodeId}`)).toBeVisible();
+    await page.getByTestId(`pbs-tree-node-${pbsNode.nodeId}`).click();
+
+    await expect(page.getByTestId('toggle-empty-groups')).toBeVisible();
+    await page.getByTestId('toggle-empty-groups').click();
+    await expect(page.getByTestId('group-input')).toBeVisible();
+    await expect(page.getByTestId('group-output')).toBeVisible();
+    await expect(page.getByTestId('group-reference')).toBeVisible();
+
+    // PBS upload type defaults to reference; change to input to test reset later.
+    await expect(page.getByTestId('upload-type-dropdown')).toHaveValue('reference');
+    await page.getByTestId('upload-type-dropdown').selectOption('input');
+    await expect(page.getByTestId('upload-type-dropdown')).toHaveValue('input');
+
+    // Switch to Task view, select task node, and ensure type resets to output.
+    await page.getByTestId('org-tab-task').click();
+    await expect(page.getByTestId('task-group-view')).toBeVisible();
+    await expect(page.getByTestId(`task-item-${taskNode.nodeId}`)).toBeVisible();
+    await page.getByTestId(`task-item-${taskNode.nodeId}`).click();
+
+    await expect(page.getByTestId('upload-type-dropdown')).toHaveValue('output');
+
+    // Upload fixture and verify it is linked as OUTPUT (appears under output group).
+    const fixturesDir = path.join(__dirname, 'fixtures');
+    const stlPath = path.join(fixturesDir, 'upload-sample.stl');
+
+    await Promise.all([
+      page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/data-assets:upload') &&
+          res.request().method() === 'POST' &&
+          res.ok()
+      ),
+      page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/data-assets/links') &&
+          res.request().method() === 'POST' &&
+          res.ok()
+      ),
+      page.getByTestId('upload-file-input').setInputFiles(stlPath),
+    ]);
+
+    await expect(page.getByTestId('group-output').getByText('upload-sample.stl')).toBeVisible();
   });
 });

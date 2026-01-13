@@ -3,6 +3,7 @@
 /**
  * Story 9.1: Data Library Drawer Toolbar
  * Story 9.5: Added UploadButton integration
+ * Story 9.7: Replaced with ContextAwareUploadButton
  */
 
 import {
@@ -14,9 +15,12 @@ import {
   Calendar,
   PanelLeftClose,
   PanelLeft,
+  Trash2,
 } from 'lucide-react';
 import { DATA_ASSET_FORMAT_OPTIONS } from './formatOptions';
-import { UploadButton } from '../UploadButton';
+import { ContextAwareUploadButton } from '../ContextAwareUploadButton';
+import type { ContextAwareUploadConfig } from '../../hooks/useContextAwareUpload';
+import { Button } from '@cdm/ui';
 import type { DataAssetFormat } from '@cdm/types';
 import type { ViewMode } from './types';
 
@@ -38,10 +42,15 @@ export interface DataLibraryDrawerToolbarProps {
   showOrgPanel: boolean;
   onToggleOrgPanel: () => void;
 
-  // Story 9.5: Upload props
+  // Story 9.7: Context-aware upload props
   graphId: string;
-  selectedFolderId: string | null;
+  uploadConfig: ContextAwareUploadConfig;
   onUploadSuccess?: () => void;
+
+  // Story 9.8: Batch delete + trash
+  selectedCount: number;
+  onBatchDelete: () => void;
+  onOpenTrash: () => void;
 }
 
 export function DataLibraryDrawerToolbar({
@@ -58,18 +67,44 @@ export function DataLibraryDrawerToolbar({
   showOrgPanel,
   onToggleOrgPanel,
   graphId,
-  selectedFolderId,
+  uploadConfig,
   onUploadSuccess,
+  selectedCount,
+  onBatchDelete,
+  onOpenTrash,
 }: DataLibraryDrawerToolbarProps) {
   return (
     <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
       <div className="flex items-center gap-4">
-        {/* Story 9.5: Upload Button */}
-        <UploadButton
+        {/* Story 9.7: Context-Aware Upload Button */}
+        <ContextAwareUploadButton
           graphId={graphId}
-          folderId={selectedFolderId ?? undefined}
+          uploadConfig={uploadConfig}
           onUploadComplete={onUploadSuccess}
         />
+
+        {selectedCount > 0 && (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={onBatchDelete}
+            className="whitespace-nowrap"
+          >
+            <Trash2 className="w-4 h-4" />
+            删除 ({selectedCount})
+          </Button>
+        )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onOpenTrash}
+          className="whitespace-nowrap"
+          title="回收站"
+        >
+          <Trash2 className="w-4 h-4" />
+          回收站
+        </Button>
 
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -156,22 +191,20 @@ export function DataLibraryDrawerToolbar({
           <button
             onClick={() => onViewModeChange('grid')}
             title="网格视图"
-            className={`p-2.5 transition-colors ${
-              viewMode === 'grid'
+            className={`p-2.5 transition-colors ${viewMode === 'grid'
                 ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600'
                 : 'bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
-            }`}
+              }`}
           >
             <LayoutGrid className="w-4 h-4" />
           </button>
           <button
             onClick={() => onViewModeChange('list')}
             title="列表视图"
-            className={`p-2.5 border-l border-gray-200 dark:border-gray-700 transition-colors ${
-              viewMode === 'list'
+            className={`p-2.5 border-l border-gray-200 dark:border-gray-700 transition-colors ${viewMode === 'list'
                 ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600'
                 : 'bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
-            }`}
+              }`}
           >
             <List className="w-4 h-4" />
           </button>
@@ -195,4 +228,3 @@ export function DataLibraryDrawerToolbar({
     </div>
   );
 }
-

@@ -49,11 +49,33 @@ export class FileService {
     }
 
     /**
+     * Decode UTF-8 filename from Multer
+     * Multer parses multipart form filenames as Latin-1 (ISO-8859-1),
+     * but browsers send UTF-8 encoded filenames. This causes Chinese
+     * and other non-ASCII characters to appear as garbled text.
+     * 
+     * @param filename - The potentially Latin-1 encoded filename from Multer
+     * @returns Properly decoded UTF-8 filename
+     */
+    private decodeUtf8Filename(filename: string): string {
+        try {
+            // Convert from Latin-1 bytes back to UTF-8 string
+            return Buffer.from(filename, 'latin1').toString('utf8');
+        } catch {
+            // If decoding fails, return original
+            return filename;
+        }
+    }
+
+    /**
      * Store an uploaded file
      */
     async storeFile(file: Express.Multer.File): Promise<FileMetadata> {
+        // Decode UTF-8 filename (Multer may return Latin-1 encoded string)
+        const decodedOriginalName = this.decodeUtf8Filename(file.originalname);
+
         const fileId = nanoid();
-        const ext = path.extname(file.originalname);
+        const ext = path.extname(decodedOriginalName);
         const fileName = `${fileId}${ext}`;
         const filePath = path.join(this.uploadDir, fileName);
 
@@ -62,7 +84,7 @@ export class FileService {
 
         const storedFile: StoredFile = {
             id: fileId,
-            originalName: file.originalname,
+            originalName: decodedOriginalName,
             fileName,
             mimeType: file.mimetype,
             size: file.size,
@@ -73,11 +95,11 @@ export class FileService {
         // Store metadata (in production, use database)
         this.fileMetadata.set(fileId, storedFile);
 
-        this.logger.log(`Stored file: ${file.originalname} as ${fileName}`);
+        this.logger.log(`Stored file: ${decodedOriginalName} as ${fileName}`);
 
         return {
             id: fileId,
-            originalName: file.originalname,
+            originalName: decodedOriginalName,
             mimeType: file.mimetype,
             size: file.size,
             uploadedAt: storedFile.uploadedAt,

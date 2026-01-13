@@ -66,10 +66,13 @@ async function createLinkableTaskNode(page: Page, label: string) {
 }
 
 async function uploadFixture(page: Page, absoluteFilePath: string) {
-  const fileChooser = await Promise.all([
-    page.waitForEvent('filechooser'),
-    page.locator('[data-testid="upload-button"]').click(),
-  ]).then(([chooser]) => chooser);
+  // Story 9.7: Upload is context-aware. When no node is selected (unlinked mode),
+  // a confirm dialog is shown before uploading to the "unlinked" area.
+  const input = page.locator('[data-testid="upload-file-input"]');
+  await input.setInputFiles(absoluteFilePath);
+
+  const confirm = page.getByRole('button', { name: '上传到未关联' });
+  await expect(confirm).toBeVisible();
 
   await Promise.all([
     page.waitForResponse(
@@ -78,7 +81,7 @@ async function uploadFixture(page: Page, absoluteFilePath: string) {
         res.request().method() === 'POST' &&
         res.ok()
     ),
-    fileChooser.setFiles(absoluteFilePath),
+    confirm.click(),
   ]);
 }
 

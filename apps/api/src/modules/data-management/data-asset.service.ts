@@ -85,19 +85,22 @@ export class DataAssetService {
     graphId: string,
     folderId?: string
   ): Promise<DataAsset> {
-    // Store file using FileService
+    // Store file using FileService (handles UTF-8 filename decoding)
     const storedFile = await this.fileService.storeFile(file);
 
+    // Use decoded filename from storedFile for format detection and asset name
+    const decodedFileName = storedFile.originalName;
+
     // Auto-detect format from filename (AC#2)
-    const format = getDataAssetFormatFromFilename(file.originalname);
+    const format = getDataAssetFormatFromFilename(decodedFileName);
 
     // Build storagePath as accessible URL
     const storagePath = `/api/files/${storedFile.id}`;
 
     try {
-      // Create DataAsset record
+      // Create DataAsset record with properly decoded filename
       const asset = await this.assetRepo.create({
-        name: file.originalname,
+        name: decodedFileName,
         format,
         fileSize: file.size,
         storagePath,
@@ -191,13 +194,97 @@ export class DataAssetService {
    * Delete a data asset
    */
   async deleteAsset(id: string): Promise<void> {
+    await this.softDeleteAsset(id);
+  }
+
+  /**
+   * Soft delete a data asset (move to trash)
+   */
+  async softDeleteAsset(id: string): Promise<void> {
     const existing = await this.assetRepo.findById(id);
     if (!existing) {
       throw new NotFoundException(`Data asset ${id} not found`);
     }
 
-    await this.assetRepo.delete(id);
-    this.logger.log(`Deleted data asset: ${id}`);
+    await this.assetRepo.softDelete(id);
+    this.logger.log(`Soft deleted data asset: ${id}`);
+  }
+
+  /**
+   * Soft delete multiple data assets (move to trash)
+   */
+  async softDeleteAssets(ids: string[]): Promise<{ deletedCount: number }> {
+    const deletedCount = await this.assetRepo.softDeleteBatch(ids);
+    this.logger.log(`Soft deleted ${deletedCount} data asset(s)`);
+    return { deletedCount };
+  }
+
+  /**
+   * Restore a soft-deleted data asset
+   */
+  async restoreAsset(id: string): Promise<DataAssetWithFolder> {
+    const existing = await this.assetRepo.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`Data asset ${id} not found`);
+    }
+
+    await this.assetRepo.restore(id);
+    const restored = await this.assetRepo.findByIdWithFolder(id);
+    this.logger.log(`Restored data asset: ${id}`);
+    return this.toAssetResponse(restored!);
+  }
+
+  /**
+   * Get trash assets for a graph
+   */
+  async getTrash(graphId: string): Promise<{ assets: Array<DataAssetWithFolder & { linkedNodeCount: number }> }> {
+    const deleted = await this.assetRepo.findDeleted(graphId);
+    return {
+      assets: deleted.map((asset) => ({
+        ...this.toAssetResponse(asset),
+        linkedNodeCount: asset._count.nodeLinks,
+      })),
+    };
+  }
+
+  /**
+   * Hard delete a data asset (permanent) - removes links and physical file
+   */
+  async hardDeleteAsset(id: string): Promise<void> {
+    const existing = await this.assetRepo.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`Data asset ${id} not found`);
+    }
+
+    // Unlink from all nodes first (explicitly), then delete file, then delete record.
+    await this.linkService.deleteLinksByAsset(id);
+
+    const fileId = this.extractFileIdFromStoragePath(existing.storagePath);
+    if (fileId) {
+      await this.fileService.deleteFile(fileId);
+    }
+
+    await this.assetRepo.hardDelete(id);
+    this.logger.log(`Hard deleted data asset: ${id}`);
+  }
+
+  /**
+   * Empty trash for a graph (permanent delete all soft-deleted assets)
+   */
+  async emptyTrash(graphId: string): Promise<{ deletedCount: number }> {
+    const deleted = await this.assetRepo.findDeleted(graphId);
+
+    // Best-effort physical file cleanup
+    for (const asset of deleted) {
+      const fileId = this.extractFileIdFromStoragePath(asset.storagePath);
+      if (fileId) {
+        await this.fileService.deleteFile(fileId);
+      }
+    }
+
+    const deletedCount = await this.assetRepo.emptyTrash(graphId);
+    this.logger.log(`Emptied trash: ${graphId}, deleted ${deletedCount} data asset(s)`);
+    return { deletedCount };
   }
 
   // ========================================
@@ -291,5 +378,20 @@ export class DataAssetService {
       createdAt: asset.createdAt.toISOString(),
       updatedAt: asset.updatedAt.toISOString(),
     };
+  }
+
+  private extractFileIdFromStoragePath(storagePath?: string | null): string | null {
+    if (!storagePath) return null;
+
+    try {
+      const url = new URL(storagePath, 'http://localhost');
+      const match = url.pathname.match(/\/api\/files\/([^/]+)$/);
+      if (match) return match[1] ?? null;
+    } catch {
+      // Ignore URL parsing errors; fallback to regex below.
+    }
+
+    const match = storagePath.match(/\/api\/files\/([^/?#]+)/);
+    return match ? (match[1] ?? null) : null;
   }
 }

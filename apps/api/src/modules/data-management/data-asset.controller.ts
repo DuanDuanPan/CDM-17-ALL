@@ -20,6 +20,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Query,
@@ -43,6 +44,7 @@ import {
   UpdateDataFolderDto,
   LinksByNodesDto,
   UploadAssetDto,
+  SoftDeleteBatchDto,
 } from './dto';
 import type {
   DataAssetQueryDto,
@@ -185,6 +187,66 @@ export class DataAssetController {
   async destroy(@Query('filterByTk') id: string): Promise<DataLibrarySuccessResponse> {
     await this.service.deleteAsset(id);
     return { success: true };
+  }
+
+  /**
+   * PATCH /data-assets:soft-delete - Soft delete (move to trash)
+   */
+  @Patch('data-assets\\:soft-delete')
+  @HttpCode(HttpStatus.OK)
+  async softDelete(@Query('filterByTk') id: string): Promise<DataLibrarySuccessResponse> {
+    await this.service.softDeleteAsset(id);
+    return { success: true };
+  }
+
+  /**
+   * PATCH /data-assets:soft-delete-batch - Batch soft delete (move to trash)
+   */
+  @Patch('data-assets\\:soft-delete-batch')
+  @HttpCode(HttpStatus.OK)
+  async softDeleteBatch(@Body() dto: SoftDeleteBatchDto): Promise<DataLibrarySuccessResponse & { deletedCount: number }> {
+    const { deletedCount } = await this.service.softDeleteAssets(dto.ids);
+    return { success: true, deletedCount };
+  }
+
+  /**
+   * PATCH /data-assets:restore - Restore a soft-deleted asset
+   */
+  @Patch('data-assets\\:restore')
+  @HttpCode(HttpStatus.OK)
+  async restore(@Query('filterByTk') id: string): Promise<DataLibrarySuccessResponse & { asset: DataAssetWithFolder }> {
+    const asset = await this.service.restoreAsset(id);
+    return { success: true, asset };
+  }
+
+  /**
+   * GET /data-assets/trash - List soft-deleted assets (trash)
+   */
+  @Get('data-assets/trash')
+  async getTrash(
+    @Query('graphId') graphId: string
+  ): Promise<{ assets: Array<DataAssetWithFolder & { linkedNodeCount: number }> }> {
+    return this.service.getTrash(graphId);
+  }
+
+  /**
+   * DELETE /data-assets:hard-delete - Hard delete a data asset (permanent)
+   */
+  @Delete('data-assets\\:hard-delete')
+  @HttpCode(HttpStatus.OK)
+  async hardDelete(@Query('filterByTk') id: string): Promise<DataLibrarySuccessResponse> {
+    await this.service.hardDeleteAsset(id);
+    return { success: true };
+  }
+
+  /**
+   * DELETE /data-assets/trash:empty - Empty trash (permanent delete)
+   */
+  @Delete('data-assets/trash\\:empty')
+  @HttpCode(HttpStatus.OK)
+  async emptyTrash(@Query('graphId') graphId: string): Promise<DataLibrarySuccessResponse & { deletedCount: number }> {
+    const { deletedCount } = await this.service.emptyTrash(graphId);
+    return { success: true, deletedCount };
   }
 
   // ========================================

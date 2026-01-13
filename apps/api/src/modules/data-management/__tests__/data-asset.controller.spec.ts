@@ -14,6 +14,12 @@ describe('DataAssetController', () => {
     getAsset: jest.fn(),
     updateAsset: jest.fn(),
     deleteAsset: jest.fn(),
+    softDeleteAsset: jest.fn(),
+    softDeleteAssets: jest.fn(),
+    restoreAsset: jest.fn(),
+    getTrash: jest.fn(),
+    hardDeleteAsset: jest.fn(),
+    emptyTrash: jest.fn(),
     getNodeAssets: jest.fn(),
     getNodeAssetLinks: jest.fn(),
     linkNodeToAsset: jest.fn(),
@@ -127,5 +133,60 @@ describe('DataAssetController', () => {
     expect(service.deleteAsset).toHaveBeenCalledWith('asset-1');
     expect(res).toEqual({ success: true });
   });
-});
 
+  it('softDelete: calls service.softDeleteAsset and returns success', async () => {
+    service.softDeleteAsset.mockResolvedValueOnce(undefined);
+
+    const res = await controller.softDelete('asset-1');
+
+    expect(service.softDeleteAsset).toHaveBeenCalledWith('asset-1');
+    expect(res).toEqual({ success: true });
+  });
+
+  it('softDeleteBatch: calls service.softDeleteAssets and returns deletedCount', async () => {
+    service.softDeleteAssets.mockResolvedValueOnce({ deletedCount: 2 });
+
+    const res = await controller.softDeleteBatch({ ids: ['a1', 'a2'] } as any);
+
+    expect(service.softDeleteAssets).toHaveBeenCalledWith(['a1', 'a2']);
+    expect(res).toEqual({ success: true, deletedCount: 2 });
+  });
+
+  it('restore: calls service.restoreAsset and returns asset', async () => {
+    const asset = { id: 'asset-1', name: 'restored' };
+    service.restoreAsset.mockResolvedValueOnce(asset);
+
+    const res = await controller.restore('asset-1');
+
+    expect(service.restoreAsset).toHaveBeenCalledWith('asset-1');
+    expect(res).toEqual({ success: true, asset });
+  });
+
+  it('getTrash: returns service.getTrash result', async () => {
+    const payload = { assets: [{ id: 'asset-1', linkedNodeCount: 1 }] };
+    service.getTrash.mockResolvedValueOnce(payload);
+
+    const res = await controller.getTrash('graph-1');
+
+    expect(service.getTrash).toHaveBeenCalledWith('graph-1');
+    expect(res).toEqual(payload);
+  });
+
+  it('hardDelete: calls service.hardDeleteAsset and returns success', async () => {
+    service.hardDeleteAsset.mockResolvedValueOnce(undefined);
+
+    const res = await controller.hardDelete('asset-1');
+
+    expect(service.hardDeleteAsset).toHaveBeenCalledWith('asset-1');
+    expect(res).toEqual({ success: true });
+  });
+
+  it('emptyTrash: calls service.emptyTrash and returns deletedCount', async () => {
+    service.emptyTrash.mockResolvedValueOnce({ deletedCount: 3 });
+
+    const res = await controller.emptyTrash('graph-1');
+
+    expect(service.emptyTrash).toHaveBeenCalledWith('graph-1');
+    expect(res).toEqual({ success: true, deletedCount: 3 });
+  });
+});
