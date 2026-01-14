@@ -21,28 +21,32 @@ describe('ApprovalService', () => {
     const mockUserId = 'user-1';
     const mockApproverId = 'approver-1';
 
-    const createMockNode = (overrides: Partial<NodeWithApproval> = {}): NodeWithApproval => ({
-        id: mockNodeId,
-        label: 'Test Task',
-        description: null,
-        creatorName: 'Test User',
-        type: 'TASK',
-        x: 0,
-        y: 0,
-        width: 120,
-        height: 40,
-        metadata: {},
-        tags: [],
-        isArchived: false,
-        archivedAt: null,
-        graphId: 'graph-1',
-        parentId: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        approval: null,
-        taskProps: { deliverables: [] },
-        ...overrides,
-    });
+    const createMockNode = (overrides: Partial<NodeWithApproval> = {}): NodeWithApproval => {
+        const { order, ...rest } = overrides;
+        return {
+            id: mockNodeId,
+            label: 'Test Task',
+            description: null,
+            creatorName: 'Test User',
+            type: 'TASK',
+            x: 0,
+            y: 0,
+            width: 120,
+            height: 40,
+            metadata: {},
+            tags: [],
+            isArchived: false,
+            archivedAt: null,
+            graphId: 'graph-1',
+            parentId: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            approval: null,
+            taskProps: { deliverables: [] },
+            ...rest,
+            order: order ?? 0,
+        };
+    };
 
     const createMockApproval = (overrides: Partial<ApprovalPipeline> = {}): ApprovalPipeline => ({
         status: 'NONE',

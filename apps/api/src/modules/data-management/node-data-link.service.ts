@@ -12,6 +12,7 @@ import {
     BadRequestException,
 } from '@nestjs/common';
 import { NodeDataLinkRepository } from './node-data-link.repository';
+import type { CreateNodeDataLinksBatchDto } from './dto';
 import type {
     DataAsset as PrismaDataAsset,
     DataFolder as PrismaDataFolder,
@@ -71,6 +72,51 @@ export class NodeDataLinkService {
 
         this.logger.log(`Linked node ${dto.nodeId} to asset ${dto.assetId}`);
         return this.toLinkResponse(link);
+    }
+
+    /**
+     * Story 9.10: Batch link a node to multiple data assets
+     * Returns created vs skipped counts (skipped = already linked)
+     */
+    async linkNodeToAssetsBatch(dto: CreateNodeDataLinksBatchDto): Promise<{ created: number; skipped: number }> {
+        const nodeGraphId = await this.linkRepo.getNodeGraphId(dto.nodeId);
+        if (!nodeGraphId) {
+            throw new NotFoundException(`Node ${dto.nodeId} not found`);
+        }
+
+        const uniqueAssetIds = Array.from(new Set(dto.assetIds));
+        if (uniqueAssetIds.length === 0) {
+            return { created: 0, skipped: 0 };
+        }
+
+        const assets = await this.linkRepo.getAssetsGraphIds(uniqueAssetIds);
+        const graphIdByAssetId = new Map(assets.map((a) => [a.id, a.graphId] as const));
+
+        const missing = uniqueAssetIds.filter((id) => !graphIdByAssetId.has(id));
+        if (missing.length > 0) {
+            throw new NotFoundException(`Data asset(s) not found: ${missing.join(', ')}`);
+        }
+
+        const crossGraph = uniqueAssetIds.filter((id) => graphIdByAssetId.get(id) !== nodeGraphId);
+        if (crossGraph.length > 0) {
+            throw new BadRequestException({
+                code: 'CROSS_GRAPH_LINK_NOT_ALLOWED',
+                message: '不允许跨图谱关联：节点与资产必须属于同一图谱',
+            });
+        }
+
+        const created = await this.linkRepo.createMany(
+            uniqueAssetIds.map((assetId) => ({
+                nodeId: dto.nodeId,
+                assetId,
+                linkType: dto.linkType || 'reference',
+            }))
+        );
+
+        const skipped = uniqueAssetIds.length - created;
+        this.logger.log(`Batch linked node ${dto.nodeId} to ${created} asset(s), skipped ${skipped}`);
+
+        return { created, skipped };
     }
 
     /**

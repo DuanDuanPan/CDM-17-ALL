@@ -49,6 +49,7 @@ describe('DataAssetController', () => {
       'a,b',
       '2026-01-01',
       '2026-12-31',
+      undefined,
       '2',
       '10',
       'createdAt',

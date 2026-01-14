@@ -23,6 +23,7 @@ import { useTemplateInsert } from '@/hooks/useTemplateInsert';
 import { CommentPanel } from '@/components/Comments';
 import { TemplateLibraryDialog } from '@/components/TemplateLibrary';
 import { CommentCountContext } from '@/contexts/CommentCountContext';
+import { DataLibraryBindingProvider } from '@/features/data-library/contexts';
 // Story 8.4: Outline View hooks
 import { useOutlineData, useZoomShortcuts } from '@/components/graph/hooks';
 import {
@@ -302,82 +303,84 @@ function GraphPageContent() {
             {/* HIGH-5 Fix: Provide comment counts to all child components */}
             <CommentCountContext.Provider value={{ unreadCounts, getUnreadCount, refresh: refreshCommentCounts }}>
                 <GraphProvider graph={graph} graphId={graphId} yDoc={collab.yDoc} onNodeSelect={handleNodeSelect}>
-                    <div className="flex flex-col h-screen">
-                        <TopBar
-                            userId={userId} // Story 2.4: Pass current user for notifications
-                            projectName="CDM图谱"
-                            currentLayout={layoutMode}
-                            onLayoutChange={handleLayoutChange}
-                            onGridToggle={handleGridToggle}
-                            gridEnabled={gridEnabled}
-                            isLoading={isLayoutLoading}
-                            viewMode={viewMode}
-                            onViewModeChange={setViewMode}
-                        />
-
-                        <div className="flex flex-1 overflow-hidden">
-                            <LeftSidebar
-                                isDependencyMode={isDependencyMode}
-                                onDependencyModeToggle={handleDependencyModeToggle}
-                                onTemplatesOpen={() => setTemplateDialogOpen(true)}
-                                userId={userId}
-                                isOutlineReady={isGraphReady}
-                                outlineData={outlineData}
-                                selectedNodeId={selectedNodeId}
-                                onOutlineNodeClick={handleOutlineNodeClick}
-                                onOutlineReorder={handleOutlineReorder}
+                    <DataLibraryBindingProvider>
+                        <div className="flex flex-col h-screen">
+                            <TopBar
+                                userId={userId} // Story 2.4: Pass current user for notifications
+                                projectName="CDM图谱"
+                                currentLayout={layoutMode}
+                                onLayoutChange={handleLayoutChange}
+                                onGridToggle={handleGridToggle}
+                                gridEnabled={gridEnabled}
+                                isLoading={isLayoutLoading}
+                                viewMode={viewMode}
+                                onViewModeChange={setViewMode}
                             />
 
-                            <main className="flex-1 relative overflow-hidden">
-                                <ViewContainer
-                                    graphId={graphId}
-                                    user={CURRENT_USER}
-                                    collaboration={collab}
-                                    onNodeSelect={handleNodeSelect}
-                                    onLayoutChange={handleLayoutChange}
-                                    onGridToggle={handleGridToggle}
-                                    currentLayout={layoutMode}
-                                    gridEnabled={gridEnabled}
-                                    onGraphReady={setGraph}
+                            <div className="flex flex-1 overflow-hidden">
+                                <LeftSidebar
                                     isDependencyMode={isDependencyMode}
-                                    onExitDependencyMode={() => setIsDependencyMode(false)}
+                                    onDependencyModeToggle={handleDependencyModeToggle}
+                                    onTemplatesOpen={() => setTemplateDialogOpen(true)}
+                                    userId={userId}
+                                    isOutlineReady={isGraphReady}
+                                    outlineData={outlineData}
+                                    selectedNodeId={selectedNodeId}
+                                    onOutlineNodeClick={handleOutlineNodeClick}
+                                    onOutlineReorder={handleOutlineReorder}
                                 />
-                            </main>
 
-                            <RightSidebar
-                                selectedNodeId={selectedNodeId}
-                                graph={graph}
-                                graphId={graphId}
-                                yDoc={collab.yDoc}
-                                creatorName={CURRENT_USER.name}
-                                onClose={handleClosePanel}
+                                <main className="flex-1 relative overflow-hidden">
+                                    <ViewContainer
+                                        graphId={graphId}
+                                        user={CURRENT_USER}
+                                        collaboration={collab}
+                                        onNodeSelect={handleNodeSelect}
+                                        onLayoutChange={handleLayoutChange}
+                                        onGridToggle={handleGridToggle}
+                                        currentLayout={layoutMode}
+                                        gridEnabled={gridEnabled}
+                                        onGraphReady={setGraph}
+                                        isDependencyMode={isDependencyMode}
+                                        onExitDependencyMode={() => setIsDependencyMode(false)}
+                                    />
+                                </main>
+
+                                <RightSidebar
+                                    selectedNodeId={selectedNodeId}
+                                    graph={graph}
+                                    graphId={graphId}
+                                    yDoc={collab.yDoc}
+                                    creatorName={CURRENT_USER.name}
+                                    onClose={handleClosePanel}
+                                />
+                            </div>
+
+                            {/* Story 4.3: Comment Panel */}
+                            {commentNodeId && (
+                                <CommentPanel
+                                    nodeId={commentNodeId}
+                                    nodeLabel={commentNodeLabel}
+                                    mindmapId={graphId}
+                                    userId={userId}
+                                    onClose={handleCloseComments}
+                                    onMarkAsRead={refreshCommentCounts}
+                                />
+                            )}
+
+                            {/* Story 5.2 Fix: Template library with insert mode for current graph */}
+                            <TemplateLibraryDialog
+                                open={templateDialogOpen}
+                                onOpenChange={setTemplateDialogOpen}
+                                onSelect={handleTemplateSelect}
+                                userId={userId}
+                                enableDragDrop
+                                onTemplateDragStart={() => setTemplateDialogOpen(false)}
+                                mode="insert"
+                                onInsertTemplate={handleInsertTemplate}
                             />
                         </div>
-
-                        {/* Story 4.3: Comment Panel */}
-                        {commentNodeId && (
-                            <CommentPanel
-                                nodeId={commentNodeId}
-                                nodeLabel={commentNodeLabel}
-                                mindmapId={graphId}
-                                userId={userId}
-                                onClose={handleCloseComments}
-                                onMarkAsRead={refreshCommentCounts}
-                            />
-                        )}
-
-                        {/* Story 5.2 Fix: Template library with insert mode for current graph */}
-                        <TemplateLibraryDialog
-                            open={templateDialogOpen}
-                            onOpenChange={setTemplateDialogOpen}
-                            onSelect={handleTemplateSelect}
-                            userId={userId}
-                            enableDragDrop
-                            onTemplateDragStart={() => setTemplateDialogOpen(false)}
-                            mode="insert"
-                            onInsertTemplate={handleInsertTemplate}
-                        />
-                    </div>
+                    </DataLibraryBindingProvider>
                 </GraphProvider>
             </CommentCountContext.Provider>
         </CollaborationUIProvider>

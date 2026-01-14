@@ -11,6 +11,7 @@ export { AssetCard } from './components/AssetCard';
 
 // Hooks
 export { useDataAssets } from './hooks/useDataAssets';
+export { useDataLibraryBinding } from './contexts';
 
 // API
 export { fetchDataAssets } from './api/data-assets';

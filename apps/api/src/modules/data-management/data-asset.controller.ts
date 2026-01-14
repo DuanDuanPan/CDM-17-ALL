@@ -41,6 +41,7 @@ import {
   UpdateDataAssetDto,
   CreateDataFolderDto,
   CreateNodeDataLinkDto,
+  CreateNodeDataLinksBatchDto,
   UpdateDataFolderDto,
   LinksByNodesDto,
   DestroyLinksByNodesDto,
@@ -352,6 +353,17 @@ export class DataAssetController {
       success: true,
       link,
     };
+  }
+
+  /**
+   * Story 9.10: POST /data-assets/links:batch - Batch link node to assets
+   */
+  @Post('data-assets/links\\:batch')
+  @HttpCode(HttpStatus.CREATED)
+  async createLinksBatch(
+    @Body() dto: CreateNodeDataLinksBatchDto
+  ): Promise<{ created: number; skipped: number }> {
+    return this.service.linkNodeToAssetsBatch(dto);
   }
 
   /**

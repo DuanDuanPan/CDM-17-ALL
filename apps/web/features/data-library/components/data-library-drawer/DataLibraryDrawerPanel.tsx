@@ -11,6 +11,8 @@ import { DataLibraryDrawerContent, type DataLibraryDrawerContentProps } from './
 import { DataLibraryDrawerFooter } from './DataLibraryDrawerFooter';
 import { DataLibraryDrawerToolbar, type DataLibraryDrawerToolbarProps } from './DataLibraryDrawerToolbar';
 import { AssetFilterBar } from '../asset-filter';
+import { BindingTargetBanner, SelectedAssetsTray } from '../binding';
+import { useDataLibraryBindingOptional } from '../../contexts';
 import type { SearchScope } from '../asset-filter/types';
 import type { DataAssetFormat } from '@cdm/types';
 
@@ -71,6 +73,8 @@ export function DataLibraryDrawerPanel({
   onOpenTrash,
   ...contentProps
 }: DataLibraryDrawerPanelProps) {
+  const bindingContext = useDataLibraryBindingOptional();
+
   return (
     <div
       data-testid="data-library-drawer"
@@ -115,10 +119,17 @@ export function DataLibraryDrawerPanel({
         graphId={graphId}
         uploadConfig={uploadConfig}
         onUploadSuccess={onUploadSuccess}
-        selectedCount={selectedCount}
+        selectedCount={bindingContext?.isBindingMode ? 0 : selectedCount}
         onBatchDelete={onBatchDelete}
         onOpenTrash={onOpenTrash}
       />
+
+      {bindingContext?.isBindingMode ? (
+        <>
+          <BindingTargetBanner />
+          <SelectedAssetsTray onCloseDrawer={onClose} />
+        </>
+      ) : null}
 
       {/* Story 9.9: Asset Filter Bar (AC2) */}
       <AssetFilterBar

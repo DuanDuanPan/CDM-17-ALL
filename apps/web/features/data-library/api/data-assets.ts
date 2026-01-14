@@ -435,6 +435,28 @@ export async function createNodeAssetLink(data: {
 }
 
 /**
+ * Story 9.10: Batch create links between node and assets
+ */
+export async function createNodeAssetLinksBatch(data: {
+  nodeId: string;
+  assetIds: string[];
+  linkType?: DataLinkType;
+}): Promise<{ created: number; skipped: number }> {
+  const response = await fetch(`${API_BASE}/api/data-assets/links:batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    throw new Error(error.message || 'Failed to batch create links');
+  }
+
+  return response.json();
+}
+
+/**
  * Delete link between node and asset
  * AC#5: Unlink asset from node
  */

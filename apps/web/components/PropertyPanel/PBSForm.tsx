@@ -8,10 +8,12 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Hash, Tag, User, Target, Plus, Trash2, Package, Link, ChevronDown, Sparkles } from 'lucide-react';
-import { Button, Badge } from '@cdm/ui';
+import { Button, Badge, useToast } from '@cdm/ui';
 import { nanoid } from 'nanoid';
-import type { PBSProps, PBSIndicator, ProductReference } from '@cdm/types';
+import type { DataAssetWithFolder, PBSProps, PBSIndicator, ProductReference } from '@cdm/types';
 import { ProductSearchDialog } from '@/components/ProductLibrary';
+import { LinkedAssetsSection } from './LinkedAssetsSection';
+import { useDataLibraryBindingOptional } from '@/features/data-library/contexts';
 
 type IndicatorPreset = {
   name: string;
@@ -98,11 +100,11 @@ export interface PBSFormProps {
   nodeId: string;
   initialData?: PBSProps;
   onUpdate?: (data: PBSProps) => void;
+  /** Story 9.5: Open asset preview modal in parent PropertyPanel */
+  onAssetPreview?: (asset: DataAssetWithFolder) => void;
 }
 
-// LOW-1 Fix: nodeId is reserved for future use (e.g., direct API calls, context association)
-// Using underscore prefix to suppress unused variable warnings
-export function PBSForm({ nodeId: _nodeId, initialData, onUpdate }: PBSFormProps) {
+export function PBSForm({ nodeId, initialData, onUpdate, onAssetPreview }: PBSFormProps) {
   const [formData, setFormData] = useState<PBSProps>({
     code: initialData?.code || '',
     version: initialData?.version || 'v1.0.0',
@@ -114,6 +116,9 @@ export function PBSForm({ nodeId: _nodeId, initialData, onUpdate }: PBSFormProps
   const [showProductSearch, setShowProductSearch] = useState(false);
   const [showPresetDropdown, setShowPresetDropdown] = useState(false);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+
+  const bindingContext = useDataLibraryBindingOptional();
+  const { addToast } = useToast();
 
   // MEDIUM-3 Fix: Refs for click outside handling
   const presetDropdownRef = useRef<HTMLDivElement>(null);
@@ -226,6 +231,19 @@ export function PBSForm({ nodeId: _nodeId, initialData, onUpdate }: PBSFormProps
     setFormData(updated);
     onUpdate?.(updated);
   }, [formData, onUpdate]);
+
+  const handleAddAssetClick = useCallback(() => {
+    if (bindingContext) {
+      bindingContext.openForBinding({ nodeId });
+      return;
+    }
+
+    addToast({
+      type: 'info',
+      title: '关联数据资产',
+      description: '请在右侧"数据资源库"中选择资产并确认绑定',
+    });
+  }, [addToast, bindingContext, nodeId]);
 
   return (
     <div className="space-y-5">
@@ -514,6 +532,12 @@ export function PBSForm({ nodeId: _nodeId, initialData, onUpdate }: PBSFormProps
           </div>
         )}
       </div>
+
+      <LinkedAssetsSection
+        nodeId={nodeId}
+        onAddClick={handleAddAssetClick}
+        onPreview={(link) => onAssetPreview?.(link.asset)}
+      />
 
       {/* Product Search Dialog */}
       <ProductSearchDialog

@@ -12,6 +12,7 @@ import { Button, Badge, useToast } from '@cdm/ui';
 import type { DataAssetWithFolder, DataProps, DataType } from '@cdm/types';
 import { DataPreviewDialog } from './DataPreviewDialog';
 import { LinkedAssetsSection } from './LinkedAssetsSection'; // Story 9.5
+import { useDataLibraryBindingOptional } from '@/features/data-library/contexts';
 
 export interface DataFormProps {
   nodeId: string;
@@ -37,16 +38,22 @@ export function DataForm({ nodeId, initialData, onUpdate, onAssetPreview }: Data
   });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const bindingContext = useDataLibraryBindingOptional();
   const { addToast } = useToast();
 
-  // Story 9.5: Guide user to Data Library for asset linking
+  // Story 9.10: Property panel triggers binding mode (AC1)
   const handleAddAssetClick = useCallback(() => {
+    if (bindingContext) {
+      bindingContext.openForBinding({ nodeId });
+      return;
+    }
+
     addToast({
       type: 'info',
       title: '关联数据资产',
-      description: '请在右侧"数据资产库"中选择资产，通过右键菜单关联到当前节点',
+      description: '请在右侧"数据资源库"中选择资产并确认绑定',
     });
-  }, [addToast]);
+  }, [addToast, bindingContext, nodeId]);
 
   useEffect(() => {
     setFormData({

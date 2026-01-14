@@ -15,4 +15,4 @@ export { useDataUpload } from './useDataUpload';
 export { useAssetLinks } from './useAssetLinks';
 export { useContextAwareUpload, type ContextAwareUploadConfig, type UploadMode } from './useContextAwareUpload';
 export { useAssetFilterState, type UseAssetFilterStateResult } from './useAssetFilterState';
-
+export { useBatchAssetBinding } from './useBatchAssetBinding';

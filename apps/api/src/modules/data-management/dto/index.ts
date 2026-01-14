@@ -2,6 +2,7 @@ export { CreateDataAssetDto } from './create-data-asset.dto';
 export { UpdateDataAssetDto } from './update-data-asset.dto';
 export { CreateDataFolderDto } from './create-data-folder.dto';
 export { CreateNodeDataLinkDto } from './create-node-data-link.dto';
+export { CreateNodeDataLinksBatchDto } from './create-node-data-links-batch.dto';
 export { UpdateDataFolderDto } from './update-data-folder.dto';
 export { LinksByNodesDto } from './links-by-nodes.dto';
 export { UploadAssetDto } from './upload-asset.dto';

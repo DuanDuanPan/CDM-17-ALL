@@ -46,6 +46,26 @@ export class NodeDataLinkRepository {
         return asset?.graphId ?? null;
     }
 
+    async getAssetsGraphIds(assetIds: string[]): Promise<Array<{ id: string; graphId: string }>> {
+        if (assetIds.length === 0) return [];
+
+        return prisma.dataAsset.findMany({
+            where: { id: { in: assetIds }, isDeleted: false },
+            select: { id: true, graphId: true },
+        });
+    }
+
+    async createMany(data: Prisma.NodeDataLinkCreateManyInput[]): Promise<number> {
+        if (data.length === 0) return 0;
+
+        const result = await prisma.nodeDataLink.createMany({
+            data,
+            skipDuplicates: true,
+        });
+
+        return result.count;
+    }
+
     /**
      * Find all links for a node with asset + folder info
      * Story 9.2: Updated to include folder info for PBS/Task views

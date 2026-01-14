@@ -17,6 +17,7 @@ import { GlobalSearchDialog } from '@/components/CommandPalette/GlobalSearchDial
 import { ArchiveDrawer } from '@/components/ArchiveBox/ArchiveDrawer';
 // Story 9.1: Data Library Drawer
 import { DataLibraryDrawer } from '@/features/data-library';
+import { useDataLibraryBindingOptional } from '@/features/data-library/contexts';
 // Keyboard Shortcuts Guide
 import { KeyboardShortcutsGuide } from '@/components/KeyboardShortcutsGuide';
 
@@ -56,6 +57,8 @@ export function TopBar({
   const [isDataLibraryOpen, setIsDataLibraryOpen] = useState(false);
   // Keyboard Shortcuts Guide state
   const [isShortcutsGuideOpen, setIsShortcutsGuideOpen] = useState(false);
+
+  const bindingContext = useDataLibraryBindingOptional();
 
   // Story 1.4 MED-12: Get collaboration state from context (optional for standalone usage)
   const collabContext = useCollaborationUIOptional();
@@ -100,6 +103,13 @@ export function TopBar({
       window.removeEventListener('notification:navigate', handleNavigate);
     };
   }, [navigateToNode]);
+
+  // Story 9.10: Binding mode should auto-open the data library drawer (AC1)
+  useEffect(() => {
+    if (bindingContext?.isBindingMode) {
+      setIsDataLibraryOpen(true);
+    }
+  }, [bindingContext?.isBindingMode]);
 
   const handleSearchSelect = useCallback(
     (nodeId: string) => {

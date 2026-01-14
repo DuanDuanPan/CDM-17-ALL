@@ -6,7 +6,9 @@
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PBSForm } from '@/components/PropertyPanel/PBSForm';
+import { ToastProvider } from '@cdm/ui';
 import type { PBSProps, ProductReference } from '@cdm/types';
 
 // Mock ProductSearchDialog
@@ -42,6 +44,23 @@ describe('PBSForm', () => {
     const mockOnUpdate = vi.fn();
     const defaultNodeId = 'test-node-123';
 
+    const createTestQueryClient = () =>
+        new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+
+    const renderPBSForm = (props: Parameters<typeof PBSForm>[0]) =>
+        render(
+            <QueryClientProvider client={createTestQueryClient()}>
+                <ToastProvider>
+                    <PBSForm {...props} />
+                </ToastProvider>
+            </QueryClientProvider>
+        );
+
     beforeEach(() => {
         mockOnUpdate.mockClear();
     });
@@ -54,7 +73,7 @@ describe('PBSForm', () => {
                 ownerId: 'user-123',
             };
 
-            render(<PBSForm nodeId={defaultNodeId} initialData={initialData} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, initialData, onUpdate: mockOnUpdate });
 
             expect(screen.getByDisplayValue('PBS-001')).toBeTruthy();
             expect(screen.getByDisplayValue('v1.2.0')).toBeTruthy();
@@ -62,7 +81,7 @@ describe('PBSForm', () => {
         });
 
         it('calls onUpdate when code field changes', () => {
-            render(<PBSForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, onUpdate: mockOnUpdate });
 
             const codeInput = screen.getByPlaceholderText('例如: PBS-001');
             fireEvent.change(codeInput, { target: { value: 'PBS-NEW' } });
@@ -75,7 +94,7 @@ describe('PBSForm', () => {
 
     describe('Indicator Management (Story 2.7)', () => {
         it('displays empty indicator list by default', () => {
-            render(<PBSForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, onUpdate: mockOnUpdate });
 
             // Should show "Add Indicator" button but no indicator rows
             expect(screen.getByText('添加指标')).toBeTruthy();
@@ -83,7 +102,7 @@ describe('PBSForm', () => {
         });
 
         it('adds a new indicator row when clicking Add Indicator', () => {
-            render(<PBSForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, onUpdate: mockOnUpdate });
 
             const addButton = screen.getByText('添加指标');
             fireEvent.click(addButton);
@@ -101,7 +120,7 @@ describe('PBSForm', () => {
         });
 
         it('adds indicator with preset values from dropdown', () => {
-            render(<PBSForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, onUpdate: mockOnUpdate });
 
             // Click "常用指标" to open dropdown
             const presetButton = screen.getByText('常用指标');
@@ -127,7 +146,7 @@ describe('PBSForm', () => {
                 ],
             };
 
-            render(<PBSForm nodeId={defaultNodeId} initialData={initialData} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, initialData, onUpdate: mockOnUpdate });
 
             // Find the target value input and change it
             const targetInput = screen.getByDisplayValue('100');
@@ -147,7 +166,7 @@ describe('PBSForm', () => {
                 ],
             };
 
-            render(<PBSForm nodeId={defaultNodeId} initialData={initialData} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, initialData, onUpdate: mockOnUpdate });
 
             // Find and click delete button for first indicator
             const deleteButtons = screen.getAllByTitle('删除指标');
@@ -162,13 +181,13 @@ describe('PBSForm', () => {
 
     describe('Product Library Link (Story 2.7)', () => {
         it('displays Link Product button when no product is linked', () => {
-            render(<PBSForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, onUpdate: mockOnUpdate });
 
             expect(screen.getByText('关联产品库产品')).toBeTruthy();
         });
 
         it('opens product search dialog when clicking Link Product', () => {
-            render(<PBSForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, onUpdate: mockOnUpdate });
 
             const linkButton = screen.getByText('关联产品库产品');
             fireEvent.click(linkButton);
@@ -177,7 +196,7 @@ describe('PBSForm', () => {
         });
 
         it('links product when selecting from dialog', () => {
-            render(<PBSForm nodeId={defaultNodeId} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, onUpdate: mockOnUpdate });
 
             // Open dialog
             const linkButton = screen.getByText('关联产品库产品');
@@ -203,7 +222,7 @@ describe('PBSForm', () => {
                 },
             };
 
-            render(<PBSForm nodeId={defaultNodeId} initialData={initialData} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, initialData, onUpdate: mockOnUpdate });
 
             expect(screen.getByText('Satellite Engine X1')).toBeTruthy();
             // Product code appears in both the linked product display and info badge
@@ -221,7 +240,7 @@ describe('PBSForm', () => {
                 },
             };
 
-            render(<PBSForm nodeId={defaultNodeId} initialData={initialData} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, initialData, onUpdate: mockOnUpdate });
 
             const unlinkButton = screen.getByTitle('取消关联');
             fireEvent.click(unlinkButton);
@@ -242,7 +261,7 @@ describe('PBSForm', () => {
                 ],
             };
 
-            render(<PBSForm nodeId={defaultNodeId} initialData={initialData} onUpdate={mockOnUpdate} />);
+            renderPBSForm({ nodeId: defaultNodeId, initialData, onUpdate: mockOnUpdate });
 
             expect(screen.getByText('指标数量:')).toBeTruthy();
             expect(screen.getByText('2')).toBeTruthy();

@@ -161,6 +161,12 @@ export function GraphComponent({
                 const data = node?.getData?.() as Record<string, unknown> | undefined;
                 return (data?.order as number | undefined) ?? null;
             },
+            removeNodeById: (id: string) => {
+                const cell = graph.getCellById(id);
+                if (!cell || !cell.isNode()) return false;
+                cell.remove();
+                return true;
+            },
         };
 
         (window as any).__CDM_E2E__ = e2eHelpers;

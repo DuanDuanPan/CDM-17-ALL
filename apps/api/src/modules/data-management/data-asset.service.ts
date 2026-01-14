@@ -35,7 +35,7 @@ import type {
   DataAsset,
   NodeDataLinkWithAsset,
 } from '@cdm/types';
-import type { UpdateDataFolderDto } from './dto';
+import type { CreateNodeDataLinksBatchDto, UpdateDataFolderDto } from './dto';
 
 @Injectable()
 export class DataAssetService {
@@ -313,6 +313,10 @@ export class DataAssetService {
 
   async linkNodeToAsset(dto: CreateNodeDataLinkDto): Promise<NodeDataLink> {
     return this.linkService.linkNodeToAsset(dto);
+  }
+
+  async linkNodeToAssetsBatch(dto: CreateNodeDataLinksBatchDto): Promise<{ created: number; skipped: number }> {
+    return this.linkService.linkNodeToAssetsBatch(dto);
   }
 
   async getNodeAssets(nodeId: string): Promise<DataAssetWithFolder[]> {

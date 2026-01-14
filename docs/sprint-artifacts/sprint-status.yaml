@@ -39,7 +39,7 @@ project: CDM-17-cc
 project_key: CDM-17-cc
 tracking_system: file-system
 story_location: c:/Users/enjoyjavapan/Code/Prototype/CDM-17-cc/docs/sprint-artifacts
-last_updated: 2026-01-14 - Story 9.9 moved to review (toolbar redesign + tests)
+last_updated: 2026-01-14 - Story 9.10 moved to review (property panel asset binding)
 
 development_status:
   epic-1: done
@@ -120,8 +120,9 @@ development_status:
   9-1-data-library-drawer: done  # All tasks complete, Round 2+3 review passed (2026-01-10)
   9-2-multi-dimensional-organization: done  # All review fixes applied; completed (2026-01-11)
   9-3-lightweight-viewer-step-gltf: done  # Code review completed, all issues fixed (2026-01-11)
-  9-4-lightweight-viewer-mesh-contour: in-progress  # Contour viewer integrated; VTU + tests pending
+  9-4-lightweight-viewer-mesh-contour: done  # Contour viewer integrated; VTU + tests pending
   9-5-data-upload-node-linking: done  # Upload + node linking + tests (2026-01-12)
-  9-7-context-aware-data-asset-interaction: in-progress  # Context-aware upload + grouped links (Story 9.7)
+  9-7-context-aware-data-asset-interaction: done  # Context-aware upload + grouped links (Story 9.7)
   9-8-node-view-merge: done  # Tab merge + projection algorithm + breadcrumb + multi-select (2026-01-13)
   9-9-toolbar-redesign: done  # Round 2 Code Review passed (2026-01-14)
+  9-10-property-panel-asset-binding: in-progress  # Code review identified issues - 7 action items added (2026-01-14)

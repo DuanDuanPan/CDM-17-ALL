@@ -31,6 +31,7 @@ import { useAssetSelection } from '../hooks/useAssetSelection';
 import { useNodeTreeProjection } from '../hooks/useNodeTreeProjection';
 import { useNodeAssetUnlink } from '../hooks/useNodeAssetUnlink';
 import { useAssetFilterState } from '../hooks/useAssetFilterState';
+import { useDataLibraryBindingOptional } from '../contexts';
 import type { DataAssetFormat, DataAssetWithFolder } from '@cdm/types';
 import type { ViewMode } from './data-library-drawer/types';
 import { TrashDrawer } from './TrashDrawer';
@@ -79,6 +80,11 @@ export function DataLibraryDrawer({
 
   // Track previous orgView for AC4 (filter reset on view change)
   const prevOrgViewRef = useRef(orgView);
+  const skipNextFilterResetRef = useRef(false);
+
+  // Story 9.10: Binding mode context (optional)
+  const bindingContext = useDataLibraryBindingOptional();
+  const isBindingMode = bindingContext?.isBindingMode ?? false;
 
   const {
     selectedPbsId,
@@ -151,13 +157,33 @@ export function DataLibraryDrawer({
   const { moveAsset, isMovingAsset } = useDataFolders({ graphId, enabled: isOpen });
 
   // Story 9.9: AC4 - Reset filters when org view changes (node <-> folder)
+  // Only show toast when there were active filters that got reset
   useEffect(() => {
     if (prevOrgViewRef.current !== orgView) {
+      if (skipNextFilterResetRef.current) {
+        skipNextFilterResetRef.current = false;
+        prevOrgViewRef.current = orgView;
+        return;
+      }
+
+      const hadActiveFilters = assetFilter.hasActiveFilters;
       assetFilter.resetOnViewChange();
-      toast.info('筛选已重置');
+      if (hadActiveFilters) {
+        toast.info('筛选已重置');
+      }
       prevOrgViewRef.current = orgView;
     }
   }, [orgView, assetFilter]);
+
+  // Story 9.10: Entering binding mode forces Folder View (AC1)
+  useEffect(() => {
+    if (!isBindingMode) return;
+    if (orgView === 'folder') return;
+
+    // Preserve existing filter state when switching views (State Isolation rule)
+    skipNextFilterResetRef.current = true;
+    setOrgView('folder');
+  }, [isBindingMode, orgView, setOrgView]);
 
   // Story 9.9: Determine data source based on searchScope (AC3)
   const isFolderView = orgView === 'folder';
@@ -253,9 +279,18 @@ export function DataLibraryDrawer({
 
   const handleAssetSelectChange = useCallback(
     (asset: DataAssetWithFolder, selected: boolean) => {
+      if (isBindingMode) {
+        bindingContext?.toggleAssetSelection({
+          id: asset.id,
+          name: asset.name,
+          format: asset.format,
+        });
+        return;
+      }
+
       selection.setSelected(asset.id, selected);
     },
-    [selection.setSelected]
+    [bindingContext, isBindingMode, selection.setSelected]
   );
 
   const handleAssetDelete = useCallback(
@@ -268,21 +303,25 @@ export function DataLibraryDrawer({
 
         const nodeIds = selectedNodeIds.size > 0 ? Array.from(selectedNodeIds) : [activeNodeId];
 
-        void nodeAssetUnlink
-          .batchUnlink({ nodeIds, assetIds: [asset.id] })
-          .then(() => selection.remove([asset.id]))
-          .catch(() => {
-            // Error toast is handled inside hook
-          });
+      void nodeAssetUnlink
+        .batchUnlink({ nodeIds, assetIds: [asset.id] })
+        .then(() => selection.remove([asset.id]))
+        .catch(() => {
+          // Error toast is handled inside hook
+        });
 
-        return;
-      }
+      bindingContext?.removeAsset(asset.id);
+      return;
+    }
 
-      assetDelete.confirmSoftDelete(asset, {
-        onSuccess: () => selection.remove([asset.id]),
-      });
-    },
-    [activeNodeId, assetDelete, nodeAssetUnlink, orgView, selectedNodeIds, selection.remove]
+    assetDelete.confirmSoftDelete(asset, {
+      onSuccess: () => {
+        selection.remove([asset.id]);
+        bindingContext?.removeAsset(asset.id);
+      },
+    });
+  },
+    [activeNodeId, assetDelete, bindingContext, nodeAssetUnlink, orgView, selectedNodeIds, selection.remove]
   );
 
   // Story 9.9: AC6 - Batch delete uses unlink in node view
@@ -412,7 +451,7 @@ export function DataLibraryDrawer({
         onAssetLink={handleAssetLink}
         onAssetDelete={handleAssetDelete}
         selectable
-        selectedIds={selection.selectedIds}
+        selectedIds={isBindingMode ? bindingContext?.selectedAssetIds : selection.selectedIds}
         onAssetSelectChange={handleAssetSelectChange}
         uploadConfig={uploadConfig}
         onUploadSuccess={refetch}
