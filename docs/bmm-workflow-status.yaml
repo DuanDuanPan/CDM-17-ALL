@@ -16,3 +16,4 @@ workflow_status:
   validate-architecture: optional
   implementation-readiness: required
   sprint-planning: required
+  document-project: docs/index.md

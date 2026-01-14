@@ -1,0 +1,117 @@
+{
+  "repository_type": "monorepo",
+  "parts": [
+    {
+      "part_id": "web",
+      "project_type_id": "web",
+      "display_name": "@cdm/web"
+    },
+    {
+      "part_id": "api",
+      "project_type_id": "backend",
+      "display_name": "@cdm/api"
+    }
+  ],
+  "integration_points": [
+    {
+      "from": "web",
+      "to": "api",
+      "type": "REST (fetch)",
+      "details": {
+        "base_url_env": [
+          "NEXT_PUBLIC_API_BASE_URL",
+          "NEXT_PUBLIC_API_URL"
+        ],
+        "default_base": "http://localhost:3001",
+        "path_prefix": "/api",
+        "auth": "x-user-id header（开发态用户标识；部分后端支持 Authorization）",
+        "common_paths_samples": [
+          "/api/:path",
+          "/api/__tests__/api-services.test.ts",
+          "/api/__tests__/nodes.test.ts",
+          "/api/app-library",
+          "/api/app-library.ts",
+          "/api/app-library/categories",
+          "/api/approval",
+          "/api/approval.ts",
+          "/api/approval/",
+          "/api/approval/node-1",
+          "/api/approval/node-1/…",
+          "/api/archive",
+          "/api/archive.ts",
+          "/api/citations/19930020471/…",
+          "/api/citations/20180006860/…",
+          "/api/citations/20210000685/…",
+          "/api/comments",
+          "/api/comments.ts",
+          "/api/comments/",
+          "/api/comments/attachments/…",
+          "/api/comments/node-1/…",
+          "/api/comments/unread",
+          "/api/data-assets",
+          "/api/data-assets.ts",
+          "/api/data-assets/folders",
+          "/api/data-assets/folders:destroy",
+          "/api/data-assets/folders:update",
+          "/api/data-assets/links",
+          "/api/data-assets/links:batch",
+          "/api/data-assets/links:byNodes"
+        ]
+      }
+    },
+    {
+      "from": "web",
+      "to": "api",
+      "type": "Socket.IO (notifications)",
+      "details": {
+        "namespace": "/notifications",
+        "client_event": "join(userId) => room user:{userId}",
+        "server_push": "notification:*（如 notification:new）",
+        "files": [
+          "apps/api/src/modules/notification/notification.gateway.ts",
+          "apps/web/hooks/useNotifications.ts"
+        ]
+      }
+    },
+    {
+      "from": "web",
+      "to": "api",
+      "type": "Hocuspocus (Yjs 协作)",
+      "details": {
+        "ws_port_env": "COLLAB_WS_PORT (default 1234)",
+        "web_env": "NEXT_PUBLIC_COLLAB_WS_URL (default ws://localhost:1234)",
+        "document_name": "graph:<graphId>",
+        "persistence": "Graph.yjsState（二进制）+ Nodes/Edges 关系数据兜底初始化",
+        "files": [
+          "apps/api/src/modules/collab/collab.service.ts",
+          "apps/web/app/graph/[graphId]/page.tsx"
+        ]
+      }
+    },
+    {
+      "from": "api",
+      "to": "database",
+      "type": "Prisma/PostgreSQL",
+      "details": {
+        "db_env": "DATABASE_URL",
+        "schema": "packages/database/prisma/schema.prisma",
+        "migrations": "packages/database/prisma/migrations",
+        "package": "@cdm/database"
+      }
+    },
+    {
+      "from": "web/api",
+      "to": "shared packages",
+      "type": "Monorepo workspaces",
+      "details": {
+        "packages": [
+          "@cdm/types",
+          "@cdm/ui",
+          "@cdm/database",
+          "@cdm/plugins",
+          "plugin-*"
+        ]
+      }
+    }
+  ]
+}
