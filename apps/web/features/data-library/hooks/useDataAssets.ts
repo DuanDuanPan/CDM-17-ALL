@@ -19,6 +19,8 @@ interface UseDataAssetsOptions {
   tags?: string[];
   createdAfter?: string;
   createdBefore?: string;
+  /** Story 9.9: Filter unlinked assets */
+  linkStatus?: 'unlinked';
   page?: number;
   pageSize?: number;
   enabled?: boolean;
@@ -38,6 +40,7 @@ interface UseDataAssetsResult {
 /**
  * Hook for fetching data assets
  * Uses TanStack Query for caching and automatic refetching
+ * Story 9.9: Added linkStatus for unlinked assets filter
  */
 export function useDataAssets(options: UseDataAssetsOptions): UseDataAssetsResult {
   const {
@@ -48,6 +51,7 @@ export function useDataAssets(options: UseDataAssetsOptions): UseDataAssetsResul
     tags,
     createdAfter,
     createdBefore,
+    linkStatus,
     page = 1,
     pageSize = 50,
     enabled = true,
@@ -66,10 +70,11 @@ export function useDataAssets(options: UseDataAssetsOptions): UseDataAssetsResul
       tags,
       createdAfter,
       createdBefore,
+      linkStatus,
       page,
       pageSize,
     ],
-    [graphId, search, format, folderId, tags, createdAfter, createdBefore, page, pageSize]
+    [graphId, search, format, folderId, tags, createdAfter, createdBefore, linkStatus, page, pageSize]
   );
 
   // Query function
@@ -84,6 +89,7 @@ export function useDataAssets(options: UseDataAssetsOptions): UseDataAssetsResul
         tags,
         createdAfter,
         createdBefore,
+        linkStatus,
         page,
         pageSize,
       }),

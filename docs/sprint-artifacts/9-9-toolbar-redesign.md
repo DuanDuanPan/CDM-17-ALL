@@ -1,6 +1,6 @@
 # Story 9.9: 数据资源库 Toolbar 重设计 (Data Library Toolbar Redesign)
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -304,66 +304,75 @@ apps/web/features/data-library/
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建 AssetFilterBar 组件 (AC: #2, #3)
-  - [ ] 1.1 创建 `components/asset-filter/` 目录结构
-  - [ ] 1.2 实现 `AssetFilterBar.tsx` 主组件（搜索输入 + 筛选下拉）
-  - [ ] 1.3 实现 `ScopeSelector.tsx` 搜索范围选择器（三选项下拉）
-  - [ ] 1.4 实现 `TypeFilter.tsx` 类型筛选器（复用现有 DataFormat 枚举）
-  - [ ] 1.5 实现 `DateRangeFilter.tsx` 日期范围选择器
-  - [ ] 1.6 添加 300ms debounce 逻辑到搜索输入
-  - [ ] 1.7 实现「已应用 N 个筛选」徽章
+- [x] Task 1: 创建 AssetFilterBar 组件 (AC: #2, #3)
+  - [x] 1.1 创建 `components/asset-filter/` 目录结构
+  - [x] 1.2 实现 `AssetFilterBar.tsx` 主组件（搜索输入 + 筛选下拉）
+  - [x] 1.3 实现 `ScopeSelector.tsx` 搜索范围选择器（三选项下拉）
+  - [x] 1.4 实现 `TypeFilter.tsx` 类型筛选器（复用现有 DataFormat 枚举）
+  - [x] 1.5 实现 `DateRangeFilter.tsx` 日期范围选择器
+  - [x] 1.6 添加 300ms debounce 逻辑到搜索输入
+  - [x] 1.7 实现「已应用 N 个筛选」徽章
 
-- [ ] Task 2: 重构 DataLibraryDrawerToolbar (AC: #1)
-  - [ ] 2.1 移除 Toolbar 中的搜索输入框
-  - [ ] 2.2 移除 Toolbar 中的类型筛选下拉
-  - [ ] 2.3 移除 Toolbar 中的日期范围选择器
-  - [ ] 2.4 保留操作类控件：上传按钮、批量删除（条件显示）、回收站
-  - [ ] 2.5 保留视图控制类控件：网格/列表/表格切换、左侧面板 Toggle
-  - [ ] 2.6 调整 Toolbar 布局（高度 ≤ 56px）
+- [x] Task 2: 重构 DataLibraryDrawerToolbar (AC: #1)
+  - [x] 2.1 移除 Toolbar 中的搜索输入框
+  - [x] 2.2 移除 Toolbar 中的类型筛选下拉
+  - [x] 2.3 移除 Toolbar 中的日期范围选择器
+  - [x] 2.4 保留操作类控件：上传按钮、批量删除（条件显示）、回收站
+  - [x] 2.5 保留视图控制类控件：网格/列表切换、左侧面板 Toggle
+  - [x] 2.6 调整 Toolbar 布局（高度 ≤ 56px）
 
-- [ ] Task 3: 筛选状态管理重构 (AC: #4)
-  - [ ] 3.1 创建 `useAssetFilterState` Hook（管理 assetSearchQuery、searchScope、formatFilter、createdAfter、createdBefore）
-  - [ ] 3.2 实现筛选状态在切换节点时保持
-  - [ ] 3.3 实现筛选状态在切换视角时清空 + Toast 提示
-  - [ ] 3.4 实现筛选状态会话内保持（Drawer 关闭/重开）
-  - [ ] 3.5 更新 `DataLibraryDrawerView.tsx` 集成新筛选栏
+- [x] Task 3: 筛选状态管理重构 (AC: #4)
+  - [x] 3.1 创建 `useAssetFilterState` Hook（管理 assetSearchQuery、searchScope、formatFilter、createdAfter、createdBefore）
+  - [x] 3.2 实现筛选状态在切换节点时保持
+  - [x] 3.3 实现筛选状态在切换视角时清空 + Toast 提示
+  - [x] 3.4 实现筛选状态会话内保持（Drawer 关闭/重开）
+  - [x] 3.5 更新 `DataLibraryDrawerPanel.tsx` 集成新筛选栏
 
-- [ ] Task 4: 支持「未关联资产」范围（API + Types）(AC: #3)
-  - [ ] 4.1 扩展 `@cdm/types` 的 `DataAssetQueryDto`：新增 `linkStatus?: 'unlinked'`
-  - [ ] 4.2 后端 `GET /api/data-assets` 支持 `linkStatus=unlinked`
+- [x] Task 4: 支持「未关联资产」范围（API + Types）(AC: #3)
+  - [x] 4.1 扩展 `@cdm/types` 的 `DataAssetQueryDto`：新增 `linkStatus?: 'unlinked'`
+  - [x] 4.2 后端 `GET /api/data-assets` 支持 `linkStatus=unlinked`
     - 在 `data-asset.controller.ts` 的 `list` 方法添加 `linkStatus` 查询参数
-    - 在 `data-asset.service.ts` 添加 WHERE 条件：`_count: { nodeLinks: 0 }`
+    - 在 `data-asset.repository.ts` 添加 WHERE 条件：`nodeLinks: { none: {} }`
     - 确保分页和其他筛选条件正常工作
-  - [ ] 4.3 前端 `fetchDataAssets` / `useDataAssets` 支持透传 `linkStatus`
-  - [ ] 4.4 添加单元测试验证 unlinked 筛选正确性
+  - [x] 4.3 前端 `fetchDataAssets` / `useDataAssets` 支持透传 `linkStatus`
+  - [x] 4.4 添加单元测试验证 unlinked 筛选正确性
 
-- [ ] Task 5: 集成资产筛选栏到 Drawer + 搜索迁移 (AC: #2, #3, #5)
-  - [ ] 5.1 在 `DataLibraryDrawerContent.tsx` 布局中插入 `AssetFilterBar`
-  - [ ] 5.2 将筛选状态传递给 `useDataAssets` / `useSelectedNodesAssets` / `useAssetLinks`，并按 `searchScope` 切换数据来源（AC3）
-  - [ ] 5.3 修改左侧节点搜索：仅保留节点搜索输入框（移除/禁用左侧资产搜索入口），并显示帮助文字「在 PBS 和任务节点中搜索」
-  - [ ] 5.4 确保节点搜索与资产搜索状态独立
-  - [ ] 5.5 **[DualSearch 迁移]** 移除 `DualSearch.tsx` 中的 `searchMode='asset'` 分支和切换 UI
-  - [ ] 5.6 **[DualSearch 迁移]** 将 `DualSearch` 重命名或简化为 `NodeSearch`（仅保留节点搜索功能）
-  - [ ] 5.7 **[DualSearch 迁移]** 从 `DataLibraryDrawer.tsx` 移除 `searchMode` 状态及相关逻辑（lines 74-166）
-  - [ ] 5.8 **[DualSearch 迁移]** 更新 `DataLibraryDrawerContent.tsx` 移除对 `searchMode` 的依赖
+- [x] Task 5: 集成资产筛选栏到 Drawer + 搜索迁移 (AC: #2, #3, #5)
+  - [x] 5.1 在 `DataLibraryDrawerPanel.tsx` 布局中插入 `AssetFilterBar`
+  - [x] 5.2 将筛选状态传递给 `useDataAssets` / `useSelectedNodesAssets` / `useAssetLinks`，并按 `searchScope` 切换数据来源（AC3）
+  - [x] 5.3 修改左侧节点搜索：仅保留节点搜索输入框（移除/禁用左侧资产搜索入口），并显示帮助文字「在 PBS 和任务节点中搜索」
+  - [x] 5.4 确保节点搜索与资产搜索状态独立
+  - [x] 5.5 **[DualSearch 迁移]** 移除 `DualSearch.tsx` 中的 `searchMode='asset'` 分支和切换 UI
+  - [x] 5.6 **[DualSearch 迁移]** 将 `DualSearch` 重命名或简化为 `NodeSearch`（仅保留节点搜索功能）
+  - [x] 5.7 **[DualSearch 迁移]** 从 `DataLibraryDrawer.tsx` 移除 `searchMode` 状态及相关逻辑（lines 74-166）
+  - [x] 5.8 **[DualSearch 迁移]** 更新 `DataLibraryDrawerContent.tsx` 移除对 `searchMode` 的依赖
 
-- [ ] Task 6: 批量操作增强 (AC: #6)
-  - [ ] 6.1 更新批量删除按钮样式（红色警示色）
-  - [ ] 6.2 确保批量删除调用解绑 API（复用 Story 9.8 的 `useNodeAssetUnlink`）
-  - [ ] 6.3 添加 Undo Toast
+- [x] Task 6: 批量操作增强 (AC: #6)
+  - [x] 6.1 更新批量删除按钮样式（红色警示色）
+  - [x] 6.2 确保批量删除调用解绑 API（复用 Story 9.8 的 `useNodeAssetUnlink`）
+  - [x] 6.3 添加 Undo Toast
 
-- [ ] Task 7: 单元测试
-  - [ ] 7.1 `AssetFilterBar.test.tsx` - 筛选栏组件测试
-  - [ ] 7.2 `ScopeSelector.test.tsx` - 范围选择器测试
-  - [ ] 7.3 `useAssetFilterState.test.ts` - 筛选状态 Hook 测试
-  - [ ] 7.4 **[更新现有测试]** `DataLibraryDrawer.test.tsx` - 移除对 toolbar 搜索框/日期选择器的断言
-  - [ ] 7.5 **[更新现有测试]** `DualSearch.test.tsx` - 更新为仅测试节点搜索（移除 asset mode 测试）
+- [x] Task 7: 单元测试
+  - [x] 7.1 `AssetFilterBar.test.tsx` - 筛选栏组件测试
+  - [x] 7.2 `ScopeSelector.test.tsx` - 范围选择器测试
+  - [x] 7.3 `useAssetFilterState.test.ts` - 筛选状态 Hook 测试
+  - [x] 7.4 **[更新现有测试]** `DataLibraryDrawer.test.tsx` - 移除对 toolbar 搜索框/日期选择器的断言
+  - [x] 7.5 **[更新现有测试]** `DualSearch.test.tsx` - 更新为仅测试节点搜索（移除 asset mode 测试）
 
-- [ ] Task 8: E2E 测试
-  - [ ] 8.1 `toolbar-redesign.spec.ts` - Toolbar 操作按钮测试
-  - [ ] 8.2 资产筛选栏功能测试
-  - [ ] 8.3 视角切换筛选重置测试
-  - [ ] 8.4 **[更新现有测试]** `data-library.spec.ts` - 更新搜索/筛选相关用例（lines 139-163）
+- [x] Task 8: E2E 测试
+  - [x] 8.1 `toolbar-redesign.spec.ts` - Toolbar 操作按钮测试
+  - [x] 8.2 资产筛选栏功能测试
+  - [x] 8.3 视角切换筛选重置测试
+  - [x] 8.4 **[更新现有测试]** `data-library.spec.ts` - 更新搜索/筛选相关用例（lines 139-163）
+
+- [x] Task 9: Review Follow-ups (AI) - Code Review 2026-01-14 (Resolved 2026-01-14)
+  - [x] 9.1 [HIGH] E2E AC4 Toast 验证缺失 - 补充验证「筛选已重置」Toast 显示
+  - [x] 9.2 [MEDIUM] ScopeSelector 键盘无障碍 - 增加 Arrow/Enter/Escape 键盘导航
+  - [x] 9.3 [MEDIUM] scopeDisabled 逻辑未启用 - 节点未选中时禁用「当前节点」scope
+  - [x] 9.4 [MEDIUM] DualSearch 兼容导出误导 - `NodeSearch.tsx` 保留 `DualSearch` 别名并添加 @deprecated
+  - [x] 9.5 [MEDIUM] FilterBadge ARIA 缺失 - 补充 `role="status"` + `aria-live`
+  - [x] 9.6 [LOW] 文件未重命名 - `DualSearch.tsx` 已重命名为 `NodeSearch.tsx`（Task 5.6）
+  - [x] 9.7 [LOW] 测试硬编码字符串 - 从 `SCOPE_OPTIONS` 常量导入/生成断言
 
 ## Dev Notes
 
@@ -918,11 +927,53 @@ cd apps/web && pnpm test:e2e -- e2e/toolbar-redesign.spec.ts
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+GPT-5.2 (Codex CLI)
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- ✅ [2026-01-14] 修复 AC2/AC3：Node 视图筛选对关联资产生效；Scope 切换正确切换数据源并隐藏 linkType 分组
+- ✅ [2026-01-14] 修复「未关联资产」范围：`linkStatus=unlinked` 贯通 Types → API → Backend → UI
+- ✅ [2026-01-14] 修复双重 debounce：整体保持 300ms
+- ✅ [2026-01-14] DualSearch 简化为 NodeSearch（移除 asset mode）
+- ✅ [2026-01-14] 更新 Web 单测（DataLibraryDrawer/OrganizationViews）+ 新增后端仓储单测覆盖 linkStatus
+- ✅ [2026-01-14] 补齐 UT：DualSearch（NodeSearch-only）并通过
+- ✅ [2026-01-14] 补齐 E2E：toolbar-redesign + 更新 data-library.spec.ts，并通过
+
 ### File List
 
+- apps/web/features/data-library/components/DataLibraryDrawer.tsx
+- apps/web/features/data-library/components/OrganizationTabs.tsx
+- apps/web/features/data-library/components/__tests__/OrganizationTabs.test.tsx
+- apps/web/features/data-library/components/data-library-drawer/DataLibraryDrawerContent.tsx
+- apps/web/features/data-library/components/data-library-drawer/DataLibraryDrawerPanel.tsx
+- apps/web/features/data-library/components/data-library-drawer/DataLibraryDrawerToolbar.tsx
+- apps/web/features/data-library/components/asset-filter/AssetFilterBar.tsx
+- apps/web/features/data-library/components/asset-filter/ScopeSelector.tsx
+- apps/web/features/data-library/components/asset-filter/TypeFilter.tsx
+- apps/web/features/data-library/components/asset-filter/DateRangeFilter.tsx
+- apps/web/features/data-library/components/asset-filter/FilterBadge.tsx
+- apps/web/features/data-library/components/asset-filter/index.ts
+- apps/web/features/data-library/components/asset-filter/types.ts
+- apps/web/features/data-library/components/node-tree/NodeSearch.tsx
+- apps/web/features/data-library/components/node-tree/index.ts
+- apps/web/features/data-library/hooks/useAssetFilterState.ts
+- apps/web/features/data-library/hooks/useAssetDelete.ts
+- apps/web/features/data-library/hooks/useDataAssets.ts
+- apps/web/features/data-library/hooks/index.ts
+- apps/web/features/data-library/api/data-assets.ts
+- apps/web/__tests__/features/data-library/AssetFilterBar.test.tsx
+- apps/web/__tests__/features/data-library/ScopeSelector.test.tsx
+- apps/web/__tests__/features/data-library/DualSearch.test.tsx
+- apps/web/__tests__/features/data-library/useAssetFilterState.test.ts
+- apps/web/features/data-library/__tests__/DataLibraryDrawer.test.tsx
+- apps/web/features/data-library/__tests__/OrganizationViews.test.tsx
+- apps/web/e2e/toolbar-redesign.spec.ts
+- apps/web/e2e/data-library.spec.ts
+- packages/types/src/data-library-types.ts
+- apps/api/src/modules/data-management/data-asset.controller.ts
+- apps/api/src/modules/data-management/data-asset.repository.ts
+- apps/api/src/modules/data-management/__tests__/data-asset.repository.spec.ts
+- docs/sprint-artifacts/9-9-toolbar-redesign.md
+- docs/sprint-artifacts/sprint-status.yaml

@@ -167,6 +167,7 @@ export interface CreateNodeDataLinkDto {
 
 /**
  * Query filters for listing data assets
+ * Story 9.9: Added linkStatus for filtering unlinked assets
  */
 export interface DataAssetQueryDto {
   graphId: string;
@@ -176,6 +177,8 @@ export interface DataAssetQueryDto {
   tags?: string[];       // Filter by tags
   createdAfter?: string; // Filter by date (ISO string)
   createdBefore?: string;
+  /** Story 9.9: Filter by link status - 'unlinked' returns assets with no NodeDataLink */
+  linkStatus?: 'unlinked';
   page?: number;
   pageSize?: number;
   sortBy?: 'name' | 'format' | 'createdAt' | 'updatedAt';

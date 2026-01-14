@@ -3,6 +3,7 @@
 import { Suspense, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider, ConfirmDialogProvider } from '@cdm/ui';
+import { Toaster } from 'sonner';
 import { AppLibraryProvider, UserProvider, type CurrentUser } from '../contexts';
 
 interface ProvidersProps {
@@ -36,6 +37,7 @@ export function Providers({ children, initialUser }: ProvidersProps) {
             </UserProvider>
           </Suspense>
         </ConfirmDialogProvider>
+        <Toaster position="top-right" />
       </ToastProvider>
     </QueryClientProvider>
   );

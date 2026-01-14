@@ -94,6 +94,20 @@ describe('DataAssetRepository', () => {
     expect(mockPrisma.dataAsset.count).toHaveBeenCalledWith({ where: args.where });
   });
 
+  it("findMany: applies linkStatus='unlinked' (nodeLinks.none)", async () => {
+    (mockPrisma.dataAsset.findMany as jest.Mock).mockResolvedValueOnce([{ id: 'asset-1', folder: null }]);
+    (mockPrisma.dataAsset.count as jest.Mock).mockResolvedValueOnce(1);
+
+    await repository.findMany('graph-1', {
+      linkStatus: 'unlinked',
+    } as any);
+
+    const args = (mockPrisma.dataAsset.findMany as jest.Mock).mock.calls[0]?.[0] as any;
+    expect(args.where.graphId).toBe('graph-1');
+    expect(args.where.isDeleted).toBe(false);
+    expect(args.where.nodeLinks).toEqual({ none: {} });
+  });
+
   it('update: calls prisma.dataAsset.update with where.id and data', async () => {
     (mockPrisma.dataAsset.update as jest.Mock).mockResolvedValueOnce({ id: 'asset-1' });
     const data = { description: 'd' } as any;

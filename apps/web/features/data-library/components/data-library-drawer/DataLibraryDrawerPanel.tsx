@@ -3,16 +3,20 @@
 /**
  * Story 9.1: Data Library Drawer Panel
  * Story 9.5: Added graphId prop for upload functionality
+ * Story 9.9: Added AssetFilterBar integration
  */
 
 import { Database, X } from 'lucide-react';
 import { DataLibraryDrawerContent, type DataLibraryDrawerContentProps } from './DataLibraryDrawerContent';
 import { DataLibraryDrawerFooter } from './DataLibraryDrawerFooter';
 import { DataLibraryDrawerToolbar, type DataLibraryDrawerToolbarProps } from './DataLibraryDrawerToolbar';
+import { AssetFilterBar } from '../asset-filter';
+import type { SearchScope } from '../asset-filter/types';
+import type { DataAssetFormat } from '@cdm/types';
 
 export interface DataLibraryDrawerPanelProps
   extends DataLibraryDrawerToolbarProps,
-    DataLibraryDrawerContentProps {
+  DataLibraryDrawerContentProps {
   drawerWidth: number;
   isResizing: boolean;
   onResizeStart: (e: React.MouseEvent) => void;
@@ -20,6 +24,16 @@ export interface DataLibraryDrawerPanelProps
 
   baseAssetCount: number;
   isMovingAsset: boolean;
+
+  // Story 9.9: Asset filter bar props
+  onAssetSearchQueryChange: (query: string) => void;
+  onSearchScopeChange: (scope: SearchScope) => void;
+  onFormatFilterChange: (format: DataAssetFormat | '') => void;
+  onDateRangeChange: (after: string, before: string) => void;
+  activeFilterCount: number;
+  onClearFilters: () => void;
+  isFolderView: boolean;
+  disableCurrentNodeScope?: boolean;
 }
 
 export function DataLibraryDrawerPanel({
@@ -30,7 +44,32 @@ export function DataLibraryDrawerPanel({
   baseAssetCount,
   isMovingAsset,
   visibleAssets,
-  ...rest
+  // Story 9.9: Filter bar props
+  assetSearchQuery,
+  onAssetSearchQueryChange,
+  searchScope,
+  onSearchScopeChange,
+  formatFilter,
+  onFormatFilterChange,
+  createdAfter,
+  createdBefore,
+  onDateRangeChange,
+  activeFilterCount,
+  onClearFilters,
+  isFolderView,
+  disableCurrentNodeScope = false,
+  // Toolbar props
+  viewMode,
+  onViewModeChange,
+  showOrgPanel,
+  onToggleOrgPanel,
+  graphId,
+  uploadConfig,
+  onUploadSuccess,
+  selectedCount,
+  onBatchDelete,
+  onOpenTrash,
+  ...contentProps
 }: DataLibraryDrawerPanelProps) {
   return (
     <div
@@ -52,6 +91,7 @@ export function DataLibraryDrawerPanel({
         </div>
       </div>
 
+      {/* Header */}
       <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-3">
           <Database className="w-6 h-6 text-blue-500" />
@@ -66,8 +106,52 @@ export function DataLibraryDrawerPanel({
         </button>
       </div>
 
-      <DataLibraryDrawerToolbar {...rest} />
-      <DataLibraryDrawerContent {...rest} visibleAssets={visibleAssets} />
+      {/* Story 9.9: Simplified Toolbar (AC1) */}
+      <DataLibraryDrawerToolbar
+        viewMode={viewMode}
+        onViewModeChange={onViewModeChange}
+        showOrgPanel={showOrgPanel}
+        onToggleOrgPanel={onToggleOrgPanel}
+        graphId={graphId}
+        uploadConfig={uploadConfig}
+        onUploadSuccess={onUploadSuccess}
+        selectedCount={selectedCount}
+        onBatchDelete={onBatchDelete}
+        onOpenTrash={onOpenTrash}
+      />
+
+      {/* Story 9.9: Asset Filter Bar (AC2) */}
+      <AssetFilterBar
+        searchQuery={assetSearchQuery}
+        onSearchQueryChange={onAssetSearchQueryChange}
+        searchScope={searchScope}
+        onSearchScopeChange={onSearchScopeChange}
+        formatFilter={formatFilter}
+        onFormatFilterChange={onFormatFilterChange}
+        createdAfter={createdAfter}
+        createdBefore={createdBefore}
+        onDateRangeChange={onDateRangeChange}
+        activeFilterCount={activeFilterCount}
+        onClearFilters={onClearFilters}
+        disableCurrentNodeScope={disableCurrentNodeScope}
+        isFolderView={isFolderView}
+      />
+
+      {/* Content */}
+      <DataLibraryDrawerContent
+        {...contentProps}
+        showOrgPanel={showOrgPanel}
+        graphId={graphId}
+        visibleAssets={visibleAssets}
+        assetSearchQuery={assetSearchQuery}
+        searchScope={searchScope}
+        formatFilter={formatFilter}
+        createdAfter={createdAfter}
+        createdBefore={createdBefore}
+        viewMode={viewMode}
+      />
+
+      {/* Footer */}
       <DataLibraryDrawerFooter
         visibleAssetCount={visibleAssets.length}
         baseAssetCount={baseAssetCount}
@@ -76,4 +160,3 @@ export function DataLibraryDrawerPanel({
     </div>
   );
 }
-

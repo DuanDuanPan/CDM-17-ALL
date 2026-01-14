@@ -11,10 +11,11 @@ import { ConfirmDialogProvider } from '@cdm/ui';
 import { DataLibraryDrawer } from '../components/DataLibraryDrawer';
 
 vi.mock('sonner', () => ({
-  toast: {
+  toast: Object.assign(vi.fn(), {
     success: vi.fn(),
     error: vi.fn(),
-  },
+    info: vi.fn(),
+  }),
 }));
 
 vi.mock('../hooks/useDataAssets', () => ({

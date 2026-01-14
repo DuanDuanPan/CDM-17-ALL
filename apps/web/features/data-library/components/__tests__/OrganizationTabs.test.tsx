@@ -59,7 +59,7 @@ describe('OrganizationTabs', () => {
   it('displays correct labels in Chinese', () => {
     render(<OrganizationTabs {...defaultProps} />);
 
-    expect(screen.getByText('节点（PBS+任务）')).toBeTruthy();
+    expect(screen.getByText('结构')).toBeTruthy();
     expect(screen.getByText('文件夹')).toBeTruthy();
   });
 });

@@ -21,6 +21,8 @@ export function useAssetDelete(graphId: string) {
 
   const invalidate = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['data-assets'] });
+    // Invalidate node-asset-links to refresh structure view after soft delete/restore/hard delete
+    queryClient.invalidateQueries({ queryKey: ['node-asset-links'] });
     if (graphId) {
       queryClient.invalidateQueries({ queryKey: ['data-folders', graphId] });
     }

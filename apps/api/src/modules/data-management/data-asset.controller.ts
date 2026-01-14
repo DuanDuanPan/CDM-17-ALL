@@ -42,11 +42,11 @@ import {
   CreateDataFolderDto,
   CreateNodeDataLinkDto,
   UpdateDataFolderDto,
-	  LinksByNodesDto,
-	  DestroyLinksByNodesDto,
-	  UploadAssetDto,
-	  SoftDeleteBatchDto,
-	} from './dto';
+  LinksByNodesDto,
+  DestroyLinksByNodesDto,
+  UploadAssetDto,
+  SoftDeleteBatchDto,
+} from './dto';
 import type {
   DataAssetQueryDto,
   DataAssetListResponse,
@@ -81,6 +81,7 @@ export class DataAssetController {
   /**
    * GET /data-assets - List data assets with filtering and pagination
    * AC#3: Supports name/type/date filtering
+   * Story 9.9: Added linkStatus for filtering unlinked assets
    */
   @Get('data-assets')
   async list(
@@ -91,6 +92,7 @@ export class DataAssetController {
     @Query('tags') tags?: string,
     @Query('createdAfter') createdAfter?: string,
     @Query('createdBefore') createdBefore?: string,
+    @Query('linkStatus') linkStatus?: 'unlinked',
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('sortBy') sortBy?: 'name' | 'format' | 'createdAt' | 'updatedAt',
@@ -104,6 +106,7 @@ export class DataAssetController {
       tags: tags ? tags.split(',') : undefined,
       createdAfter,
       createdBefore,
+      linkStatus,
       page: page ? parseInt(page, 10) : undefined,
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
       sortBy,
@@ -384,10 +387,10 @@ export class DataAssetController {
    */
   @Post('data-assets/links\\:destroyByNodes')
   @HttpCode(HttpStatus.OK)
-	  async destroyLinksByNodes(
-	    @Body() dto: DestroyLinksByNodesDto
-	  ): Promise<{ success: boolean; unlinked: Array<{ nodeId: string; assetId: string; linkType: string }> }> {
-	    const unlinked = await this.service.unlinkNodesByAssets(dto.nodeIds, dto.assetIds);
-	    return { success: true, unlinked };
-	  }
+  async destroyLinksByNodes(
+    @Body() dto: DestroyLinksByNodesDto
+  ): Promise<{ success: boolean; unlinked: Array<{ nodeId: string; assetId: string; linkType: string }> }> {
+    const unlinked = await this.service.unlinkNodesByAssets(dto.nodeIds, dto.assetIds);
+    return { success: true, unlinked };
+  }
 }

@@ -2,25 +2,20 @@
 
 /**
  * Story 9.1: Data Library Drawer Component
- * AC#1: Drawer opens from right, 60-70% viewport width, supports drag resize
- * AC#2: Closes on backdrop click, close button, or ESC
- * AC#3: Supports grid/list view toggle and search/filter
- *
  * Story 9.2: Multi-Dimensional Organization Views
- * AC#1-3: PBS, Task, and Folder organization views
- * AC#4: Drag-drop assets to folders
- * AC#5: State persistence
- *
- * Story 9.4: Contour viewer integration
- *
- * Story 9.5: Upload button integration, Link-to-node dialog
+ * Story 9.9: Toolbar Redesign with separated AssetFilterBar
+ * 
+ * AC1: Toolbar精简 - 只保留操作类控件
+ * AC2: Asset Filter Bar - 独立的资产筛选栏
+ * AC3: Scope Selector - 搜索范围选择器
+ * AC4: Filter State Behavior - 筛选状态行为
+ * AC5: Node Search Enhancement - 节点搜索增强
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import { useOrganizationView } from './OrganizationTabs';
-import type { SearchMode } from './node-tree';
 import { DataLibraryDrawerView } from './data-library-drawer/DataLibraryDrawerView';
 import { filterAssets } from './data-library-drawer/filterAssets';
 import { getDataLibraryEmptyStateMessage } from './data-library-drawer/emptyState';
@@ -35,6 +30,7 @@ import { useAssetDelete } from '../hooks/useAssetDelete';
 import { useAssetSelection } from '../hooks/useAssetSelection';
 import { useNodeTreeProjection } from '../hooks/useNodeTreeProjection';
 import { useNodeAssetUnlink } from '../hooks/useNodeAssetUnlink';
+import { useAssetFilterState } from '../hooks/useAssetFilterState';
 import type { DataAssetFormat, DataAssetWithFolder } from '@cdm/types';
 import type { ViewMode } from './data-library-drawer/types';
 import { TrashDrawer } from './TrashDrawer';
@@ -59,10 +55,7 @@ interface DataLibraryDrawerProps {
 
 /**
  * Data Library Drawer Component
- * AC#1: Maximized drawer (60-70% width) with drag-to-resize
- * AC#2: Multiple close mechanisms
- * AC#3: View toggle and search/filter
- * Story 9.2: Multi-dimensional organization views
+ * Story 9.9: Redesigned with separated toolbar and filter bar
  */
 export function DataLibraryDrawer({
   isOpen,
@@ -71,17 +64,21 @@ export function DataLibraryDrawer({
 }: DataLibraryDrawerProps) {
   const [mounted, setMounted] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState<SearchMode>('node');
-  const [formatFilter, setFormatFilter] = useState<DataAssetFormat | ''>('');
-  const [createdAfter, setCreatedAfter] = useState('');
-  const [createdBefore, setCreatedBefore] = useState('');
+
+  // Story 9.9: Use new asset filter state hook (AC4)
+  const assetFilter = useAssetFilterState();
+
+  // Story 9.9: Legacy search state for node search (AC5 - kept separate)
+  const [nodeSearchQuery, setNodeSearchQuery] = useState('');
+
   const { drawerWidth, isResizing, handleResizeStart } = useDrawerResize();
 
   // Story 9.2: Organization view state with persistence
   const [orgView, setOrgView] = useOrganizationView(graphId);
   const [showOrgPanel, setShowOrgPanel] = useState(true);
+
+  // Track previous orgView for AC4 (filter reset on view change)
+  const prevOrgViewRef = useRef(orgView);
 
   const {
     selectedPbsId,
@@ -153,15 +150,29 @@ export function DataLibraryDrawer({
   // Story 9.2: Folder operations hook
   const { moveAsset, isMovingAsset } = useDataFolders({ graphId, enabled: isOpen });
 
-  // Debounce search to avoid request storms when typing
+  // Story 9.9: AC4 - Reset filters when org view changes (node <-> folder)
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+    if (prevOrgViewRef.current !== orgView) {
+      assetFilter.resetOnViewChange();
+      toast.info('筛选已重置');
+      prevOrgViewRef.current = orgView;
+    }
+  }, [orgView, assetFilter]);
 
-  const effectiveSearchMode: SearchMode = orgView === 'folder' ? 'asset' : searchMode;
+  // Story 9.9: Determine data source based on searchScope (AC3)
+  const isFolderView = orgView === 'folder';
+  const isNodeView = orgView === 'node';
+  const searchScope = assetFilter.filterState.searchScope;
+  const assetSearchQuery = assetFilter.filterState.assetSearchQuery;
+
+  const disableCurrentNodeScope = isNodeView && !activeNodeId && selectedNodeIds.size === 0;
+
+  // Should fetch global assets when:
+  // - In folder view
+  // - In node view with scope = 'all' or 'unlinked'
   const shouldFetchGlobalAssets =
-    orgView === 'folder' || (orgView === 'node' && effectiveSearchMode === 'asset');
+    isFolderView ||
+    (isNodeView && (searchScope === 'all' || searchScope === 'unlinked'));
 
   // Data fetching hook
   const {
@@ -171,21 +182,22 @@ export function DataLibraryDrawer({
     refetch,
   } = useDataAssets({
     graphId,
-    search: shouldFetchGlobalAssets ? debouncedSearchQuery : undefined,
-    format: shouldFetchGlobalAssets ? (formatFilter || undefined) : undefined,
-    folderId: orgView === 'folder' && selectedFolderId ? selectedFolderId : undefined,
-    createdAfter: shouldFetchGlobalAssets ? (createdAfter || undefined) : undefined,
-    createdBefore: shouldFetchGlobalAssets ? (createdBefore || undefined) : undefined,
+    search: shouldFetchGlobalAssets ? assetSearchQuery : undefined,
+    format: shouldFetchGlobalAssets ? (assetFilter.filterState.formatFilter as DataAssetFormat || undefined) : undefined,
+    folderId: isFolderView && selectedFolderId ? selectedFolderId : undefined,
+    createdAfter: shouldFetchGlobalAssets ? (assetFilter.filterState.createdAfter || undefined) : undefined,
+    createdBefore: shouldFetchGlobalAssets ? (assetFilter.filterState.createdBefore || undefined) : undefined,
+    linkStatus: isNodeView && searchScope === 'unlinked' ? 'unlinked' : undefined,
     enabled: isOpen && shouldFetchGlobalAssets,
   });
 
   const baseAssets = shouldFetchGlobalAssets ? assets : [];
 
   const visibleAssets = filterAssets(baseAssets, {
-    search: shouldFetchGlobalAssets ? debouncedSearchQuery : '',
-    format: shouldFetchGlobalAssets ? formatFilter : '',
-    createdAfter: shouldFetchGlobalAssets ? createdAfter : '',
-    createdBefore: shouldFetchGlobalAssets ? createdBefore : '',
+    search: shouldFetchGlobalAssets ? assetSearchQuery : '',
+    format: shouldFetchGlobalAssets ? assetFilter.filterState.formatFilter : '',
+    createdAfter: shouldFetchGlobalAssets ? assetFilter.filterState.createdAfter : '',
+    createdBefore: shouldFetchGlobalAssets ? assetFilter.filterState.createdBefore : '',
   });
 
   // Story 9.2: Handle asset drop to folder
@@ -273,6 +285,7 @@ export function DataLibraryDrawer({
     [activeNodeId, assetDelete, nodeAssetUnlink, orgView, selectedNodeIds, selection.remove]
   );
 
+  // Story 9.9: AC6 - Batch delete uses unlink in node view
   const handleBatchDelete = useCallback(() => {
     if (selection.selectedIdList.length === 0) return;
 
@@ -299,12 +312,29 @@ export function DataLibraryDrawer({
     });
   }, [activeNodeId, assetDelete, nodeAssetUnlink, orgView, selectedNodeIds, selection.selectedIdList, selection.clearSelection]);
 
+  // Story 9.9: Handle date range change
+  const handleDateRangeChange = useCallback((after: string, before: string) => {
+    assetFilter.setDateRange(after, before);
+  }, [assetFilter]);
+
   if (!isOpen || !mounted) return null;
 
+  const hasAssetFilters =
+    !!assetSearchQuery ||
+    !!assetFilter.filterState.formatFilter ||
+    !!assetFilter.filterState.createdAfter ||
+    !!assetFilter.filterState.createdBefore;
+
   const emptyStateMessage =
-    ((searchQuery && shouldFetchGlobalAssets) || formatFilter || createdAfter || createdBefore)
+    hasAssetFilters && shouldFetchGlobalAssets
       ? '无匹配资产'
-      : getDataLibraryEmptyStateMessage({ orgView, activeNodeId, selectedPbsId, selectedTaskId, selectedFolderId });
+      : isFolderView
+        ? getDataLibraryEmptyStateMessage({ orgView, activeNodeId, selectedPbsId, selectedTaskId, selectedFolderId })
+        : isNodeView && searchScope === 'unlinked'
+          ? '暂无未关联资产'
+          : isNodeView && searchScope === 'all'
+            ? '暂无数据资产'
+            : getDataLibraryEmptyStateMessage({ orgView, activeNodeId, selectedPbsId, selectedTaskId, selectedFolderId });
 
   return (
     <>
@@ -313,23 +343,39 @@ export function DataLibraryDrawer({
         isResizing={isResizing}
         onResizeStart={handleResizeStart}
         onClose={onClose}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        formatFilter={formatFilter}
-        onFormatFilterChange={setFormatFilter}
-        createdAfter={createdAfter}
-        onCreatedAfterChange={setCreatedAfter}
-        createdBefore={createdBefore}
-        onCreatedBeforeChange={setCreatedBefore}
+
+        // Story 9.9: Asset filter bar props (AC2)
+        assetSearchQuery={assetFilter.filterState.assetSearchQuery}
+        onAssetSearchQueryChange={assetFilter.setAssetSearchQuery}
+        searchScope={assetFilter.filterState.searchScope}
+        onSearchScopeChange={assetFilter.setSearchScope}
+        formatFilter={assetFilter.filterState.formatFilter as DataAssetFormat | ''}
+        onFormatFilterChange={assetFilter.setFormatFilter}
+        createdAfter={assetFilter.filterState.createdAfter}
+        createdBefore={assetFilter.filterState.createdBefore}
+        onDateRangeChange={handleDateRangeChange}
+        activeFilterCount={assetFilter.activeFilterCount}
+        onClearFilters={assetFilter.clearAllFilters}
+        isFolderView={isFolderView}
+        disableCurrentNodeScope={disableCurrentNodeScope}
+
+        // Toolbar props (AC1 - simplified)
         viewMode={viewMode}
         onViewModeChange={setViewMode}
-        searchMode={searchMode}
-        onSearchModeChange={setSearchMode}
         showOrgPanel={showOrgPanel}
         onToggleOrgPanel={() => setShowOrgPanel((prev) => !prev)}
+
+        // Content props
         orgView={orgView}
         onOrgViewChange={setOrgView}
         graphId={graphId}
+
+        // Story 9.9: Node search stays separate (AC5)
+        searchQuery={nodeSearchQuery}
+        onSearchQueryChange={setNodeSearchQuery}
+        searchMode="node" // Always node mode now
+        onSearchModeChange={() => { }} // No-op, mode is fixed
+
         // Story 9.8: New node view props
         activeNodeId={activeNodeId}
         onActiveNodeChange={handleActiveNodeChange}
@@ -337,6 +383,7 @@ export function DataLibraryDrawer({
         onSelectedNodeIdsChange={handleSelectedNodeIdsChange}
         nodeExpandedIds={nodeExpandedIds}
         onToggleNodeExpand={toggleNodeExpand}
+
         // Legacy props for backward compatibility
         selectedPbsId={selectedPbsId}
         onSelectPbs={setSelectedPbsId}

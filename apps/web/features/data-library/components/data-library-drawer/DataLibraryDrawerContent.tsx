@@ -4,25 +4,30 @@
  * Story 9.1: Data Library Drawer Content
  * Story 9.7: Added GroupedAssetList for linkType grouping
  * Story 9.8: Added NodeTreeView for merged PBS+Task view
+ * Story 9.9: Simplified - removed DualSearch asset mode (AC5)
+ *   - Left panel now only shows node search
+ *   - Asset search moved to AssetFilterBar
  */
 
-import { useCallback, useState } from 'react';
-import { FolderOpen, Loader2 } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
+import { FolderOpen, Loader2, Search, X } from 'lucide-react';
 import { AssetGrid } from '../AssetGrid';
 import { AssetList } from '../AssetList';
 import { AssetCard } from '../AssetCard';
 import { FolderTreeView } from '../FolderTreeView';
 import { GroupedAssetList } from '../GroupedAssetList';
 import { OrganizationTabs, type OrganizationView } from '../OrganizationTabs';
-import { AssetProvenance, DualSearch, NodeBreadcrumb, NodeTreeView, type SearchMode } from '../node-tree';
+import { AssetProvenance, NodeBreadcrumb, NodeTreeView, type SearchMode } from '../node-tree';
 import { DataLibraryDndProvider } from '../dnd';
 import { useAssetLinks } from '../../hooks/useAssetLinks';
 import { useNodeTreeProjection } from '../../hooks/useNodeTreeProjection';
 import { useSelectedNodesAssets } from '../../hooks/useSelectedNodesAssets';
-import { NodeType, type DataAssetWithFolder, type TaskStatus } from '@cdm/types';
+import { filterAssets } from './filterAssets';
+import { NodeType, type DataAssetFormat, type DataAssetWithFolder, type TaskStatus } from '@cdm/types';
 import type { ViewMode } from './types';
-import { Badge, cn } from '@cdm/ui';
+import { Badge, cn, Input } from '@cdm/ui';
 import { ChevronDown, ChevronRight, Download, Eye, EyeOff, Paperclip, Upload } from 'lucide-react';
+import type { SearchScope } from '../asset-filter/types';
 
 export interface DataLibraryDrawerContentProps {
   showOrgPanel: boolean;
@@ -31,9 +36,11 @@ export interface DataLibraryDrawerContentProps {
   onOrgViewChange: (next: OrganizationView) => void;
 
   graphId: string;
+
+  // Story 9.9: Node search only (AC5)
   searchQuery: string;
   onSearchQueryChange: (next: string) => void;
-  searchMode: SearchMode;
+  searchMode: SearchMode; // Kept for compatibility, but always 'node' now
   onSearchModeChange: (mode: SearchMode) => void;
 
   // Story 9.8: Merged node view state
@@ -70,6 +77,13 @@ export interface DataLibraryDrawerContentProps {
   visibleAssets: DataAssetWithFolder[];
   emptyStateMessage: string;
 
+  // Story 9.9: Asset filter state (AC2/AC3)
+  assetSearchQuery: string;
+  searchScope: SearchScope;
+  formatFilter: DataAssetFormat | '';
+  createdAfter: string;
+  createdBefore: string;
+
   viewMode: ViewMode;
   draggableAssets: boolean;
 
@@ -87,6 +101,10 @@ export interface DataLibraryDrawerContentProps {
 
 interface SelectedNodesGroupedAssetListProps {
   groupedAssets: ReturnType<typeof useSelectedNodesAssets>['groupedAssets'];
+  assetSearchQuery: string;
+  formatFilter: DataAssetFormat | '';
+  createdAfter: string;
+  createdBefore: string;
   onAssetPreview?: (asset: DataAssetWithFolder) => void;
   onAssetLink?: (asset: DataAssetWithFolder) => void;
   onAssetDelete?: (asset: DataAssetWithFolder) => void;
@@ -126,6 +144,10 @@ const LINK_TYPE_CONFIGS: LinkTypeConfig[] = [
 
 function SelectedNodesGroupedAssetList({
   groupedAssets,
+  assetSearchQuery,
+  formatFilter,
+  createdAfter,
+  createdBefore,
   onAssetPreview,
   onAssetLink,
   onAssetDelete,
@@ -136,6 +158,8 @@ function SelectedNodesGroupedAssetList({
 }: SelectedNodesGroupedAssetListProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<LinkTypeConfig['type']>>(new Set());
   const [showEmptyGroups, setShowEmptyGroups] = useState(false);
+  const hasActiveFilters =
+    !!assetSearchQuery || !!formatFilter || !!createdAfter || !!createdBefore;
 
   const toggleGroup = useCallback((type: LinkTypeConfig['type']) => {
     setCollapsedGroups((prev) => {
@@ -145,6 +169,22 @@ function SelectedNodesGroupedAssetList({
       return next;
     });
   }, []);
+
+  const filterGroupedAssets = useCallback(
+    (items: typeof groupedAssets.input) => {
+      if (!hasActiveFilters) return items;
+      const allowed = new Set(
+        filterAssets(items.map((i) => i.asset), {
+          search: assetSearchQuery,
+          format: formatFilter,
+          createdAfter,
+          createdBefore,
+        }).map((a) => a.id)
+      );
+      return items.filter((i) => allowed.has(i.asset.id));
+    },
+    [assetSearchQuery, createdAfter, createdBefore, formatFilter, hasActiveFilters]
+  );
 
   return (
     <div className="flex flex-col gap-2">
@@ -172,7 +212,7 @@ function SelectedNodesGroupedAssetList({
       </div>
 
       {LINK_TYPE_CONFIGS.map((config) => {
-        const assets = groupedAssets[config.type];
+        const assets = filterGroupedAssets(groupedAssets[config.type]);
         const count = assets.length;
         const isCollapsed = collapsedGroups.has(config.type);
         const isEmpty = count === 0;
@@ -252,6 +292,64 @@ function SelectedNodesGroupedAssetList({
   );
 }
 
+/**
+ * Story 9.9: Node Search Component (Simplified from DualSearch)
+ * AC5: Left panel only shows node search with help text
+ */
+function NodeSearch({
+  query,
+  onQueryChange,
+  className,
+}: {
+  query: string;
+  onQueryChange: (query: string) => void;
+  className?: string;
+}) {
+  const [isFocused, setIsFocused] = useState(false);
+
+  const handleClear = useCallback(() => {
+    onQueryChange('');
+  }, [onQueryChange]);
+
+  return (
+    <div className={cn('flex flex-col gap-2', className)} data-testid="node-search">
+      {/* Search input */}
+      <div className="relative">
+        <Search
+          className={cn(
+            'absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors',
+            isFocused ? 'text-blue-500' : 'text-gray-400'
+          )}
+        />
+        <Input
+          type="text"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          placeholder="搜索节点 (PBS/任务)..."
+          className="pl-9 pr-8"
+          data-testid="node-search-input"
+        />
+        {query && (
+          <button
+            onClick={handleClear}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded"
+            aria-label="清空搜索"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* AC5: Help text */}
+      <p className="text-xs text-blue-500 dark:text-blue-400">
+        在 PBS 和任务节点中搜索
+      </p>
+    </div>
+  );
+}
+
 export function DataLibraryDrawerContent({
   showOrgPanel,
   orgView,
@@ -259,8 +357,8 @@ export function DataLibraryDrawerContent({
   graphId,
   searchQuery,
   onSearchQueryChange,
-  searchMode,
-  onSearchModeChange,
+  searchMode: _searchMode,
+  onSearchModeChange: _onSearchModeChange,
   // Story 9.8: Merged node view state
   activeNodeId,
   onActiveNodeChange,
@@ -289,6 +387,11 @@ export function DataLibraryDrawerContent({
   onRetry,
   visibleAssets,
   emptyStateMessage,
+  assetSearchQuery,
+  searchScope,
+  formatFilter,
+  createdAfter,
+  createdBefore,
   viewMode,
   draggableAssets,
   onAssetPreview,
@@ -299,8 +402,11 @@ export function DataLibraryDrawerContent({
   onAssetSelectChange,
 }: DataLibraryDrawerContentProps) {
   const isNodeView = orgView === 'node';
-  const isNodeSearchMode = isNodeView && searchMode === 'node';
-  const hasSelectedNodes = selectedNodeIds.size > 0;
+  const isNodeScope = searchScope === 'current-node';
+  // Story 9.9: searchMode is always 'node' now, asset search is in AssetFilterBar
+  const hasSelectedNodes = isNodeScope && selectedNodeIds.size > 0;
+  const hasActiveFilters =
+    !!assetSearchQuery || !!formatFilter || !!createdAfter || !!createdBefore;
 
   const { getNodeType } = useNodeTreeProjection();
   const handleNodeNavigate = useCallback(
@@ -315,7 +421,7 @@ export function DataLibraryDrawerContent({
 
   // Story 9.8: Determine if we should use grouped view
   // Use grouped view when: Node view with active node selected and no multi-selection
-  const shouldUseGroupedView = isNodeView && isNodeSearchMode && !!activeNodeId && !hasSelectedNodes;
+  const shouldUseGroupedView = isNodeView && isNodeScope && !!activeNodeId && !hasSelectedNodes;
 
   // Story 9.8: Get node ID for grouped view (use activeNodeId for merged view)
   const selectedNodeIdForLinks = shouldUseGroupedView ? activeNodeId : null;
@@ -331,15 +437,66 @@ export function DataLibraryDrawerContent({
     enabled: shouldUseGroupedView && !!selectedNodeIdForLinks,
   });
 
-  const selectedNodesAssets = useSelectedNodesAssets(selectedNodeIds);
+  const selectedNodeIdsForAssets = useMemo(
+    () => (isNodeScope ? selectedNodeIds : new Set<string>()),
+    [isNodeScope, selectedNodeIds]
+  );
+  const selectedNodesAssets = useSelectedNodesAssets(selectedNodeIdsForAssets);
 
   // Determine loading/error states for grouped view
   const groupedViewLoading = shouldUseGroupedView && linksLoading;
   const groupedViewError = shouldUseGroupedView ? linksError : null;
 
+  const filteredLinks = useMemo(() => {
+    if (!shouldUseGroupedView || !hasActiveFilters) return links;
+    const allowed = new Set(
+      filterAssets(links.map((l) => l.asset), {
+        search: assetSearchQuery,
+        format: formatFilter,
+        createdAfter,
+        createdBefore,
+      }).map((a) => a.id)
+    );
+    return links.filter((l) => allowed.has(l.asset.id));
+  }, [assetSearchQuery, createdAfter, createdBefore, formatFilter, hasActiveFilters, links, shouldUseGroupedView]);
+
+  const displayedAssetCount = useMemo(() => {
+    if (!isNodeView) return visibleAssets.length;
+    if (!isNodeScope) return visibleAssets.length;
+
+    if (selectedNodeIds.size > 0) {
+      if (!hasActiveFilters) return selectedNodesAssets.totalCount;
+      return filterAssets(selectedNodesAssets.assets.map((i) => i.asset), {
+        search: assetSearchQuery,
+        format: formatFilter,
+        createdAfter,
+        createdBefore,
+      }).length;
+    }
+
+    if (activeNodeId) return hasActiveFilters ? filteredLinks.length : links.length;
+
+    return 0;
+  }, [
+    activeNodeId,
+    assetSearchQuery,
+    createdAfter,
+    createdBefore,
+    filteredLinks.length,
+    formatFilter,
+    hasActiveFilters,
+    isNodeScope,
+    isNodeView,
+    links.length,
+    selectedNodeIds.size,
+    selectedNodesAssets.assets,
+    selectedNodesAssets.totalCount,
+    visibleAssets.length,
+  ]);
+
   // Render content for the right side panel
   const renderAssetContent = () => {
-    if (isNodeView && isNodeSearchMode && hasSelectedNodes) {
+    if (isNodeView && isNodeScope && hasSelectedNodes) {
       if (selectedNodesAssets.isLoading) {
         return (
           <div className="flex items-center justify-center py-20">
@@ -362,10 +519,19 @@ export function DataLibraryDrawerContent({
         );
       }
 
-      if (selectedNodesAssets.totalCount === 0) {
+      const filteredSelectedCount = hasActiveFilters
+        ? filterAssets(selectedNodesAssets.assets.map((i) => i.asset), {
+          search: assetSearchQuery,
+          format: formatFilter,
+          createdAfter,
+          createdBefore,
+        }).length
+        : selectedNodesAssets.totalCount;
+
+      if (filteredSelectedCount === 0) {
         return (
           <div className="text-center text-sm text-gray-400 py-10">
-            所选节点暂无关联资产
+            {hasActiveFilters ? '无匹配资产' : '所选节点暂无关联资产'}
           </div>
         );
       }
@@ -373,6 +539,10 @@ export function DataLibraryDrawerContent({
       return (
         <SelectedNodesGroupedAssetList
           groupedAssets={selectedNodesAssets.groupedAssets}
+          assetSearchQuery={assetSearchQuery}
+          formatFilter={formatFilter}
+          createdAfter={createdAfter}
+          createdBefore={createdBefore}
           onAssetPreview={onAssetPreview}
           onAssetLink={onAssetLink}
           onAssetDelete={onAssetDelete}
@@ -413,9 +583,16 @@ export function DataLibraryDrawerContent({
 
     // Story 9.8: Use grouped view for Node view with active node selected
     if (shouldUseGroupedView) {
+      if (hasActiveFilters && filteredLinks.length === 0) {
+        return (
+          <div className="text-center text-sm text-gray-400 py-10">
+            无匹配资产
+          </div>
+        );
+      }
       return (
         <GroupedAssetList
-          links={links}
+          links={hasActiveFilters ? filteredLinks : links}
           onAssetPreview={onAssetPreview}
           onAssetLink={onAssetLink}
           onAssetDelete={onAssetDelete}
@@ -426,8 +603,8 @@ export function DataLibraryDrawerContent({
       );
     }
 
-    // Story 9.8: Node view in node-search mode with no active node selected
-    if (isNodeView && isNodeSearchMode && !activeNodeId) {
+    // Story 9.8: Node view with no active node selected
+    if (isNodeView && isNodeScope && !activeNodeId) {
       return (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
           <FolderOpen className="w-16 h-16 mb-4 opacity-20" />
@@ -480,48 +657,13 @@ export function DataLibraryDrawerContent({
           <div className="flex-1 min-h-0 overflow-hidden">
             {orgView === 'node' && (
               <div className="flex flex-col h-full">
-                {/* Secondary Tabs: 节点/资产 */}
-                <div className="flex border-b border-gray-200 dark:border-gray-700">
-                  <button
-                    type="button"
-                    onClick={() => onSearchModeChange('node')}
-                    className={cn(
-                      'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-colors',
-                      searchMode === 'node'
-                        ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50 dark:bg-blue-900/20'
-                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                    )}
-                  >
-                    <span>🔗</span>
-                    <span>节点</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onSearchModeChange('asset')}
-                    className={cn(
-                      'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-colors',
-                      searchMode === 'asset'
-                        ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50 dark:bg-blue-900/20'
-                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
-                    )}
-                  >
-                    <span>📄</span>
-                    <span>资产</span>
-                  </button>
-                </div>
-
-                {/* Search bar */}
+                {/* Story 9.9: Simplified - removed secondary tabs (AC5) */}
+                {/* Node search only - asset search is now in AssetFilterBar */}
                 <div className="p-3 border-b border-gray-100 dark:border-gray-800">
-                  <DualSearch
-                    mode={searchMode}
-                    onModeChange={onSearchModeChange}
+                  <NodeSearch
                     query={searchQuery}
                     onQueryChange={onSearchQueryChange}
                   />
-                  {/* Help text */}
-                  <p className="mt-2 text-xs text-blue-500 dark:text-blue-400">
-                    在 PBS 和任务节点中搜索
-                  </p>
                 </div>
 
                 {/* Selection bar - moved to top per prototype */}
@@ -549,14 +691,14 @@ export function DataLibraryDrawerContent({
                     onSelectedNodeIdsChange={onSelectedNodeIdsChange}
                     expandedIds={nodeExpandedIds}
                     onToggleExpand={onToggleNodeExpand}
-                    searchQuery={isNodeSearchMode ? searchQuery : ''}
+                    searchQuery={searchQuery}
                   />
                 </div>
 
                 {/* Bottom stats bar per prototype */}
                 <div className="border-t border-gray-200 dark:border-gray-700 px-3 py-2">
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    共 {visibleAssets.length} 个数据资产
+                    共 {displayedAssetCount} 个数据资产
                   </span>
                 </div>
               </div>
@@ -575,7 +717,7 @@ export function DataLibraryDrawerContent({
       )}
 
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-        {isNodeView && isNodeSearchMode && activeNodeId && (
+        {isNodeView && isNodeScope && activeNodeId && (
           <div className="mb-4">
             <NodeBreadcrumb activeNodeId={activeNodeId} onNodeClick={handleNodeNavigate} />
           </div>

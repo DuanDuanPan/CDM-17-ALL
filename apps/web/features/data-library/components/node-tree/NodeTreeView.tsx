@@ -13,7 +13,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import { cn } from '@cdm/ui';
 import { useNodeTreeProjection, type ProjectedNode } from '@/features/data-library/hooks/useNodeTreeProjection';
 import { NodeType } from '@cdm/types';
-import { escapeRegex } from './DualSearch';
+import { escapeRegex } from './NodeSearch';
 
 // ========================================
 // Types

@@ -71,6 +71,7 @@ async function readApiError(response: Response): Promise<ParsedApiError> {
 
 /**
  * Fetch data assets with optional filtering
+ * Story 9.9: Added linkStatus for unlinked assets
  */
 export async function fetchDataAssets(
   params: DataAssetQueryDto
@@ -89,6 +90,8 @@ export async function fetchDataAssets(
   }
   if (params.createdAfter) searchParams.set('createdAfter', params.createdAfter);
   if (params.createdBefore) searchParams.set('createdBefore', params.createdBefore);
+  // Story 9.9: linkStatus filter
+  if (params.linkStatus) searchParams.set('linkStatus', params.linkStatus);
   if (params.page) searchParams.set('page', String(params.page));
   if (params.pageSize) searchParams.set('pageSize', String(params.pageSize));
   if (params.sortBy) searchParams.set('sortBy', params.sortBy);

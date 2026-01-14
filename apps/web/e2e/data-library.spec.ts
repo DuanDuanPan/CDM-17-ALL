@@ -96,11 +96,12 @@ test.describe('Data Library Drawer (Story 9.1)', () => {
     const initialBox = await drawer.boundingBox();
     await resizeHandle.hover();
     await page.mouse.down();
+    // Wait for resizing state to apply (listeners attach after React state update)
+    await expect(drawer).toHaveClass(/select-none/);
     await page.mouse.move(initialBox!.x - 100, initialBox!.y + 100);
     await page.mouse.up();
 
-    const newBox = await drawer.boundingBox();
-    expect(newBox?.width).toBeGreaterThan(initialBox!.width);
+    await expect.poll(async () => (await drawer.boundingBox())?.width).toBeGreaterThan(initialBox!.width);
   });
 
   // === AC2: Drawer 关闭 ===
@@ -127,6 +128,9 @@ test.describe('Data Library Drawer (Story 9.1)', () => {
 
   test('AC3.1: toggles between grid and list view', async ({ page }) => {
     await openDataLibraryDrawer(page);
+
+    // Story 9.2+: Default is Node view with empty state; switch to Folder view to validate list/grid.
+    await page.getByTestId('org-tab-folder').click();
     await expect(page.locator('[data-testid="asset-grid"]')).toBeVisible();
 
     await page.getByTitle('列表视图').click();
@@ -138,12 +142,15 @@ test.describe('Data Library Drawer (Story 9.1)', () => {
 
   test('AC3.2: filters by name search (debounced)', async ({ page }) => {
     await openDataLibraryDrawer(page);
+
+    await page.getByTestId('org-tab-folder').click();
+    await expect(page.getByTestId('asset-filter-bar')).toBeVisible();
     await expect(page.locator('[data-testid="asset-grid"]')).toBeVisible();
 
     await expect(page.locator('text=卫星总体结构')).toBeVisible();
     await expect(page.locator('text=推进系统管路图')).toBeVisible();
 
-    await page.getByTestId('data-library-drawer').getByPlaceholder('搜索').fill('卫星');
+    await page.getByTestId('asset-search-input').fill('卫星');
 
     await expect(page.locator('text=卫星总体结构')).toBeVisible();
     await expect(page.locator('text=推进系统管路图')).toHaveCount(0);
@@ -151,12 +158,15 @@ test.describe('Data Library Drawer (Story 9.1)', () => {
 
   test('AC3.3: filters by format type', async ({ page }) => {
     await openDataLibraryDrawer(page);
+
+    await page.getByTestId('org-tab-folder').click();
+    await expect(page.getByTestId('asset-filter-bar')).toBeVisible();
     await expect(page.locator('[data-testid="asset-grid"]')).toBeVisible();
 
     await expect(page.locator('text=卫星总体结构')).toBeVisible();
     await expect(page.locator('text=推进系统管路图')).toBeVisible();
 
-    await page.getByRole('combobox', { name: '类型' }).selectOption('STEP');
+    await page.getByTestId('type-filter-select').selectOption('STEP');
 
     await expect(page.locator('text=卫星总体结构')).toBeVisible();
     await expect(page.locator('text=推进系统管路图')).toHaveCount(0);

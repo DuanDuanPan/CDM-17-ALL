@@ -34,9 +34,9 @@ const TABS: Array<{
 }> = [
     {
       id: 'node',
-      label: '节点（PBS+任务）',
+      label: '结构',
       icon: GitBranch,
-      description: '按图谱结构组织',
+      description: '结构（PBS+任务）- 按图谱结构组织',
     },
     {
       id: 'folder',

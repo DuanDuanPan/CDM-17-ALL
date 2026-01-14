@@ -12,10 +12,11 @@ import { ConfirmDialogProvider } from '@cdm/ui';
 import { DataLibraryDrawer } from '../components/DataLibraryDrawer';
 
 vi.mock('sonner', () => ({
-  toast: {
+  toast: Object.assign(vi.fn(), {
     success: vi.fn(),
     error: vi.fn(),
-  },
+    info: vi.fn(),
+  }),
 }));
 
 // Mock the useDataAssets hook
@@ -153,13 +154,13 @@ describe('DataLibraryDrawer', () => {
     });
   });
 
-  describe('AC3: View toggle and search', () => {
-    it('should render search input', () => {
+  describe('Story 9.9: Toolbar + AssetFilterBar', () => {
+    it('should render asset search input', () => {
       render(createElement(DataLibraryDrawer, defaultProps), {
         wrapper: createWrapper(),
       });
 
-      expect(screen.getByPlaceholderText('搜索')).toBeDefined();
+      expect(screen.getByTestId('asset-search-input')).toBeDefined();
     });
 
     it('should render date range filters', () => {
@@ -185,17 +186,17 @@ describe('DataLibraryDrawer', () => {
         wrapper: createWrapper(),
       });
 
-      expect(screen.getByLabelText('类型')).toBeDefined();
+      expect(screen.getByLabelText('类型筛选')).toBeDefined();
     });
 
-    it('should update search value on input', async () => {
+    it('should update asset search value on input', async () => {
       const user = userEvent.setup();
 
       render(createElement(DataLibraryDrawer, defaultProps), {
         wrapper: createWrapper(),
       });
 
-      const searchInput = screen.getByPlaceholderText('搜索');
+      const searchInput = screen.getByTestId('asset-search-input');
       await user.type(searchInput, 'satellite');
 
       expect(searchInput).toHaveProperty('value', 'satellite');
@@ -253,7 +254,7 @@ describe('DataLibraryDrawer', () => {
         wrapper: createWrapper(),
       });
 
-      expect(screen.getByText(/共 0 个数据资产/)).toBeDefined();
+      expect(screen.getAllByText(/共 0 个数据资产/).length).toBeGreaterThan(0);
     });
   });
 });

@@ -55,6 +55,7 @@ export class DataAssetRepository {
 
   /**
    * Find many data assets with filtering, pagination, and sorting
+   * Story 9.9: Added linkStatus filter for unlinked assets
    */
   async findMany(
     graphId: string,
@@ -67,6 +68,7 @@ export class DataAssetRepository {
       tags,
       createdAfter,
       createdBefore,
+      linkStatus,
       page = 1,
       pageSize = 50,
       sortBy = 'createdAt',
@@ -113,6 +115,13 @@ export class DataAssetRepository {
       if (createdBefore) {
         where.createdAt.lte = parseDateBoundary(createdBefore, 'end');
       }
+    }
+
+    // Story 9.9: Filter by link status (unlinked = no NodeDataLink records)
+    if (linkStatus === 'unlinked') {
+      where.nodeLinks = {
+        none: {},
+      };
     }
 
     // Build orderBy clause
