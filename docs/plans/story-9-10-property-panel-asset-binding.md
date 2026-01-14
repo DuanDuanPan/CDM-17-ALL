@@ -102,29 +102,31 @@
 interface BindingState {
   isBindingMode: boolean;       // 是否处于绑定模式
   targetNodeId: string | null;  // 目标节点 ID
-  targetNodeLabel: string | null; // 目标节点名称
-  selectedAssetIds: Set<string>; // 购物车中的资产 ID
+  selectedAssetIds: Set<string>; // 已选资产 ID（跨视图保持）
+  selectedAssetsById: Map<string, { id: string; name: string; format: DataAssetFormat }>; // 用于托盘明细展示
 }
 
 interface BindingActions {
-  openForBinding: (nodeId: string, nodeLabel: string) => void;
-  confirmBinding: () => Promise<void>;
-  // ... 其他操作
+  openForBinding: (params: { nodeId: string; nodeLabel?: string }) => void;
+  confirmBinding: (params?: { linkType?: DataLinkType }) => Promise<{ created: number; skipped: number }>;
+  clearSelection: () => void;
+  exitBindingMode: () => void;
+  // ... 其他操作（toggleAssetSelection/removeAsset 等）
 }
 ```
 
 ### 5.2 组件集成点
 
-1.  **Layout 集成**：在 `app/(graph)/layout.tsx` 中包裹 `DataLibraryBindingProvider`。
+1.  **Layout 集成**：在 `apps/web/app/graph/[graphId]/page.tsx` 的 `<GraphProvider>` 内包裹 `DataLibraryBindingProvider`（确保 `TopBar` / `RightSidebar` 可访问）。
 2.  **触发入口**：修改 `TaskForm` / `DataForm` / `PBSForm`，点击添加时调用 `openForBinding()`。
-3.  **抽屉响应**：`DataLibraryDrawer` 监听 Context，`isBindingMode` 为 true 时自动打开。
+3.  **抽屉响应**：`TopBar` 监听 `isBindingMode`，并控制 `DataLibraryDrawer` 的 `isOpen`（绑定模式自动打开；确认后关闭）。
 4.  **UI 注入**：
-    - `DataLibraryDrawerPanel` 根据状态条件渲染 `BindingTargetBanner`。
-    - 注入浮动组件 `SelectedAssetsTray`。
+     - `DataLibraryDrawerPanel` 根据状态条件渲染 `BindingTargetBanner`。
+     - 注入浮动组件 `SelectedAssetsTray`。
 5.  **选中持久化**：改造 `useAssetSelection` 或在 Context 中实现选择逻辑，确保切换文件夹时不丢失选中项。
 
 ### 5.3 数据流同步
-- **绑定成功后**：调用 `queryClient.invalidateQueries(['assetLinks', nodeId])`，确保属性面板（LinkedAssetsSection）能感知到数据变化并自动刷新。
+- **绑定成功后**：调用 `queryClient.invalidateQueries({ queryKey: ['node-asset-links', nodeId] })`，确保属性面板（LinkedAssetsSection）自动刷新。
 
 ---
 
@@ -158,9 +160,9 @@ interface BindingActions {
 2.  **跨视图保持**：切换文件夹视图、节点视图或修改筛选条件时，**保留**已选中的资产状态，不自动清空。
 3.  **绑定触发**：操作入口统一为托盘底部的**固定按钮 "确认绑定 (N)"**。
 4.  **默认视图**：进入绑定模式时默认切换到**文件夹视图**，允许用户手动切换回结构视图查找资产。
-5.  **目标节点视觉**：在左侧节点树中，目标节点显示**蓝色高亮边框**及专用图标（🎯）以示区分。
+5.  **目标节点视觉**：非本 Story 必做项（后续可在节点树/画布上高亮目标节点并显示 🎯 提示）。
 6.  **目标删除处理**：若目标节点被删除，系统自动**退出绑定模式**并显示 Toast 错误提示。
-7.  **重复绑定**：**允许**重复绑定（不限制），即使资产已关联到该节点，仍可再次选中提交（后端处理幂等性或忽略）。
-8.  **绑定数量**：**无上限**，支持一次性绑定大量资产。
+7.  **重复绑定**：按 **幂等** 处理：已存在的关联会被后端 `createMany({ skipDuplicates: true })` 跳过，并在响应中计入 `skipped`。
+8.  **绑定数量**：单次最多 **500** 个（后端 DTO 限制），超过需前端分批或提示用户。
 9.  **自动刷新**：绑定成功后，属性面板（LinkedAssetsSection）**自动刷新**显示新关联资产（支持多浏览器/多标签页同步）。
 10. **节点支持**：**全面支持** Task 节点和 PBS 节点。

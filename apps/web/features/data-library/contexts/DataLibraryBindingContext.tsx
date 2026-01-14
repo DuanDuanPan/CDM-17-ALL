@@ -96,6 +96,8 @@ export function DataLibraryBindingProvider({ children }: DataLibraryBindingProvi
   const exitBindingMode = useCallback(() => {
     setIsBindingMode(false);
     setTargetNodeId(null);
+    setSelectedAssetIds(new Set());
+    setSelectedAssetsById(new Map());
   }, []);
 
   // Story 9.10: Listen for target node deletion (AC5)

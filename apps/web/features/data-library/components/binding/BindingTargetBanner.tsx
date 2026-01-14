@@ -36,6 +36,7 @@ export function BindingTargetBanner() {
 
   return (
     <div
+      role="banner"
       data-testid="binding-target-banner"
       className="w-full h-14 px-6 flex items-center justify-between bg-gradient-to-r from-blue-500 to-violet-600 text-white shadow-md"
     >

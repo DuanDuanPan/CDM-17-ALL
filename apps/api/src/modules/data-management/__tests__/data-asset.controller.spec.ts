@@ -23,6 +23,7 @@ describe('DataAssetController', () => {
     getNodeAssets: jest.fn(),
     getNodeAssetLinks: jest.fn(),
     linkNodeToAsset: jest.fn(),
+    linkNodeToAssetsBatch: jest.fn(),
     unlinkNodeFromAsset: jest.fn(),
     getNodeAssetsByNodes: jest.fn(),
     getFolderTree: jest.fn(),
@@ -189,5 +190,23 @@ describe('DataAssetController', () => {
 
     expect(service.emptyTrash).toHaveBeenCalledWith('graph-1');
     expect(res).toEqual({ success: true, deletedCount: 3 });
+  });
+
+  // Story 9.10: Test for batch link creation endpoint (H4)
+  it('createLinksBatch: calls service.linkNodeToAssetsBatch and returns created/skipped', async () => {
+    service.linkNodeToAssetsBatch = jest.fn().mockResolvedValueOnce({ created: 2, skipped: 1 });
+
+    const res = await controller.createLinksBatch({
+      nodeId: 'node-1',
+      assetIds: ['asset-1', 'asset-2', 'asset-3'],
+      linkType: 'reference',
+    } as any);
+
+    expect(service.linkNodeToAssetsBatch).toHaveBeenCalledWith({
+      nodeId: 'node-1',
+      assetIds: ['asset-1', 'asset-2', 'asset-3'],
+      linkType: 'reference',
+    });
+    expect(res).toEqual({ created: 2, skipped: 1 });
   });
 });

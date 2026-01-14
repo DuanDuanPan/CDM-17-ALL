@@ -67,5 +67,78 @@ describe('BindingTargetBanner', () => {
     await user.click(screen.getByTestId('binding-target-clear'));
     expect(screen.queryByTestId('binding-target-banner')).toBeNull();
   });
+
+  // UT-2.3: Accessibility - aria-label on clear button
+  it('has accessible aria-label on clear button', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    const graphMock = {
+      on: vi.fn(),
+      off: vi.fn(),
+      getCellById: (id: string) => {
+        if (id !== 'node-1') return null;
+        return {
+          id,
+          isNode: () => true,
+          getData: () => ({ label: 'Node' }),
+          getAttrs: () => ({}),
+        };
+      },
+    } as any;
+
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          GraphProvider,
+          { graph: graphMock, graphId: 'graph-1' },
+          createElement(DataLibraryBindingProvider, null, createElement(Harness))
+        )
+      )
+    );
+
+    await user.click(screen.getByRole('button', { name: 'open' }));
+
+    const clearButton = screen.getByTestId('binding-target-clear');
+    expect(clearButton.getAttribute('aria-label')).toBe('清除选择');
+    expect(screen.getByRole('banner')).toBeDefined();
+  });
+
+  // Edge case: null nodeLabel fallback to '未命名节点'
+  it('falls back to 未命名节点 when node has no label', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    const graphMock = {
+      on: vi.fn(),
+      off: vi.fn(),
+      getCellById: (id: string) => {
+        if (id !== 'node-1') return null;
+        return {
+          id,
+          isNode: () => true,
+          getData: () => ({}), // No label
+          getAttrs: () => ({}), // No attrs.text.text
+        };
+      },
+    } as any;
+
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          GraphProvider,
+          { graph: graphMock, graphId: 'graph-1' },
+          createElement(DataLibraryBindingProvider, null, createElement(Harness))
+        )
+      )
+    );
+
+    await user.click(screen.getByRole('button', { name: 'open' }));
+    expect(screen.getByText('未命名节点')).toBeDefined();
+  });
 });
 

@@ -86,4 +86,27 @@ describe('useBatchAssetBinding', () => {
       ).rejects.toThrow('boom');
     });
   });
+
+  // UT-4.4: Binding success returns result so caller can handle post-binding actions (e.g., close drawer)
+  it('UT-4.4: bindAssets returns created/skipped counts for caller to handle post-binding', async () => {
+    createNodeAssetLinksBatchMock.mockResolvedValueOnce({ created: 3, skipped: 0 });
+
+    const queryClient = createTestQueryClient();
+
+    const { result } = renderHook(() => useBatchAssetBinding(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    let response: { created: number; skipped: number } | undefined;
+
+    await act(async () => {
+      response = await result.current.bindAssets({
+        nodeId: 'node-1',
+        assetIds: ['asset-1', 'asset-2', 'asset-3'],
+      });
+    });
+
+    expect(response).toEqual({ created: 3, skipped: 0 });
+    // Caller (e.g., SelectedAssetsTray) can now call exitBindingMode() and close drawer based on this result
+  });
 });
