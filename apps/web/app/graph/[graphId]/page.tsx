@@ -9,7 +9,7 @@
 
 import { useState, useCallback, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { TopBar, LeftSidebar, RightSidebar } from '@/components/layout';
+import { TopBar, LeftSidebar } from '@/components/layout';
 import type { Graph } from '@antv/x6';
 import { LayoutMode } from '@cdm/types';
 import type { CreateFromTemplateResponse } from '@cdm/types';
@@ -20,7 +20,6 @@ import { ViewContainer } from '@/features/views';
 import { useCollaboration } from '@/hooks/useCollaboration';
 import { useCommentCount } from '@/hooks/useCommentCount';
 import { useTemplateInsert } from '@/hooks/useTemplateInsert';
-import { CommentPanel } from '@/components/Comments';
 import { TemplateLibraryDialog } from '@/components/TemplateLibrary';
 import { CommentCountContext } from '@/contexts/CommentCountContext';
 import { DataLibraryBindingProvider } from '@/features/data-library/contexts';
@@ -66,9 +65,8 @@ function GraphPageContent() {
     const [isDependencyMode, setIsDependencyMode] = useState(false);
     // Story 5.2: Template library dialog (drag-drop insert)
     const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
-    // Story 4.3: Comment panel state
-    const [commentNodeId, setCommentNodeId] = useState<string | null>(null);
-    const [commentNodeLabel, setCommentNodeLabel] = useState<string>('');
+    // Selected node label for unified sidebar comments panel
+    const [selectedNodeLabel, setSelectedNodeLabel] = useState<string>('');
 
     // 使用URL参数的userId构建用户对象
     const CURRENT_USER = {
@@ -117,11 +115,17 @@ function GraphPageContent() {
 
     const handleNodeSelect = useCallback((nodeId: string | null) => {
         setSelectedNodeId(nodeId);
-    }, []);
-
-    const handleClosePanel = useCallback(() => {
-        setSelectedNodeId(null);
-    }, []);
+        // Update selected node label for comments panel
+        if (nodeId && graph) {
+            const cell = graph.getCellById(nodeId);
+            if (cell && cell.isNode()) {
+                const label = cell.getData()?.label || cell.getAttrs()?.text?.text || '未命名节点';
+                setSelectedNodeLabel(String(label));
+            }
+        } else {
+            setSelectedNodeLabel('');
+        }
+    }, [graph]);
 
     // Story 5.2 Fix: Use template insert hook for inserting templates into current graph
     const { insertTemplate } = useTemplateInsert({
@@ -200,7 +204,7 @@ function GraphPageContent() {
         window.dispatchEvent(
             new CustomEvent('mindmap:expand-path-to-node', { detail: { nodeId } })
         );
-        
+
         // 2. Use requestAnimationFrame to ensure centering happens after DOM updates from expansion
         // This fixes the issue where clicking outline items doesn't center the node in view
         requestAnimationFrame(() => {
@@ -208,7 +212,7 @@ function GraphPageContent() {
             requestAnimationFrame(() => {
                 // Center node in view (Story 8.3)
                 centerNode(nodeId);
-                
+
                 // 3. Select node in X6 graph (properly trigger onNodeSelect)
                 if (graph) {
                     const cell = graph.getCellById(nodeId);
@@ -257,42 +261,6 @@ function GraphPageContent() {
         }
     }, [reorderNode, layoutMode, centerNode, handleNodeSelect]);
 
-    // Story 4.3: Handle opening comments for a node
-    const handleOpenComments = useCallback((nodeId: string, nodeLabel: string) => {
-        setCommentNodeId(nodeId);
-        setCommentNodeLabel(nodeLabel);
-    }, []);
-
-    const handleCloseComments = useCallback(() => {
-        setCommentNodeId(null);
-        setCommentNodeLabel('');
-    }, []);
-
-    // Story 4.3: Listen for custom event to open comments
-    useEffect(() => {
-        const handleCommentEvent = (event: Event) => {
-            const customEvent = event as CustomEvent<{ nodeId: string; nodeLabel: string }>;
-            handleOpenComments(customEvent.detail.nodeId, customEvent.detail.nodeLabel);
-        };
-        window.addEventListener('mindmap:open-comments', handleCommentEvent);
-        return () => {
-            window.removeEventListener('mindmap:open-comments', handleCommentEvent);
-        };
-    }, [handleOpenComments]);
-
-    // Story 4.3+: Sync comment panel with selected node when panel is open
-    useEffect(() => {
-        // If comment panel is open and user selects a different node, update the panel
-        if (commentNodeId && selectedNodeId && commentNodeId !== selectedNodeId && graph) {
-            // Use X6 Graph API to get node data
-            const cell = graph.getCellById(selectedNodeId);
-            if (cell && cell.isNode()) {
-                const nodeLabel = cell.getData()?.label || cell.getAttrs()?.text?.text || '未命名节点';
-                setCommentNodeId(selectedNodeId);
-                setCommentNodeLabel(String(nodeLabel));
-            }
-        }
-    }, [selectedNodeId, commentNodeId, graph]);
 
 
     return (
@@ -323,11 +291,19 @@ function GraphPageContent() {
                                     onDependencyModeToggle={handleDependencyModeToggle}
                                     onTemplatesOpen={() => setTemplateDialogOpen(true)}
                                     userId={userId}
+                                    // Graph props for property panel
+                                    graph={graph}
+                                    graphId={graphId}
+                                    yDoc={collab.yDoc}
+                                    creatorName={CURRENT_USER.name}
+                                    // Outline props
                                     isOutlineReady={isGraphReady}
                                     outlineData={outlineData}
                                     selectedNodeId={selectedNodeId}
+                                    selectedNodeLabel={selectedNodeLabel}
                                     onOutlineNodeClick={handleOutlineNodeClick}
                                     onOutlineReorder={handleOutlineReorder}
+                                    onMarkCommentsAsRead={refreshCommentCounts}
                                 />
 
                                 <main className="flex-1 relative overflow-hidden">
@@ -345,28 +321,7 @@ function GraphPageContent() {
                                         onExitDependencyMode={() => setIsDependencyMode(false)}
                                     />
                                 </main>
-
-                                <RightSidebar
-                                    selectedNodeId={selectedNodeId}
-                                    graph={graph}
-                                    graphId={graphId}
-                                    yDoc={collab.yDoc}
-                                    creatorName={CURRENT_USER.name}
-                                    onClose={handleClosePanel}
-                                />
                             </div>
-
-                            {/* Story 4.3: Comment Panel */}
-                            {commentNodeId && (
-                                <CommentPanel
-                                    nodeId={commentNodeId}
-                                    nodeLabel={commentNodeLabel}
-                                    mindmapId={graphId}
-                                    userId={userId}
-                                    onClose={handleCloseComments}
-                                    onMarkAsRead={refreshCommentCounts}
-                                />
-                            )}
 
                             {/* Story 5.2 Fix: Template library with insert mode for current graph */}
                             <TemplateLibraryDialog

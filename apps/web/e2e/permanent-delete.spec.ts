@@ -2,6 +2,18 @@ import { test, expect, BrowserContext, Page } from '@playwright/test';
 import { createTestGraph, gotoTestGraph, makeTestGraphUrl } from './testUtils';
 
 /**
+ * Helper function to open the archive panel from left sidebar
+ * (Archive was moved from TopBar to LeftSidebar in unified sidebar refactor)
+ */
+async function openArchivePanel(page: Page) {
+    // Click the archive icon in the left sidebar navigation
+    const sidebar = page.locator('aside').first();
+    const archiveButton = sidebar.locator('button').filter({ has: page.locator('svg.lucide-archive') });
+    await archiveButton.click();
+    await page.waitForTimeout(300);
+}
+
+/**
  * E2E Tests for Permanent Delete Feature
  *
  * Story 2.7: Tests for hard delete functionality
@@ -42,20 +54,19 @@ test.describe('Permanent Delete Feature', () => {
             await page.keyboard.press('Delete');
             await page.waitForTimeout(1000);
 
-            // Open Archive Drawer
-            const archiveButton = page.getByRole('button', { name: '归档箱' });
-            await archiveButton.click();
-            const archiveDrawer = page.locator('div.fixed', {
-                has: page.getByRole('heading', { name: '归档箱' }),
-            }).first();
-            await expect(archiveDrawer.getByRole('heading', { name: '归档箱' })).toBeVisible();
+            // Open Archive Panel (from left sidebar)
+            await openArchivePanel(page);
 
-            // Verify node appears in archive
-            const archivedNode = archiveDrawer.getByRole('heading', { name: 'Node To Delete', level: 3 });
+            // Verify archive panel is visible and contains the node
+            const archivePanel = page.locator('aside').first();
+            await expect(archivePanel.getByText('归档')).toBeVisible();
+
+            // Verify node appears in archive panel
+            const archivedNode = archivePanel.getByText('Node To Delete');
             await expect(archivedNode).toBeVisible({ timeout: 5000 });
 
             // Click delete button on the archived node
-            await archiveDrawer.getByRole('button', { name: '删除' }).first().click();
+            await archivePanel.getByRole('button', { name: '删除' }).first().click();
 
             // Confirm deletion dialog should appear
             const confirmDialog = page.locator('text=确认永久删除');
@@ -139,14 +150,10 @@ test.describe('Permanent Delete Feature', () => {
             await expect(testNode).not.toBeVisible({ timeout: 5000 });
 
             // Verify it's not in archive either
-            const archiveButton = page.getByRole('button', { name: '归档箱' });
-            await archiveButton.click();
-            const archiveDrawer = page.locator('div.fixed', {
-                has: page.getByRole('heading', { name: '归档箱' }),
-            }).first();
-            await expect(archiveDrawer.getByRole('heading', { name: '归档箱' })).toBeVisible();
+            await openArchivePanel(page);
+            const archivePanel = page.locator('aside').first();
 
-            const archivedNode = archiveDrawer.getByRole('heading', { name: 'To Be Deleted', level: 3 });
+            const archivedNode = archivePanel.getByText('To Be Deleted');
             await expect(archivedNode).toHaveCount(0);
         });
 
@@ -178,14 +185,10 @@ test.describe('Permanent Delete Feature', () => {
             await expect(testNode).not.toBeVisible({ timeout: 3000 });
 
             // But should be in archive
-            const archiveButton = page.getByRole('button', { name: '归档箱' });
-            await archiveButton.click();
-            const archiveDrawer = page.locator('div.fixed', {
-                has: page.getByRole('heading', { name: '归档箱' }),
-            }).first();
-            await expect(archiveDrawer.getByRole('heading', { name: '归档箱' })).toBeVisible();
+            await openArchivePanel(page);
+            const archivePanel = page.locator('aside').first();
 
-            const archivedNode = archiveDrawer.getByRole('heading', { name: 'Archive Not Delete', level: 3 });
+            const archivedNode = archivePanel.getByText('Archive Not Delete');
             await expect(archivedNode).toBeVisible({ timeout: 5000 });
         });
     });

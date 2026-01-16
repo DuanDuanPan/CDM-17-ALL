@@ -77,8 +77,6 @@
 
 ## 功能模块总览
 
-![功能模块概览图](./assets/module_overview.png)
-
 ---
 
 ## 一、协同脑图核心 (Collaborative Graph Core)

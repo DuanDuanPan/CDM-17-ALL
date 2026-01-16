@@ -40,6 +40,8 @@ export interface PropertyPanelProps {
   onArchiveToggle?: (nodeId: string, nextIsArchived: boolean) => void;
   /** Story 7.2: Callback when approval/deliverables change - receives nodeId and payload for Yjs sync */
   onApprovalUpdate?: (nodeId: string, payload: { approval: ApprovalPipeline | null; deliverables: Deliverable[] }) => void;
+  /** Hide the close button and header when embedded in unified sidebar */
+  hideCloseButton?: boolean;
 }
 
 // Story 4.1: FIX-9 - Use context instead of prop for currentUserId
@@ -52,6 +54,7 @@ export function PropertyPanel({
   onTagsUpdate,
   onArchiveToggle,
   onApprovalUpdate,
+  hideCloseButton = false,
 }: PropertyPanelProps) {
   const currentUserId = useCurrentUserId();
   const [currentType, setCurrentType] = useState<NodeType>(nodeData?.type || NodeType.ORDINARY);
@@ -108,18 +111,20 @@ export function PropertyPanel({
   const FormComponent = getFormComponent(currentType);
 
   return (
-    <aside className="w-80 h-full bg-white/95 backdrop-blur-md border-l border-gray-200/50 flex flex-col shadow-lg">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <h2 className="font-semibold text-gray-800">属性面板</h2>
-        <button
-          onClick={onClose}
-          className="p-1.5 hover:bg-gray-100 rounded-md transition-colors"
-          aria-label="关闭面板"
-        >
-          <X className="w-4 h-4 text-gray-500" />
-        </button>
-      </div>
+    <aside className={hideCloseButton ? "h-full flex flex-col" : "w-80 h-full bg-white/95 backdrop-blur-md border-l border-gray-200/50 flex flex-col shadow-lg"}>
+      {/* Header - Hidden when embedded in unified sidebar */}
+      {!hideCloseButton && (
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <h2 className="font-semibold text-gray-800">属性面板</h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 hover:bg-gray-100 rounded-md transition-colors"
+            aria-label="关闭面板"
+          >
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+      )}
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">

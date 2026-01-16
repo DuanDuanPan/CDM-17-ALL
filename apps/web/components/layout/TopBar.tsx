@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Archive, Menu, Search, Share2, Settings, Database, Keyboard } from 'lucide-react';
+import { Menu, Search, Share2, Settings, Database, Keyboard } from 'lucide-react';
 import { LayoutSwitcher } from '../toolbar/LayoutSwitcher';
 import { ViewSwitcher } from '@/features/views';
 import { ActiveUsersAvatarStack } from '../collab/ActiveUsersAvatarStack';
@@ -14,7 +14,6 @@ import { MAX_VISIBLE_AVATARS } from '@/lib/constants';
 // Story 2.4: Notification system
 import { useNotifications } from '@/hooks/useNotifications';
 import { GlobalSearchDialog } from '@/components/CommandPalette/GlobalSearchDialog';
-import { ArchiveDrawer } from '@/components/ArchiveBox/ArchiveDrawer';
 // Story 9.1: Data Library Drawer
 import { DataLibraryDrawer } from '@/features/data-library';
 import { useDataLibraryBindingOptional } from '@/features/data-library/contexts';
@@ -52,7 +51,6 @@ export function TopBar({
   viewMode,
   onViewModeChange,
 }: TopBarProps) {
-  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   // Story 9.1: Data Library Drawer state
   const [isDataLibraryOpen, setIsDataLibraryOpen] = useState(false);
   // Keyboard Shortcuts Guide state
@@ -112,15 +110,6 @@ export function TopBar({
   }, [bindingContext?.isBindingMode]);
 
   const handleSearchSelect = useCallback(
-    (nodeId: string) => {
-      navigateToNode?.(nodeId);
-    },
-    [navigateToNode]
-  );
-
-  // Story 2.7: Simplified - ArchiveDrawer now handles Yjs sync and X6 visibility
-  // This callback only needs to navigate to the restored node
-  const handleArchiveRestore = useCallback(
     (nodeId: string) => {
       navigateToNode?.(nodeId);
     },
@@ -196,12 +185,6 @@ export function TopBar({
           onSelect={handleSearchSelect}
           graphId={graphContext?.graphId || undefined}
         />
-        <ArchiveDrawer
-          isOpen={isArchiveOpen}
-          onClose={() => setIsArchiveOpen(false)}
-          graphId={graphContext?.graphId || undefined}
-          onRestore={handleArchiveRestore}
-        />
         {/* Story 9.1: Data Library Drawer */}
         <DataLibraryDrawer
           isOpen={isDataLibraryOpen}
@@ -232,13 +215,6 @@ export function TopBar({
             aria-label="搜索 (Cmd/Ctrl+K)"
           >
             <Search className="w-4 h-4 text-gray-600" />
-          </button>
-          <button
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            onClick={() => setIsArchiveOpen(true)}
-            aria-label="归档箱"
-          >
-            <Archive className="w-4 h-4 text-gray-600" />
           </button>
           {/* Story 9.1: Data Library Button */}
           <button
