@@ -20,6 +20,9 @@ export class LayoutManager {
   private currentMode: LayoutMode = 'mindmap';
   private nodeAddedListener: ((args: { node: any }) => void) | null = null;
 
+  // Node panning behavior state
+  private nodePanningCleanup: (() => void) | null = null;
+
   constructor(graph: Graph) {
     this.graph = graph;
     this.strategies = new Map<LayoutMode, BaseLayout>([
@@ -31,6 +34,9 @@ export class LayoutManager {
 
     // Listen for node additions to apply movable setting
     this.setupNodeAddedListener();
+
+    // Setup node drag -> canvas pan behavior for auto-layout modes
+    this.setupNodePanningBehavior();
   }
 
   /**
@@ -124,17 +130,80 @@ export class LayoutManager {
   }
 
   /**
+   * Setup node panning behavior for auto-layout modes
+   * In mindmap/logic modes, dragging a node will pan the canvas instead of moving the node
+   */
+  private setupNodePanningBehavior(): void {
+    let isPanning = false;
+    let startX = 0;
+    let startY = 0;
+    let startScrollLeft = 0;
+    let startScrollTop = 0;
+
+    const onNodeMouseDown = ({ e }: { e: MouseEvent }) => {
+      // Only intercept in auto-layout modes (not free mode)
+      if (this.currentMode === 'free') return;
+
+      // Start panning
+      isPanning = true;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      // Get current scroll position
+      const transform = this.graph.translate();
+      startScrollLeft = transform.tx;
+      startScrollTop = transform.ty;
+
+      // Update cursor to grabbing
+      document.body.style.cursor = 'grabbing';
+
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isPanning) return;
+
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      // Apply panning
+      this.graph.translate(startScrollLeft + dx, startScrollTop + dy);
+    };
+
+    const onMouseUp = () => {
+      if (!isPanning) return;
+
+      isPanning = false;
+      document.body.style.cursor = '';
+    };
+
+    // Attach event listeners
+    this.graph.on('node:mousedown', onNodeMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+    // Store cleanup function
+    this.nodePanningCleanup = () => {
+      this.graph.off('node:mousedown', onNodeMouseDown);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }
+
+  /**
    * Setup listener for node additions to apply cursor style
    */
   private setupNodeAddedListener(): void {
     this.nodeAddedListener = ({ node }: { node: any }) => {
       // Apply cursor style to newly added node based on current mode
-      const isDraggingEnabled = this.currentMode === 'free';
+      // Use 'grab' for auto-layout modes to indicate canvas can be panned
+      const isFreeMode = this.currentMode === 'free';
 
       node.setAttrs({
         body: {
           ...node.getAttrs().body,
-          cursor: isDraggingEnabled ? 'move' : 'default',
+          cursor: isFreeMode ? 'move' : 'grab',
         },
       });
     };
@@ -162,7 +231,7 @@ export class LayoutManager {
       node.setAttrs({
         body: {
           ...node.getAttrs().body,
-          cursor: enable ? 'move' : 'default',
+          cursor: enable ? 'move' : 'grab',
         },
       });
     });
@@ -175,6 +244,11 @@ export class LayoutManager {
     if (this.nodeAddedListener) {
       this.graph.off('node:added', this.nodeAddedListener);
       this.nodeAddedListener = null;
+    }
+
+    if (this.nodePanningCleanup) {
+      this.nodePanningCleanup();
+      this.nodePanningCleanup = null;
     }
   }
 
