@@ -280,8 +280,13 @@ export function useMinimap({
                 //
                 // Workaround: call the prototype `updateViewport` (non-debounced) on the next animation frame.
                 const forceUpdateViewport = () => {
-                    const proto = Object.getPrototypeOf(minimap) as { updateViewport?: () => void };
-                    proto.updateViewport?.call(minimap);
+                    try {
+                        const proto = Object.getPrototypeOf(minimap) as { updateViewport?: unknown };
+                        if (typeof proto.updateViewport !== 'function') return;
+                        proto.updateViewport.call(minimap);
+                    } catch (err) {
+                        console.warn('[useMinimap] forceUpdateViewport failed:', err);
+                    }
                 };
                 let viewportRaf: number | null = null;
                 const scheduleForceUpdateViewport = () => {

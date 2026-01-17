@@ -241,6 +241,9 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
 
     const handleNodeMouseUp = ({ node, e }: { node: Node; e: MouseEvent }) => {
       if (currentMode === 'free') return;
+      // In auto-layout modes we allow "dragging a node" to pan the canvas.
+      // Skip drag-drop reparenting when node panning is active.
+      if ((graph as unknown as { __cdmNodePanning?: boolean }).__cdmNodePanning) return;
       if (!graph.clientToLocal) return;
 
       const local = graph.clientToLocal(e.clientX, e.clientY);

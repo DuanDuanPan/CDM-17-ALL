@@ -100,12 +100,17 @@ export function ArchivePanelContent({
     }, [error]);
 
     // Filter by search
-    const filteredNodes = useMemo(() => archivedNodes.filter(
-        (node) =>
-            !searchQuery ||
-            node.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            node.tags.some((t) => t.includes(searchQuery.toLowerCase()))
-    ), [archivedNodes, searchQuery]);
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+    const filteredNodes = useMemo(
+        () =>
+            archivedNodes.filter(
+                (node) =>
+                    !normalizedSearchQuery ||
+                    node.label.toLowerCase().includes(normalizedSearchQuery) ||
+                    node.tags.some((t) => t.toLowerCase().includes(normalizedSearchQuery))
+            ),
+        [archivedNodes, normalizedSearchQuery]
+    );
 
     // Selection Handlers
     const toggleSelect = (id: string) => {

@@ -134,60 +134,143 @@ export class LayoutManager {
    * In mindmap/logic modes, dragging a node will pan the canvas instead of moving the node
    */
   private setupNodePanningBehavior(): void {
+    // Node environment (unit tests) has no DOM; skip.
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    const PAN_THRESHOLD_PX = 6;
+
+    let isPointerDown = false;
     let isPanning = false;
-    let startX = 0;
-    let startY = 0;
-    let startScrollLeft = 0;
-    let startScrollTop = 0;
+    let startClientX = 0;
+    let startClientY = 0;
+    let startTx = 0;
+    let startTy = 0;
+    let previousContainerCursor: string | null = null;
+    let docCleanup: (() => void) | null = null;
+    let clearPanningFlagTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const setContainerCursor = (cursor: string | null) => {
+      const container = (this.graph as unknown as { container?: HTMLElement }).container;
+      if (!container) return;
+
+      if (previousContainerCursor === null) {
+        previousContainerCursor = container.style.cursor ?? '';
+      }
+      container.style.cursor = cursor ?? previousContainerCursor;
+      if (cursor === null) {
+        previousContainerCursor = null;
+      }
+    };
+
+    const setGraphNodePanningFlag = (value: boolean) => {
+      (this.graph as unknown as { __cdmNodePanning?: boolean }).__cdmNodePanning = value;
+    };
+
+    const clearGraphNodePanningFlagSoon = () => {
+      if (clearPanningFlagTimer) {
+        clearTimeout(clearPanningFlagTimer);
+      }
+      // Clear on next tick so graph-level node:mouseup handlers can still observe the flag.
+      clearPanningFlagTimer = setTimeout(() => {
+        setGraphNodePanningFlag(false);
+        clearPanningFlagTimer = null;
+      }, 0);
+    };
+
+    const endPointerSession = () => {
+      if (docCleanup) {
+        docCleanup();
+        docCleanup = null;
+      }
+
+      if (!isPointerDown) return;
+      isPointerDown = false;
+
+      if (isPanning) {
+        isPanning = false;
+        setContainerCursor(null);
+        clearGraphNodePanningFlagSoon();
+      }
+    };
 
     const onNodeMouseDown = ({ e }: { e: MouseEvent }) => {
       // Only intercept in auto-layout modes (not free mode)
       if (this.currentMode === 'free') return;
+      // Let Alt+drag use the existing canvas panning behavior.
+      if (e.altKey) return;
+      // Only left click / primary button.
+      if (e.button !== 0) return;
 
-      // Start panning
-      isPanning = true;
-      startX = e.clientX;
-      startY = e.clientY;
-
-      // Get current scroll position
-      const transform = this.graph.translate();
-      startScrollLeft = transform.tx;
-      startScrollTop = transform.ty;
-
-      // Update cursor to grabbing
-      document.body.style.cursor = 'grabbing';
-
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isPanning) return;
-
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-
-      // Apply panning
-      this.graph.translate(startScrollLeft + dx, startScrollTop + dy);
-    };
-
-    const onMouseUp = () => {
-      if (!isPanning) return;
-
+      // Start tracking. Do NOT prevent default here: keep selection/context menu intact.
+      isPointerDown = true;
       isPanning = false;
-      document.body.style.cursor = '';
+      startClientX = e.clientX;
+      startClientY = e.clientY;
+
+      const transform = this.graph.translate();
+      startTx = transform.tx;
+      startTy = transform.ty;
+
+      setGraphNodePanningFlag(false);
+
+      if (clearPanningFlagTimer) {
+        clearTimeout(clearPanningFlagTimer);
+        clearPanningFlagTimer = null;
+      }
+
+      const onMouseMove = (moveEvent: MouseEvent) => {
+        if (!isPointerDown) return;
+
+        const dx = moveEvent.clientX - startClientX;
+        const dy = moveEvent.clientY - startClientY;
+
+        if (!isPanning) {
+          if (Math.hypot(dx, dy) < PAN_THRESHOLD_PX) return;
+
+          isPanning = true;
+          setGraphNodePanningFlag(true);
+          setContainerCursor('grabbing');
+        }
+
+        // Apply panning
+        this.graph.translate(startTx + dx, startTy + dy);
+        moveEvent.preventDefault();
+      };
+
+      const onMouseUp = () => {
+        endPointerSession();
+      };
+
+      const onWindowBlur = () => {
+        endPointerSession();
+      };
+
+      // Capture phase ensures we end the panning session even if other handlers stop propagation.
+      document.addEventListener('mousemove', onMouseMove, true);
+      document.addEventListener('mouseup', onMouseUp, true);
+      window.addEventListener('blur', onWindowBlur, true);
+
+      docCleanup = () => {
+        document.removeEventListener('mousemove', onMouseMove, true);
+        document.removeEventListener('mouseup', onMouseUp, true);
+        window.removeEventListener('blur', onWindowBlur, true);
+      };
     };
 
-    // Attach event listeners
+    // Attach graph listener
     this.graph.on('node:mousedown', onNodeMouseDown);
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
 
     // Store cleanup function
     this.nodePanningCleanup = () => {
       this.graph.off('node:mousedown', onNodeMouseDown);
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
+      endPointerSession();
+      if (clearPanningFlagTimer) {
+        clearTimeout(clearPanningFlagTimer);
+        clearPanningFlagTimer = null;
+      }
+      setGraphNodePanningFlag(false);
     };
   }
 

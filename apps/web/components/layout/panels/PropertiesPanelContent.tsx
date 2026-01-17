@@ -87,7 +87,7 @@ export function PropertiesPanelContent({
     }
 
     return (
-        <div className="h-full overflow-y-auto">
+        <div className="h-full">
             <PropertyPanel
                 nodeId={selectedNodeId}
                 nodeData={nodeData || undefined}

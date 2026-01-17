@@ -48,9 +48,24 @@ export function CommentsPanelContent({
     useEffect(() => {
         if (!nodeId) return;
 
-        markAsRead(nodeId, userId).then(() => {
-            onMarkAsRead?.();
-        });
+        let cancelled = false;
+
+        (async () => {
+            try {
+                await markAsRead(nodeId, userId);
+                if (!cancelled) {
+                    onMarkAsRead?.();
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    console.warn('[CommentsPanelContent] markAsRead failed:', err);
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
     }, [nodeId, userId, markAsRead, onMarkAsRead]);
 
     // Handle reply

@@ -8,7 +8,7 @@ import { createTestGraph, gotoTestGraph, makeTestGraphUrl } from './testUtils';
 async function openArchivePanel(page: Page) {
     // Click the archive icon in the left sidebar navigation
     const sidebar = page.locator('aside').first();
-    const archiveButton = sidebar.locator('button').filter({ has: page.locator('svg.lucide-archive') });
+    const archiveButton = sidebar.locator('button[data-nav-id="archive"]');
     await archiveButton.click();
     await page.waitForTimeout(300);
 }

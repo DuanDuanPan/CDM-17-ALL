@@ -11,7 +11,7 @@
  * - Toggling: clicking active icon closes panel, clicking different icon switches panel
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LayoutGrid,
   ChevronLeft,
@@ -121,6 +121,8 @@ export function LeftSidebar({
     selectedNodeId,
   });
 
+  const pendingOpenCommentsNodeIdRef = useRef<string | null>(null);
+
   // Get current active nav item
   const activeNavItem = navItems.find((item) => item.id === activePanel);
 
@@ -147,18 +149,30 @@ export function LeftSidebar({
       const customEvent = event as CustomEvent<{ nodeId: string; nodeLabel: string }>;
       // Open comments panel - it will show the currently selected node's comments
       if (customEvent.detail?.nodeId) {
-        // Use setTimeout to ensure the node selection has completed
-        // Use force=true to bypass the selectedNodeId check (node will be selected by then)
-        setTimeout(() => {
+        pendingOpenCommentsNodeIdRef.current = customEvent.detail.nodeId;
+
+        // If the selection already updated, open immediately.
+        if (selectedNodeId === customEvent.detail.nodeId) {
           openPanel('comments', true);
-        }, 50);
+          pendingOpenCommentsNodeIdRef.current = null;
+        }
       }
     };
     window.addEventListener('mindmap:open-comments', handleOpenComments);
     return () => {
       window.removeEventListener('mindmap:open-comments', handleOpenComments);
     };
-  }, [openPanel]);
+  }, [openPanel, selectedNodeId]);
+
+  // Open comments panel only after node selection has applied (avoids brief "no node selected" state).
+  useEffect(() => {
+    const pendingId = pendingOpenCommentsNodeIdRef.current;
+    if (!pendingId) return;
+    if (selectedNodeId !== pendingId) return;
+
+    openPanel('comments', true);
+    pendingOpenCommentsNodeIdRef.current = null;
+  }, [openPanel, selectedNodeId]);
 
   // Load templates when templates nav is active
   useEffect(() => {
@@ -175,10 +189,11 @@ export function LeftSidebar({
   // Handle template drag start
   const handleTemplateDragStart = useCallback(
     (_e: React.DragEvent, _template: TemplateListItem) => {
-      // Close sidebar panel for better drag experience
-      closePanel();
+      // NOTE: Don't auto-close the sidebar on drag start.
+      // Closing the panel unmounts the draggable source and can cancel the HTML5 drag operation,
+      // preventing the drop handler (template insert) from firing.
     },
-    [closePanel]
+    []
   );
 
   // Handle template card click - load full structure for preview
@@ -211,138 +226,144 @@ export function LeftSidebar({
     switch (activePanel) {
       case 'templates':
         return (
-          <div className="space-y-3">
-            {/* Search input */}
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-              <input
-                type="text"
-                value={templateSearch}
-                onChange={(e) => setTemplateSearch(e.target.value)}
-                placeholder="搜索模板..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Tab switcher */}
-            <div className="flex gap-1 text-[10px]">
-              <button
-                onClick={() => setTemplateTab('all')}
-                className={`flex-1 py-1 px-2 rounded flex items-center justify-center gap-1 transition-colors ${templateTab === 'all'
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-500 hover:bg-gray-100'
-                  }`}
-              >
-                <Globe className="w-3 h-3" />
-                全部
-              </button>
-              <button
-                onClick={() => setTemplateTab('mine')}
-                className={`flex-1 py-1 px-2 rounded flex items-center justify-center gap-1 transition-colors ${templateTab === 'mine'
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-500 hover:bg-gray-100'
-                  }`}
-              >
-                <User className="w-3 h-3" />
-                我的
-              </button>
-              <button
-                onClick={() => setTemplateTab('recent')}
-                className={`flex-1 py-1 px-2 rounded flex items-center justify-center gap-1 transition-colors ${templateTab === 'recent'
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-500 hover:bg-gray-100'
-                  }`}
-              >
-                <Clock className="w-3 h-3" />
-                最近
-              </button>
-            </div>
-
-            {/* Open library button */}
-            <button
-              onClick={onTemplatesOpen}
-              className="w-full px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              打开完整模板库
-            </button>
-
-            {/* Template cards */}
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8 text-gray-400">
-                <Loader2 className="w-5 h-5 animate-spin" />
+          <div className="h-full flex flex-col p-4">
+            <div className="space-y-3">
+              {/* Search input */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={templateSearch}
+                  onChange={(e) => setTemplateSearch(e.target.value)}
+                  placeholder="搜索模板..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
               </div>
-            ) : error ? (
-              <div className="text-center py-4">
-                <p className="text-xs text-red-500 mb-2">加载失败</p>
+
+              {/* Tab switcher */}
+              <div className="flex gap-1 text-[10px]">
                 <button
-                  onClick={() => loadTemplates({ userId, limit: 10 })}
-                  className="text-xs text-blue-500 hover:underline flex items-center justify-center gap-1"
+                  onClick={() => setTemplateTab('all')}
+                  className={`flex-1 py-1 px-2 rounded flex items-center justify-center gap-1 transition-colors ${templateTab === 'all'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-500 hover:bg-gray-100'
+                    }`}
                 >
-                  <RefreshCw className="w-3 h-3" />
-                  重试
+                  <Globe className="w-3 h-3" />
+                  全部
+                </button>
+                <button
+                  onClick={() => setTemplateTab('mine')}
+                  className={`flex-1 py-1 px-2 rounded flex items-center justify-center gap-1 transition-colors ${templateTab === 'mine'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-500 hover:bg-gray-100'
+                    }`}
+                >
+                  <User className="w-3 h-3" />
+                  我的
+                </button>
+                <button
+                  onClick={() => setTemplateTab('recent')}
+                  className={`flex-1 py-1 px-2 rounded flex items-center justify-center gap-1 transition-colors ${templateTab === 'recent'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-500 hover:bg-gray-100'
+                    }`}
+                >
+                  <Clock className="w-3 h-3" />
+                  最近
                 </button>
               </div>
-            ) : templates.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-4">
-                暂无模板
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {templates.slice(0, 5).map((template) => (
-                  <TemplateCardMini
-                    key={template.id}
-                    template={template}
-                    fullTemplate={
-                      selectedTemplate?.id === template.id
-                        ? selectedTemplate
-                        : undefined
-                    }
-                    isLoadingStructure={
-                      isLoadingTemplate && selectedTemplate?.id === template.id
-                    }
-                    onDragStart={handleTemplateDragStart}
-                    onClick={handleTemplateClick}
-                    currentUserId={userId}
-                    onDelete={handleTemplateDelete}
-                    isDeleting={isDeleting}
-                  />
-                ))}
-                {templates.length > 5 && (
-                  <button
-                    onClick={onTemplatesOpen}
-                    className="w-full text-xs text-blue-500 hover:underline py-2"
-                  >
-                    查看全部 {templates.length} 个模板
-                  </button>
-                )}
-              </div>
-            )}
 
-            <p className="text-[10px] text-gray-400 leading-relaxed">
-              提示：拖拽模板到画布，挂载为选中节点的子节点
-            </p>
+              {/* Open library button */}
+              <button
+                onClick={onTemplatesOpen}
+                className="w-full px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                打开完整模板库
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto pt-3 space-y-3">
+              {/* Template cards */}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8 text-gray-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                </div>
+              ) : error ? (
+                <div className="text-center py-4">
+                  <p className="text-xs text-red-500 mb-2">加载失败</p>
+                  <button
+                    onClick={() => loadTemplates({ userId, limit: 10 })}
+                    className="text-xs text-blue-500 hover:underline flex items-center justify-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    重试
+                  </button>
+                </div>
+              ) : templates.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">
+                  暂无模板
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {templates.slice(0, 5).map((template) => (
+                    <TemplateCardMini
+                      key={template.id}
+                      template={template}
+                      fullTemplate={
+                        selectedTemplate?.id === template.id
+                          ? selectedTemplate
+                          : undefined
+                      }
+                      isLoadingStructure={
+                        isLoadingTemplate && selectedTemplate?.id === template.id
+                      }
+                      onDragStart={handleTemplateDragStart}
+                      onClick={handleTemplateClick}
+                      currentUserId={userId}
+                      onDelete={handleTemplateDelete}
+                      isDeleting={isDeleting}
+                    />
+                  ))}
+                  {templates.length > 5 && (
+                    <button
+                      onClick={onTemplatesOpen}
+                      className="w-full text-xs text-blue-500 hover:underline py-2"
+                    >
+                      查看全部 {templates.length} 个模板
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <p className="text-[10px] text-gray-400 leading-relaxed">
+                提示：拖拽模板到画布，挂载为选中节点的子节点
+              </p>
+            </div>
           </div>
         );
 
       case 'outline':
         return (
-          <div className="space-y-3">
+          <div className="h-full flex flex-col p-4">
             <p className="text-xs text-gray-500 mb-2">
               点击节点跳转，拖拽重排层级
             </p>
-            {isOutlineReady && onOutlineNodeClick && onOutlineReorder ? (
-              <OutlinePanel
-                data={outlineData ?? []}
-                selectedNodeId={selectedNodeId ?? null}
-                onNodeClick={onOutlineNodeClick}
-                onReorder={onOutlineReorder}
-              />
-            ) : (
-              <p className="text-xs text-gray-400 text-center py-4">
-                请打开图谱以查看大纲
-              </p>
-            )}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {isOutlineReady && onOutlineNodeClick && onOutlineReorder ? (
+                <OutlinePanel
+                  data={outlineData ?? []}
+                  selectedNodeId={selectedNodeId ?? null}
+                  onNodeClick={onOutlineNodeClick}
+                  onReorder={onOutlineReorder}
+                />
+              ) : (
+                <p className="text-xs text-gray-400 text-center py-4">
+                  请打开图谱以查看大纲
+                </p>
+              )}
+            </div>
           </div>
         );
 
@@ -439,7 +460,7 @@ export function LeftSidebar({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-hidden">
             {renderPanelContent()}
           </div>
         </div>
