@@ -37,6 +37,7 @@ const mockRAF = () => {
 type MockNode = {
     id: string;
     isNode: () => boolean;
+    isVisible: () => boolean;
     getBBox: () => { x: number; y: number; width: number; height: number; getCenter: () => { x: number; y: number }; union: (other: ReturnType<MockNode['getBBox']>) => ReturnType<MockNode['getBBox']> };
 };
 
@@ -60,6 +61,7 @@ function createMockGraph() {
     const createMockNode = (id: string, x: number, y: number, width: number = 100, height: number = 50): MockNode => ({
         id,
         isNode: () => true,
+        isVisible: () => true,
         getBBox: () => createBBox(x, y, width, height),
     });
 
@@ -76,6 +78,13 @@ function createMockGraph() {
             return currentTranslate;
         }),
         centerPoint: vi.fn(),
+        getGraphArea: vi.fn(() => {
+            const width = 800;
+            const height = 600;
+            const x = -currentTranslate.tx / currentZoom;
+            const y = -currentTranslate.ty / currentZoom;
+            return createBBox(x, y, width / currentZoom, height / currentZoom);
+        }),
         getCellById: vi.fn((id: string) => nodes.get(id) || null),
         getNodes: vi.fn(() => Array.from(nodes.values())),
     };
@@ -219,7 +228,7 @@ describe('useZoomShortcuts', () => {
 
             // Should have called zoomTo immediately without RAF
             expect(mockGraph.graph.zoomTo).toHaveBeenCalled();
-            expect(mockGraph.graph.translate).toHaveBeenCalled();
+            expect(mockGraph.graph.centerPoint).toHaveBeenCalled();
         });
     });
 
@@ -264,8 +273,8 @@ describe('useZoomShortcuts', () => {
                 result.current.zoomTo100();
             });
 
-            // Translate should have been called to keep center stable
-            expect(mockGraph.graph.translate).toHaveBeenCalled();
+            // Centering should have been called to keep the viewport stable
+            expect(mockGraph.graph.centerPoint).toHaveBeenCalled();
         });
 
         it('should use animation when reduced motion is not preferred (AC5)', () => {

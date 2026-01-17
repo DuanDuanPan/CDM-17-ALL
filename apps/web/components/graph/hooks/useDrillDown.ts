@@ -10,7 +10,7 @@
  * - TD-3: 子图渲染通过视图过滤实现，不改变底层数据结构
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Graph, Node, Edge } from '@antv/x6';
 import {
     useDrillPath,
@@ -21,6 +21,13 @@ import {
     restoreFromUrl,
 } from '@/lib/drillDownStore';
 import { isDependencyEdge } from '@/lib/edgeValidation';
+import {
+    animateGraphZoomAndCenterToPoint,
+    animateTranslateToCenterPoint,
+    getPrefersReducedMotion,
+} from '@/components/graph/utils/viewport';
+
+const DRILL_ENTER_ANIMATION_DURATION = 360;
 
 export interface UseDrillDownOptions {
     graph: Graph | null;
@@ -63,6 +70,62 @@ export function useDrillDown({ graph, isReady }: UseDrillDownOptions): UseDrillD
     const currentRootIdRef = useRef<string | null>(null);
     const reapplyRafRef = useRef<number | null>(null);
     const viewportRafRef = useRef<number | null>(null);
+    const previousDrillDepthRef = useRef(drillPath.length);
+    const pendingEnterViewportResetRef = useRef(false);
+    const prefersReducedMotion = useMemo(() => getPrefersReducedMotion(), []);
+
+    const scheduleEnterViewportReset = useCallback(
+        (rootNodeId: string) => {
+            if (!graph || !isReady) return;
+            if (typeof window === 'undefined') return;
+
+            if (viewportRafRef.current !== null) {
+                window.cancelAnimationFrame(viewportRafRef.current);
+                viewportRafRef.current = null;
+            }
+
+            viewportRafRef.current = window.requestAnimationFrame(() => {
+                viewportRafRef.current = null;
+                if (!graph) return;
+
+                const visibleNodes = graph.getNodes().filter((n) => n.isVisible());
+                if (visibleNodes.length === 0) return;
+
+                const rootCell = graph.getCellById(rootNodeId);
+                const targetNode = rootCell && rootCell.isNode() ? (rootCell as Node) : null;
+                if (!targetNode) return;
+
+                const nodeBBox = targetNode.getBBox();
+                const nodeCenterX = nodeBBox.x + nodeBBox.width / 2;
+                const nodeCenterY = nodeBBox.y + nodeBBox.height / 2;
+
+                const currentScale = graph.zoom();
+                const isAlreadyAt100 = Math.abs(currentScale - 1) < 0.001;
+
+                if (isAlreadyAt100 && !prefersReducedMotion) {
+                    graph.zoomTo(1);
+                    animateTranslateToCenterPoint(
+                        graph,
+                        nodeCenterX,
+                        nodeCenterY,
+                        DRILL_ENTER_ANIMATION_DURATION,
+                        prefersReducedMotion
+                    );
+                } else {
+                    animateGraphZoomAndCenterToPoint(
+                        graph,
+                        1,
+                        nodeCenterX,
+                        nodeCenterY,
+                        DRILL_ENTER_ANIMATION_DURATION,
+                        prefersReducedMotion
+                    );
+                }
+                pendingEnterViewportResetRef.current = false;
+            });
+        },
+        [graph, isReady, prefersReducedMotion]
+    );
 
     useEffect(() => {
         currentRootIdRef.current = drillPath.length > 0 ? drillPath[drillPath.length - 1] : null;
@@ -82,28 +145,29 @@ export function useDrillDown({ graph, isReady }: UseDrillDownOptions): UseDrillD
         const currentRootId = drillPath.length > 0 ? drillPath[drillPath.length - 1] : null;
         applyVisibilityFilter(graph, currentRootId);
 
-        // Center/fit after visibility changes (cancel previous scheduled viewport updates)
         if (typeof window === 'undefined') return;
+
+        // Cancel any previously scheduled viewport updates (path changed again)
         if (viewportRafRef.current !== null) {
             window.cancelAnimationFrame(viewportRafRef.current);
-        }
-        viewportRafRef.current = window.requestAnimationFrame(() => {
             viewportRafRef.current = null;
+        }
 
-            if (!graph) return;
+        const previousDrillDepth = previousDrillDepthRef.current;
+        const nextDrillDepth = drillPath.length;
+        const isEnteringSubgraph = nextDrillDepth > previousDrillDepth;
+        if (!isEnteringSubgraph) {
+            pendingEnterViewportResetRef.current = false;
+            previousDrillDepthRef.current = nextDrillDepth;
+            return;
+        }
+        previousDrillDepthRef.current = nextDrillDepth;
 
-            if (!currentRootId) {
-                graph.zoomToFit({ padding: 60, maxScale: 1.2 });
-                return;
-            }
-
-            const rootCell = graph.getCellById(currentRootId);
-            if (rootCell && rootCell.isNode()) {
-                graph.centerCell(rootCell as Node);
-                graph.zoomToFit({ padding: 80, maxScale: 1.5 });
-            }
-        });
-    }, [graph, isReady, drillPath]);
+        // Only on entering a subgraph: reset to 100% and center the new root.
+        pendingEnterViewportResetRef.current = true;
+        if (!currentRootId) return;
+        scheduleEnterViewportReset(currentRootId);
+    }, [graph, isReady, drillPath, prefersReducedMotion, scheduleEnterViewportReset]);
 
     // Re-apply visibility on graph mutations (collaboration, collapse/expand, add/remove)
     useEffect(() => {
@@ -115,6 +179,9 @@ export function useDrillDown({ graph, isReady }: UseDrillDownOptions): UseDrillD
             reapplyRafRef.current = window.requestAnimationFrame(() => {
                 reapplyRafRef.current = null;
                 applyVisibilityFilter(graph, currentRootIdRef.current);
+                if (pendingEnterViewportResetRef.current && currentRootIdRef.current) {
+                    scheduleEnterViewportReset(currentRootIdRef.current);
+                }
             });
         };
 
@@ -140,7 +207,7 @@ export function useDrillDown({ graph, isReady }: UseDrillDownOptions): UseDrillD
                 viewportRafRef.current = null;
             }
         };
-    }, [graph, isReady]);
+    }, [graph, isReady, scheduleEnterViewportReset]);
 
     /**
      * Check if a node has hierarchical children (can be drilled into)
@@ -228,6 +295,9 @@ function applyVisibilityFilter(graph: Graph, rootNodeId: string | null): void {
     if (rootNodeId) {
         const rootCell = graph.getCellById(rootNodeId);
         if (!rootCell || !rootCell.isNode()) {
+            // During initial load/restore, the graph may still be empty; don't reset the drill path yet.
+            // We'll re-apply the filter on subsequent graph mutations as nodes load in.
+            if (allNodes.length === 0) return;
             console.warn('[useDrillDown] Root node not found, resetting to main view:', rootNodeId);
             resetPath();
             return;

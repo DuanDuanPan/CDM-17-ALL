@@ -8,6 +8,12 @@
 
 import { useCallback, useMemo } from 'react';
 import type { Graph, Node } from '@antv/x6';
+import {
+    animateGraphZoomAndCenterToPoint,
+    animateGraphZoomTo,
+    animateTranslateToCenterPoint,
+    getPrefersReducedMotion,
+} from '../utils/viewport';
 
 export interface UseZoomShortcutsOptions {
     graph: Graph | null;
@@ -31,151 +37,6 @@ const CENTER_ANIMATION_DURATION = 400;
 const FIT_PADDING = 40;
 
 /**
- * Detect user preference for reduced motion (accessibility).
- * SSR-safe: returns false on server.
- */
-function shouldReduceMotion(): boolean {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
-}
-
-/**
- * Clamp a value between min and max.
- */
-function clamp(value: number, min: number, max: number): number {
-    return Math.min(max, Math.max(min, value));
-}
-
-/**
- * Ease-out cubic function for smooth animation deceleration.
- */
-function easeOutCubic(t: number): number {
-    return 1 - Math.pow(1 - t, 3);
-}
-
-/**
- * Animate graph transform (scale + translate) using requestAnimationFrame.
- * Respects prefers-reduced-motion by setting duration to 0.
- */
-function animateGraphTransformTo(
-    graph: Graph,
-    target: { scale: number; tx: number; ty: number },
-    durationMs: number,
-    reduceMotion: boolean
-): void {
-    const duration = reduceMotion ? 0 : durationMs;
-
-    if (duration <= 0) {
-        // Immediate update
-        graph.zoomTo(target.scale);
-        graph.translate(target.tx, target.ty);
-        return;
-    }
-
-    const startScale = graph.zoom();
-    const start = graph.translate();
-    const startTime = performance.now();
-
-    const step = (now: number) => {
-        const t = clamp((now - startTime) / duration, 0, 1);
-        const eased = easeOutCubic(t);
-
-        const currentScale = startScale + (target.scale - startScale) * eased;
-        const currentTx = start.tx + (target.tx - start.tx) * eased;
-        const currentTy = start.ty + (target.ty - start.ty) * eased;
-
-        graph.zoomTo(currentScale);
-        graph.translate(currentTx, currentTy);
-
-        if (t < 1) {
-            requestAnimationFrame(step);
-        }
-    };
-
-    requestAnimationFrame(step);
-}
-
-/**
- * Animate zoom to a specific scale while keeping viewport center stable.
- */
-function animateGraphZoomTo(
-    graph: Graph,
-    targetScale: number,
-    durationMs: number,
-    reduceMotion: boolean
-): void {
-    const duration = reduceMotion ? 0 : durationMs;
-
-    // Get current state
-    const startScale = graph.zoom();
-    const start = graph.translate();
-
-    // Get container dimensions
-    const container = (graph as unknown as { container?: HTMLElement }).container;
-    const rect = container?.getBoundingClientRect();
-    const width = rect?.width ?? 0;
-    const height = rect?.height ?? 0;
-
-    if (!width || !height) {
-        graph.zoomTo(targetScale);
-        return;
-    }
-
-    // Calculate center point in graph coordinates
-    const centerX = (width / 2 - start.tx) / startScale;
-    const centerY = (height / 2 - start.ty) / startScale;
-
-    // Calculate target translate to keep center point stable
-    const targetTx = width / 2 - centerX * targetScale;
-    const targetTy = height / 2 - centerY * targetScale;
-
-    animateGraphTransformTo(graph, { scale: targetScale, tx: targetTx, ty: targetTy }, duration, reduceMotion);
-}
-
-/**
- * Animate translate to center a point in the viewport (without changing zoom).
- */
-function animateTranslateToCenterPoint(
-    graph: Graph,
-    x: number,
-    y: number,
-    durationMs: number,
-    reduceMotion: boolean
-): void {
-    const duration = reduceMotion ? 0 : durationMs;
-
-    const container = (graph as unknown as { container?: HTMLElement }).container;
-    const rect = container?.getBoundingClientRect();
-    const width = rect?.width ?? 0;
-    const height = rect?.height ?? 0;
-
-    if (!width || !height || duration <= 0) {
-        graph.centerPoint(x, y);
-        return;
-    }
-
-    const scale = graph.zoom();
-    const start = graph.translate();
-    const targetTx = width / 2 - x * scale;
-    const targetTy = height / 2 - y * scale;
-
-    const startTime = performance.now();
-
-    const step = (now: number) => {
-        const t = clamp((now - startTime) / duration, 0, 1);
-        const eased = easeOutCubic(t);
-        const tx = start.tx + (targetTx - start.tx) * eased;
-        const ty = start.ty + (targetTy - start.ty) * eased;
-        graph.translate(tx, ty);
-        if (t < 1) {
-            requestAnimationFrame(step);
-        }
-    };
-
-    requestAnimationFrame(step);
-}
-
-/**
  * Hook providing zoom shortcut functions for keyboard and UI interactions.
  *
  * Features:
@@ -189,7 +50,7 @@ export function useZoomShortcuts({
     isReady,
 }: UseZoomShortcutsOptions): UseZoomShortcutsReturn {
     // Memoize reduced motion check (stable across renders)
-    const prefersReducedMotion = useMemo(() => shouldReduceMotion(), []);
+    const prefersReducedMotion = useMemo(() => getPrefersReducedMotion(), []);
 
     /**
      * AC2: Fit to Screen (Cmd/Ctrl + 0)
@@ -201,7 +62,8 @@ export function useZoomShortcuts({
         if (!graph || !isReady) return;
 
         // AC2: Empty canvas check - no-op if no nodes
-        const nodes = graph.getNodes();
+        // Filter to only visible nodes (important for drill-down mode)
+        const nodes = graph.getNodes().filter((n) => n.isVisible());
         if (nodes.length === 0) return;
 
         const container = (graph as unknown as { container?: HTMLElement }).container;
@@ -218,14 +80,13 @@ export function useZoomShortcuts({
         // Calculate scale to fit, but cap at 1 (100%)
         const targetScale = Math.min(availableW / bbox.width, availableH / bbox.height, 1);
 
-        // Calculate translate to center the content
         const center = bbox.getCenter();
-        const targetTx = rect.width / 2 - center.x * targetScale;
-        const targetTy = rect.height / 2 - center.y * targetScale;
 
-        animateGraphTransformTo(
+        animateGraphZoomAndCenterToPoint(
             graph,
-            { scale: targetScale, tx: targetTx, ty: targetTy },
+            targetScale,
+            center.x,
+            center.y,
             ZOOM_ANIMATION_DURATION,
             prefersReducedMotion
         );

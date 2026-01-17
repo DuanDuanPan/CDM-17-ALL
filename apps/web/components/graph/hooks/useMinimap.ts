@@ -271,6 +271,31 @@ export function useMinimap({
                 graph.use(minimap);
                 minimapRef.current = minimap;
 
+                // Keep minimap viewport in sync after graph updates.
+                //
+                // Note: X6 MiniMap wraps `updateViewport` with a 0ms debounce in `init()`.
+                // Under rapid updates (e.g. animated translate/scale or hide/show batches),
+                // the debounced function can lag behind and the viewport rectangle appears "stuck"
+                // until the next user interaction.
+                //
+                // Workaround: call the prototype `updateViewport` (non-debounced) on the next animation frame.
+                const forceUpdateViewport = () => {
+                    const proto = Object.getPrototypeOf(minimap) as { updateViewport?: () => void };
+                    proto.updateViewport?.call(minimap);
+                };
+                let viewportRaf: number | null = null;
+                const scheduleForceUpdateViewport = () => {
+                    if (viewportRaf !== null) return;
+                    viewportRaf = window.requestAnimationFrame(() => {
+                        viewportRaf = null;
+                        forceUpdateViewport();
+                    });
+                };
+
+                graph.on('translate', scheduleForceUpdateViewport);
+                graph.on('scale', scheduleForceUpdateViewport);
+                graph.on('model:updated', scheduleForceUpdateViewport);
+
                 // AC3: Smooth click-to-navigate (override default immediate centerPoint).
                 const mm = minimap as unknown as {
                     container?: HTMLElement;
@@ -307,8 +332,27 @@ export function useMinimap({
                     miniGraphEl.addEventListener('touchstart', handlePointer, true);
 
                     cleanupFn = () => {
+                        graph.off('translate', scheduleForceUpdateViewport);
+                        graph.off('scale', scheduleForceUpdateViewport);
+                        graph.off('model:updated', scheduleForceUpdateViewport);
+                        if (viewportRaf !== null) {
+                            window.cancelAnimationFrame(viewportRaf);
+                            viewportRaf = null;
+                        }
                         miniGraphEl.removeEventListener('mousedown', handlePointer, true);
                         miniGraphEl.removeEventListener('touchstart', handlePointer, true);
+                        minimap.dispose();
+                        minimapRef.current = null;
+                    };
+                } else {
+                    cleanupFn = () => {
+                        graph.off('translate', scheduleForceUpdateViewport);
+                        graph.off('scale', scheduleForceUpdateViewport);
+                        graph.off('model:updated', scheduleForceUpdateViewport);
+                        if (viewportRaf !== null) {
+                            window.cancelAnimationFrame(viewportRaf);
+                            viewportRaf = null;
+                        }
                         minimap.dispose();
                         minimapRef.current = null;
                     };
