@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Graph, type Node } from '@antv/x6';
 import { LayoutMode } from '@cdm/types';
 import { layoutPlugin } from '@cdm/plugin-layout';
@@ -6,6 +6,10 @@ import { useToast } from '@cdm/ui';
 import { isDependencyEdge } from '@/lib/edgeValidation';
 import { VERTICAL_SHARED_TRUNK_ROUTER } from '@/lib/edgeRoutingConstants';
 import { HIERARCHICAL_EDGE_SHAPE } from '@/lib/edgeShapes';
+import { reconcileSingleNodeEdge } from '@/lib/edgeReconciler';
+
+// Story 8.10: Minimum drag distance to trigger re-parenting (prevent click from triggering reparent)
+const DRAG_THRESHOLD = 5;
 
 /**
  * Hook to integrate layout plugin with the graph
@@ -222,6 +226,9 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     };
   }, [graph, isReady, currentMode, addToast, isDocumentVisible]);
 
+  // Story 8.10: Track mouse down position for drag threshold
+  const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
+
   // In non-free mode, transform drag-drop into hierarchy/order changes
   useEffect(() => {
     if (!graph || !isReady) return;
@@ -239,8 +246,29 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
 
     graph.on('edge:added', handleEdgeAdded);
 
+    // Story 8.10: Track mouse down position
+    const handleNodeMouseDown = ({ e }: { e: MouseEvent }) => {
+      mouseDownPosRef.current = { x: e.clientX, y: e.clientY };
+    };
+
     const handleNodeMouseUp = ({ node, e }: { node: Node; e: MouseEvent }) => {
-      if (currentMode === 'free') return;
+      if (currentMode === 'free') {
+        mouseDownPosRef.current = null;
+        return;
+      }
+
+      // Story 8.10: Check drag threshold to distinguish click from drag
+      if (mouseDownPosRef.current) {
+        const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
+        const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
+        if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) {
+          // This is a click, not a drag - skip reparenting
+          mouseDownPosRef.current = null;
+          return;
+        }
+      }
+      mouseDownPosRef.current = null;
+
       // In auto-layout modes we allow "dragging a node" to pan the canvas.
       // Skip drag-drop reparenting when node panning is active.
       if ((graph as unknown as { __cdmNodePanning?: boolean }).__cdmNodePanning) return;
@@ -251,19 +279,28 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
       if (!dropTarget) return;
 
       const targetData = dropTarget.getData() || {};
-      const parentId = targetData.parentId ?? (targetData.type === 'root' ? targetData.id : undefined);
+      const newParentId = targetData.parentId ?? (targetData.type === 'root' ? targetData.id : dropTarget.id);
+
+      // Get current parentId
+      const currentData = node.getData() || {};
+      const oldParentId = currentData.parentId;
 
       // Re-parent and insert after target (order uses fractional then normalize)
-      const currentData = node.getData() || {};
       const newOrder = (targetData.order ?? 0) + 0.5;
-      node.setData({ ...currentData, parentId, order: newOrder });
+      node.setData({ ...currentData, parentId: newParentId, order: newOrder });
 
-      normalizeSiblingOrder(graph, parentId, currentMode);
+      // Story 8.10: Reconcile edge after parentId change
+      if (oldParentId !== newParentId) {
+        reconcileSingleNodeEdge(graph, node.id, oldParentId, newParentId, { layoutMode: currentMode });
+      }
+
+      normalizeSiblingOrder(graph, newParentId, currentMode);
 
       const layoutManager = layoutPlugin.getLayoutManager();
       layoutManager?.recalculate(true);
     };
 
+    graph.on('node:mousedown', handleNodeMouseDown);
     graph.on('node:mouseup', handleNodeMouseUp);
     return () => {
       if (edgeRefreshTimer) {
@@ -271,6 +308,7 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
         edgeRefreshTimer = null;
       }
       graph.off('edge:added', handleEdgeAdded);
+      graph.off('node:mousedown', handleNodeMouseDown);
       graph.off('node:mouseup', handleNodeMouseUp);
     };
   }, [graph, isReady, currentMode]);
@@ -333,9 +371,14 @@ function forceUpdateHierarchicalEdgeViews(graph: Graph, edges: unknown[]) {
   }
 }
 
-// Helpers
+// Story 8.10: Find target node for drop, filtering hidden nodes
 function findTargetNode(graph: Graph, draggedId: string, x: number, y: number) {
-  const nodes = graph.getNodes().filter((n) => n.id !== draggedId);
+  const nodes = graph.getNodes().filter((n) => {
+    if (n.id === draggedId) return false;
+    // Story 8.10: Skip hidden nodes to prevent reparenting to collapsed/hidden nodes
+    if (!n.isVisible()) return false;
+    return true;
+  });
   return nodes.find((n) => {
     const bbox = n.getBBox();
     return x >= bbox.x && x <= bbox.x + bbox.width && y >= bbox.y && y <= bbox.y + bbox.height;

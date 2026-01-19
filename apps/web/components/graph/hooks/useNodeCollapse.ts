@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import type { Graph, Node } from '@antv/x6';
-import { isDependencyEdge } from '@/lib/edgeValidation';
+import {
+    getDirectChildrenByParentId,
+    getAllDescendantsByParentId,
+    getAncestorsByParentId,
+} from '@/lib/parentIdUtils';
 
 /**
  * Story 8.1: Node Collapse & Expand
@@ -63,92 +67,29 @@ export function useNodeCollapse({
     }, [graph]);
 
     /**
-     * Get direct children of a node (outgoing hierarchical edges only)
+     * Get direct children of a node (Story 8.10: parentId-based)
      */
     const getDirectChildren = useCallback((nodeId: string): Node[] => {
         if (!graph) return [];
-
-        const node = getNodeById(nodeId);
-        if (!node) return [];
-
-        const outgoingEdges = graph.getOutgoingEdges(node) ?? [];
-        const children: Node[] = [];
-        const seen = new Set<string>();
-
-        outgoingEdges.forEach((edge) => {
-            // Skip dependency edges - only hierarchical edges define the tree
-            if (isDependencyEdge(edge)) return;
-
-            const targetId = edge.getTargetCellId();
-            if (!targetId || seen.has(targetId)) return;
-
-            const targetCell = graph.getCellById(targetId);
-            if (!targetCell || !targetCell.isNode()) return;
-
-            seen.add(targetId);
-            children.push(targetCell as Node);
-        });
-
-        return children;
-    }, [graph, getNodeById]);
+        return getDirectChildrenByParentId(graph, nodeId);
+    }, [graph]);
 
     /**
-     * Get all descendants of a node recursively
+     * Get all descendants of a node recursively (Story 8.10: parentId-based)
      */
     const getAllDescendants = useCallback((nodeId: string): Node[] => {
         if (!graph) return [];
-
-        const root = getNodeById(nodeId);
-        if (!root) return [];
-
-        const descendants: Node[] = [];
-        const visited = new Set<string>([nodeId]);
-        const queue: string[] = [nodeId];
-
-        while (queue.length > 0) {
-            const currentId = queue.shift()!;
-            const children = getDirectChildren(currentId);
-
-            children.forEach((child) => {
-                if (visited.has(child.id)) return;
-                visited.add(child.id);
-                descendants.push(child);
-                queue.push(child.id);
-            });
-        }
-
-        return descendants;
-    }, [graph, getNodeById, getDirectChildren]);
+        return getAllDescendantsByParentId(graph, nodeId);
+    }, [graph]);
 
     /**
      * Get all ancestors of a node (path to root)
+     * (Already parentId-based in original implementation)
      */
     const getAncestors = useCallback((nodeId: string): Node[] => {
         if (!graph) return [];
-
-        const ancestors: Node[] = [];
-        const visited = new Set<string>();
-        let currentId: string | null = nodeId;
-
-        while (currentId) {
-            const node = getNodeById(currentId);
-            if (!node) break;
-
-            const data = node.getData() || {};
-            const parentId = data.parentId;
-            if (typeof parentId !== 'string' || parentId.length === 0) break;
-            if (visited.has(parentId)) break;
-            visited.add(parentId);
-
-            const parentNode = getNodeById(parentId);
-            if (!parentNode) break;
-
-            ancestors.push(parentNode);
-            currentId = parentId;
-        }
-
-        return ancestors;
-    }, [graph, getNodeById]);
+        return getAncestorsByParentId(graph, nodeId);
+    }, [graph]);
 
     /**
      * Check if a node should currently be visible based on its ancestors' collapse state.

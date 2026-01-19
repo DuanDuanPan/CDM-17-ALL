@@ -21,7 +21,9 @@ const createMockGraph = () => {
                 eventHandlers[event] = eventHandlers[event].filter(h => h !== handler);
             }
         }),
+        batchUpdate: vi.fn((fn: () => void) => fn()),
         getNodes: vi.fn(() => Array.from(nodes.values())),
+        getEdges: vi.fn(() => Array.from(edges.values())),
         getCellById: vi.fn((id: string) => nodes.get(id) || edges.get(id) || null),
         addNode: vi.fn((config: any) => {
             const node = {
@@ -37,16 +39,22 @@ const createMockGraph = () => {
             return node;
         }),
         addEdge: vi.fn((config: any) => {
+            const sourceId = typeof config.source === 'string' ? config.source : config.source?.cell;
+            const targetId = typeof config.target === 'string' ? config.target : config.target?.cell;
+            const edgeId = config.id ?? `${sourceId}→${targetId}`;
             const edge = {
-                id: config.id,
+                id: edgeId,
                 isNode: () => false,
                 isEdge: () => true,
-                getSourceCellId: () => config.source,
-                getTargetCellId: () => config.target,
+                getSourceCellId: () => sourceId,
+                getTargetCellId: () => targetId,
                 getData: () => config.data || {},
             };
-            edges.set(config.id, edge);
+            edges.set(edgeId, edge);
             return edge;
+        }),
+        removeEdge: vi.fn((edgeId: string) => {
+            edges.delete(edgeId);
         }),
         removeCell: vi.fn((cell: any) => {
             nodes.delete(cell.id);
@@ -277,17 +285,13 @@ describe('GraphSyncManager', () => {
             // horizontally (e.g. inherited from mindmap).
             yDoc.getMap('meta').set('layoutMode', 'free');
 
-            // Simulate a remote edge creation.
+            // Story 8.10: Hierarchical edges are derived from parentId, not synced via yEdges.
+            // Simulate a remote parentId relationship (node-2 is child of node-1).
             const remoteDoc = new Y.Doc();
-            const remoteEdges = remoteDoc.getMap('edges');
+            const remoteNodes = remoteDoc.getMap<YjsNodeData>('nodes');
             remoteDoc.transact(() => {
-                remoteEdges.set('edge-1', {
-                    id: 'edge-1',
-                    source: 'node-1',
-                    target: 'node-2',
-                    type: 'hierarchical',
-                    metadata: { kind: 'hierarchical' },
-                });
+                remoteNodes.set('node-1', { id: 'node-1', x: 0, y: 0, label: 'Parent', mindmapType: 'topic' });
+                remoteNodes.set('node-2', { id: 'node-2', x: 0, y: 0, label: 'Child', mindmapType: 'topic', parentId: 'node-1' });
             });
             Y.applyUpdate(yDoc, Y.encodeStateAsUpdate(remoteDoc));
 
@@ -296,7 +300,6 @@ describe('GraphSyncManager', () => {
             expect(mockGraph.addEdge).toHaveBeenCalledTimes(1);
             const config = mockGraph.addEdge.mock.calls[0]?.[0] as any;
             expect(config).toEqual(expect.objectContaining({
-                id: 'edge-1',
                 router: undefined,
                 connector: expect.objectContaining({ name: 'smooth' }),
             }));
@@ -353,15 +356,10 @@ describe('GraphSyncManager', () => {
             syncManager.setLayoutMode('logic');
 
             const remoteDoc = new Y.Doc();
-            const remoteEdges = remoteDoc.getMap('edges');
+            const remoteNodes = remoteDoc.getMap<YjsNodeData>('nodes');
             remoteDoc.transact(() => {
-                remoteEdges.set('edge-1', {
-                    id: 'edge-1',
-                    source: 'node-a',
-                    target: 'node-b',
-                    type: 'hierarchical',
-                    metadata: { kind: 'hierarchical' },
-                });
+                remoteNodes.set('node-a', { id: 'node-a', x: 0, y: 0, label: 'A', mindmapType: 'topic' });
+                remoteNodes.set('node-b', { id: 'node-b', x: 0, y: 0, label: 'B', mindmapType: 'topic', parentId: 'node-a' });
             });
             Y.applyUpdate(yDoc, Y.encodeStateAsUpdate(remoteDoc));
 

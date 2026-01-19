@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useDrillDown } from '@/components/graph/hooks/useDrillDown';
 import * as drillDownStore from '@/lib/drillDownStore';
 import type { Graph, Node, Edge } from '@antv/x6';
@@ -33,38 +33,55 @@ const createMockGraph = (
     nodes: Array<{ id: string; outEdges?: Array<{ targetId: string; edgeType?: string }> }>
 ) => {
     const nodeMap = new Map<string, Node>();
+    const nodeDataMap = new Map<string, Record<string, unknown>>();
     const edgeMap = new Map<string, Edge[]>();
 
+    // First pass: create nodes (so edges can reference targets)
     nodes.forEach((nodeData) => {
+        const data: Record<string, unknown> = {};
         const mockNode = {
             id: nodeData.id,
             isNode: () => true,
             isEdge: () => false,
             show: vi.fn(),
             hide: vi.fn(),
-            getData: () => ({}),
+            getData: () => data,
+            setData: vi.fn((next: Record<string, unknown>) => Object.assign(data, next)),
         } as unknown as Node;
 
         nodeMap.set(nodeData.id, mockNode);
+        nodeDataMap.set(nodeData.id, data);
+    });
 
-        if (nodeData.outEdges) {
-            const edges = nodeData.outEdges.map((e, idx) => ({
-                id: `${nodeData.id}-${e.targetId}-${idx}`,
-                isEdge: () => true,
-                isNode: () => false,
-                getData: () => ({
-                    metadata: {
-                        kind: e.edgeType === 'dependency' ? 'dependency' : 'hierarchical',
-                    },
-                }),
-                getTargetCell: () => nodeMap.get(e.targetId) || null,
-                getSourceCellId: () => nodeData.id,
-                getTargetCellId: () => e.targetId,
-                show: vi.fn(),
-                hide: vi.fn(),
-            }));
-            edgeMap.set(nodeData.id, edges as unknown as Edge[]);
-        }
+    // Second pass: create edges and derive hierarchy via parentId
+    nodes.forEach((nodeData) => {
+        if (!nodeData.outEdges) return;
+
+        const edges = nodeData.outEdges.map((e, idx) => ({
+            id: `${nodeData.id}-${e.targetId}-${idx}`,
+            isEdge: () => true,
+            isNode: () => false,
+            getData: () => ({
+                metadata: {
+                    kind: e.edgeType === 'dependency' ? 'dependency' : 'hierarchical',
+                },
+            }),
+            getTargetCell: () => nodeMap.get(e.targetId) || null,
+            getSourceCellId: () => nodeData.id,
+            getTargetCellId: () => e.targetId,
+            show: vi.fn(),
+            hide: vi.fn(),
+        }));
+        edgeMap.set(nodeData.id, edges as unknown as Edge[]);
+
+        // Story 8.10: Hierarchy derives from node.data.parentId (not edges)
+        nodeData.outEdges.forEach((edge) => {
+            if (edge.edgeType === 'dependency') return;
+            const targetData = nodeDataMap.get(edge.targetId);
+            if (targetData) {
+                targetData.parentId = nodeData.id;
+            }
+        });
     });
 
     const mockGraph = {

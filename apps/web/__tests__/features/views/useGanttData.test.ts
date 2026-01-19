@@ -76,12 +76,21 @@ function createYDocWithData(
   });
 
   edges.forEach((edge) => {
+    const edgeKind = edge.metadata?.kind ?? 'hierarchical';
+    // Story 8.10: Hierarchy comes from node.parentId, not Yjs edges.
+    if (edgeKind === 'hierarchical') {
+      const targetNode = yNodes.get(edge.target);
+      if (!targetNode) return;
+      yNodes.set(edge.target, { ...targetNode, parentId: edge.source });
+      return;
+    }
+
     yEdges.set(edge.id, {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      type: edge.metadata?.kind === 'dependency' ? 'reference' : 'hierarchical',
-      metadata: edge.metadata || { kind: 'hierarchical' },
+      type: 'reference',
+      metadata: edge.metadata || { kind: 'dependency' },
     });
   });
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { Node, Graph, Edge } from '@antv/x6';
+import type { Node, Graph } from '@antv/x6';
 import {
     NodeType,
     type TaskProps,
@@ -13,7 +13,10 @@ import {
     type ApprovalPipeline,
 } from '@cdm/types';
 import { CollapseToggle } from '@cdm/ui';
-import { isDependencyEdge } from '@/lib/edgeValidation';
+import {
+    getDirectChildrenByParentId,
+    getAllDescendantsByParentId,
+} from '@/lib/parentIdUtils';
 
 // Story 7.4: Extracted hooks
 import { useNodeDataSync, useAppExecution, useNodeEditing } from './hooks';
@@ -133,77 +136,67 @@ export function MindNode({ node }: MindNodeProps) {
 
     const graph = node.model?.graph as Graph | undefined;
 
-    // Story 8.1: Ensure the node UI reacts to outgoing edge changes (e.g. remote child added/removed)
-    // Without this, child count / collapse toggle can become stale when only edges change.
-    const [, bumpOutgoingEdgeRevision] = useState(0);
+    // Story 8.10: Ensure the node UI reacts to parentId changes (e.g. child added/removed)
+    // Without this, child count / collapse toggle can become stale when children change.
+    const [, bumpParentIdRevision] = useState(0);
     useEffect(() => {
         if (!graph) return;
 
-        const bumpIfOutgoing = ({ edge }: { edge: Edge }) => {
-            if (edge.getSourceCellId() === node.id) {
-                bumpOutgoingEdgeRevision((v) => v + 1);
+        const bumpIfRelevant = ({
+            node: changedNode,
+            current,
+            previous,
+        }: {
+            node: Node;
+            current?: unknown;
+            previous?: unknown;
+        }) => {
+            const currentData = (current ?? changedNode.getData() ?? {}) as {
+                parentId?: string;
+            } | null;
+            const previousData = (previous ?? {}) as { parentId?: string } | null;
+
+            const currentParentId = currentData?.parentId;
+            const previousParentId = previousData?.parentId;
+
+            const shouldBump =
+                // This node's own data changed
+                changedNode.id === node.id ||
+                // This node gained or lost a child (child parentId changed to/from this node)
+                currentParentId === node.id ||
+                previousParentId === node.id;
+
+            if (shouldBump) {
+                bumpParentIdRevision((v) => v + 1);
             }
         };
 
-        graph.on('edge:added', bumpIfOutgoing);
-        graph.on('edge:removed', bumpIfOutgoing);
+        graph.on('node:change:data', bumpIfRelevant);
+        graph.on('node:added', bumpIfRelevant);
+        graph.on('node:removed', bumpIfRelevant);
 
         return () => {
-            graph.off('edge:added', bumpIfOutgoing);
-            graph.off('edge:removed', bumpIfOutgoing);
+            graph.off('node:change:data', bumpIfRelevant);
+            graph.off('node:added', bumpIfRelevant);
+            graph.off('node:removed', bumpIfRelevant);
         };
     }, [graph, node.id]);
 
-    // Story 8.1: Get child count from node's graph
+    // Story 8.10: Get child count from node's graph (parentId-based)
     const childCount = (() => {
         if (!graph) return 0;
-        const outgoingEdges = graph.getOutgoingEdges(node) ?? [];
-        const uniqueChildIds = new Set<string>();
-
-        outgoingEdges.forEach((edge) => {
-            // Only hierarchical edges define children; skip dependency edges
-            if (isDependencyEdge(edge)) return;
-            const targetId = edge.getTargetCellId();
-            if (targetId) uniqueChildIds.add(targetId);
-        });
-
-        let count = 0;
-        uniqueChildIds.forEach((childId) => {
-            const cell = graph.getCellById(childId);
-            if (cell && cell.isNode()) count += 1;
-        });
-
-        return count;
+        const children = getDirectChildrenByParentId(graph, node.id);
+        return children.length;
     })();
 
     const hasChildren = childCount > 0;
 
-    // Story 8.1: Get hidden descendant count for collapsed node
+    // Story 8.10: Get hidden descendant count for collapsed node (parentId-based)
     const hiddenDescendantCount = (() => {
         if (!isCollapsed) return 0;
         if (!graph) return 0;
-        const visited = new Set<string>([node.id]);
-        const queue: string[] = [node.id];
-        let count = 0;
-
-        while (queue.length > 0) {
-            const currentId = queue.shift()!;
-            const outgoingEdges = graph.getOutgoingEdges(currentId) ?? [];
-            outgoingEdges.forEach((edge) => {
-                if (isDependencyEdge(edge)) return;
-                const targetId = edge.getTargetCellId();
-                if (!targetId || visited.has(targetId)) return;
-
-                visited.add(targetId);
-                const cell = graph.getCellById(targetId);
-                if (cell && cell.isNode()) {
-                    count += 1;
-                    queue.push(targetId);
-                }
-            });
-        }
-
-        return count;
+        const descendants = getAllDescendantsByParentId(graph, node.id);
+        return descendants.length;
     })();
 
     // Story 8.1: Handle collapse toggle

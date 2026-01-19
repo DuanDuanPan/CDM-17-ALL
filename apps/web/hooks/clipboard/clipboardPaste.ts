@@ -14,9 +14,7 @@ import { unarchiveNode } from '@/lib/api/nodes';
 import { parseClipboardData, sanitizeNodeProps } from '@cdm/types';
 import {
     getFallbackParentId,
-    ensureHierarchicalEdges,
     createClipboardEdges,
-    createParentChildEdges,
 } from './pasteHelpers';
 
 export interface PasteOptions {
@@ -122,7 +120,7 @@ interface HandlePasteCommonOptions {
  */
 async function handleCutPasteMove({
     graph,
-    graphId,
+    graphId: _graphId,
     yDoc,
     undoManager,
     selectedNodes,
@@ -143,7 +141,6 @@ async function handleCutPasteMove({
     }
 
     const fallbackParentId = getFallbackParentId(graph, selectedNodes);
-    const parentChildRelations: Array<{ parentId: string; childId: string }> = [];
 
     undoManager?.stopCapturing();
     yDoc.transact(() => {
@@ -172,10 +169,6 @@ async function handleCutPasteMove({
                 resolvedParentId = fallbackParentId;
             }
 
-            if (resolvedParentId) {
-                parentChildRelations.push({ parentId: resolvedParentId, childId: nodeData.originalId });
-            }
-
             yNodes.set(nodeData.originalId, {
                 ...existing,
                 x: nodeData.x + pasteCenter.x,
@@ -186,8 +179,6 @@ async function handleCutPasteMove({
                 updatedAt: now,
             });
         });
-
-        ensureHierarchicalEdges(yEdges, parentChildRelations, graphId);
     });
 
     // Unarchive on backend
@@ -236,7 +227,6 @@ async function handleCopyPaste({
 
     const newNodeIds: string[] = [];
     const newEdgeIds: string[] = [];
-    const parentChildRelations: Array<{ parentId: string; childId: string }> = [];
     const fallbackParentId = getFallbackParentId(graph, selectedNodes);
 
     yDoc.transact(() => {
@@ -251,10 +241,6 @@ async function handleCopyPaste({
                 resolvedParentId = mappedParentId ?? fallbackParentId;
             } else if (fallbackParentId) {
                 resolvedParentId = fallbackParentId;
-            }
-
-            if (resolvedParentId) {
-                parentChildRelations.push({ parentId: resolvedParentId, childId: newId });
             }
 
             const now = new Date().toISOString();
@@ -286,9 +272,6 @@ async function handleCopyPaste({
 
         // Create edges from clipboard
         createClipboardEdges(yEdges, data.edges, idMap, graphId, newEdgeIds);
-
-        // Create hierarchical edges for parent-child relationships
-        createParentChildEdges(yEdges, parentChildRelations, data.edges, idMap, graphId, newEdgeIds);
     });
 
     // Select new nodes

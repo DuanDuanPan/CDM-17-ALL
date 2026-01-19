@@ -32,48 +32,8 @@ export function getFallbackParentId(graph: Graph, selectedNodes: Node[]): string
 }
 
 /**
- * Ensure hierarchical edges exist for parent-child relations.
- */
-export function ensureHierarchicalEdges(
-    yEdges: Y.Map<unknown>,
-    parentChildRelations: Array<{ parentId: string; childId: string }>,
-    graphId: string
-): void {
-    const existingHierarchicalPairs = new Set<string>();
-    yEdges.forEach((edgeData) => {
-        const edge = edgeData as {
-            source?: string;
-            target?: string;
-            type?: string;
-            metadata?: { kind?: string };
-        };
-        const sourceId = edge.source;
-        const targetId = edge.target;
-        if (!sourceId || !targetId) return;
-        const metadata = edge.metadata || {};
-        const kind = metadata.kind ?? (edge.type === 'reference' ? 'dependency' : 'hierarchical');
-        if (kind !== 'hierarchical') return;
-        const key = sourceId < targetId ? `${sourceId}|${targetId}` : `${targetId}|${sourceId}`;
-        existingHierarchicalPairs.add(key);
-    });
-
-    parentChildRelations.forEach(({ parentId, childId }) => {
-        const key = parentId < childId ? `${parentId}|${childId}` : `${childId}|${parentId}`;
-        if (existingHierarchicalPairs.has(key)) return;
-        const edgeId = nanoid();
-        yEdges.set(edgeId, {
-            id: edgeId,
-            source: parentId,
-            target: childId,
-            type: 'hierarchical',
-            metadata: { kind: 'hierarchical' },
-            graphId: graphId,
-        });
-    });
-}
-
-/**
  * Build edges between newly created nodes during paste.
+ * Story 8.10: Only dependency edges are stored in Yjs (hierarchical edges are derived locally from parentId).
  */
 export function createClipboardEdges(
     yEdges: Y.Map<unknown>,
@@ -88,6 +48,7 @@ export function createClipboardEdges(
     newEdgeIds: string[]
 ): void {
     edges.forEach(edgeData => {
+        if (edgeData.kind !== 'dependency') return;
         const newSourceId = idMap.get(edgeData.sourceOriginalId);
         const newTargetId = idMap.get(edgeData.targetOriginalId);
 
@@ -99,47 +60,11 @@ export function createClipboardEdges(
                 id: edgeId,
                 source: newSourceId,
                 target: newTargetId,
-                type: edgeData.kind === 'dependency' ? 'reference' : 'hierarchical',
+                type: 'reference',
                 metadata: {
-                    kind: edgeData.kind,
+                    kind: 'dependency',
                     dependencyType: edgeData.dependencyType,
                 },
-                graphId: graphId,
-            });
-        }
-    });
-}
-
-/**
- * Create hierarchical edges for parent-child relationships from paste.
- */
-export function createParentChildEdges(
-    yEdges: Y.Map<unknown>,
-    parentChildRelations: Array<{ parentId: string; childId: string }>,
-    clipboardEdges: Array<{ sourceOriginalId: string; targetOriginalId: string; kind: string }>,
-    idMap: Map<string, string>,
-    graphId: string,
-    newEdgeIds: string[]
-): void {
-    parentChildRelations.forEach(({ parentId, childId }) => {
-        const hierarchicalEdgeExists = clipboardEdges.some(e => {
-            if (e.kind === 'dependency') return false;
-            const mappedSource = idMap.get(e.sourceOriginalId);
-            const mappedTarget = idMap.get(e.targetOriginalId);
-            return (mappedSource === parentId && mappedTarget === childId) ||
-                (mappedSource === childId && mappedTarget === parentId);
-        });
-
-        if (!hierarchicalEdgeExists) {
-            const edgeId = nanoid();
-            newEdgeIds.push(edgeId);
-
-            yEdges.set(edgeId, {
-                id: edgeId,
-                source: parentId,
-                target: childId,
-                type: 'hierarchical',
-                metadata: { kind: 'hierarchical' },
                 graphId: graphId,
             });
         }

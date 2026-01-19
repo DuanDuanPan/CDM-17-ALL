@@ -5,6 +5,8 @@ import { syncLogger as logger } from '@/lib/logger';
 import { VERTICAL_SHARED_TRUNK_ROUTER } from '@/lib/edgeRoutingConstants';
 import { HIERARCHICAL_EDGE_ATTRS } from '@/lib/edgeStyles';
 import { HIERARCHICAL_EDGE_SHAPE } from '@/lib/edgeShapes';
+import { isDependencyEdge } from '@/lib/edgeValidation';
+import { reconcileHierarchicalEdges } from '@/lib/edgeReconciler';
 
 /**
  * Node data structure stored in Yjs
@@ -225,23 +227,30 @@ export class GraphSyncManager {
         };
         this.graph.on('node:change:data', this.boundHandlers.nodeDataChange);
 
-        // Edge added
+        // Edge added - Story 8.10: Only sync dependency edges
         this.boundHandlers.edgeAdded = ({ edge }) => {
             if (this.isRemoteUpdate) return;
+            // Story 8.10: Only sync dependency edges to Yjs
+            if (!isDependencyEdge(edge)) return;
             this.syncEdgeToYjs(edge);
         };
         this.graph.on('edge:added', this.boundHandlers.edgeAdded);
 
-        // Edge removed
+        // Edge removed - Story 8.10: Only sync dependency edges
         this.boundHandlers.edgeRemoved = ({ edge }) => {
             if (this.isRemoteUpdate) return;
+            // Story 8.10: Only sync dependency edges to Yjs
+            if (!isDependencyEdge(edge)) return;
             this.removeEdgeFromYjs(edge.id);
         };
         this.graph.on('edge:removed', this.boundHandlers.edgeRemoved);
 
         // Story 2.2: Edge data change (metadata, dependencyType)
+        // Story 8.10: Only sync dependency edges
         this.boundHandlers.edgeDataChange = ({ edge }) => {
             if (this.isRemoteUpdate) return;
+            // Story 8.10: Only sync dependency edges to Yjs
+            if (!isDependencyEdge(edge)) return;
             // Bugfix: Defer sync to ensure X6 data is fully updated before reading
             setTimeout(() => {
                 this.syncEdgeToYjs(edge);
@@ -280,12 +289,22 @@ export class GraphSyncManager {
             });
 
             this.isRemoteUpdate = true;
+            let shouldReconcileHierarchy = false;
             try {
                 event.changes.keys.forEach((change, nodeId) => {
                     logger.debug('yNodes.observe: processing change', { nodeId, action: change.action });
                     if (change.action === 'add' || change.action === 'update') {
                         const nodeData = this.yNodes?.get(nodeId);
                         if (nodeData) {
+                            const existingCell = this.graph?.getCellById(nodeId);
+                            const oldParentId =
+                                existingCell && existingCell.isNode()
+                                    ? (existingCell as Node).getData()?.parentId
+                                    : undefined;
+                            const newParentId = nodeData.parentId;
+                            if (oldParentId !== newParentId) {
+                                shouldReconcileHierarchy = true;
+                            }
                             this.applyNodeToGraph(nodeData);
                         }
                     } else if (change.action === 'delete') {
@@ -293,6 +312,14 @@ export class GraphSyncManager {
                         this.removeNodeFromGraph(nodeId);
                     }
                 });
+
+                // Story 8.10: Reconcile hierarchical edges when parentId changes (avoid running on position-only updates)
+                if (shouldReconcileHierarchy && this.graph) {
+                    reconcileHierarchicalEdges(this.graph, {
+                        warnOrphans: false,
+                        layoutMode: this.getLayoutMode(),
+                    });
+                }
             } finally {
                 this.isRemoteUpdate = false;
             }
@@ -321,6 +348,14 @@ export class GraphSyncManager {
                     if (change.action === 'add' || change.action === 'update') {
                         const edgeData = this.yEdges?.get(edgeId);
                         if (edgeData) {
+                            // Story 8.10: Only apply dependency edges from Yjs (hierarchical edges are local-derived)
+                            const edgeKind =
+                                edgeData.metadata?.kind ||
+                                (edgeData.type === 'reference' ? 'dependency' : 'hierarchical');
+                            if (edgeKind !== 'dependency') {
+                                logger.debug('yEdges.observe: ignoring non-dependency edge', { edgeId, edgeKind });
+                                return;
+                            }
                             this.applyEdgeToGraph(edgeData);
                         }
                     } else if (change.action === 'delete') {
@@ -883,6 +918,8 @@ export class GraphSyncManager {
 
     /**
      * Load initial state from Yjs to X6
+     * Story 8.10: Only dependency edges are loaded from Yjs.
+     * Hierarchical edges are derived from parentId via reconcileHierarchicalEdges.
      */
     loadInitialState(): void {
         if (!this.graph || !this.yNodes || !this.yEdges) return;
@@ -894,9 +931,20 @@ export class GraphSyncManager {
                 this.applyNodeToGraph(data);
             });
 
-            // Load edges
+            // Story 8.10: Load only dependency edges from Yjs
+            // (Hierarchical edges are derived from parentId)
             this.yEdges.forEach((data) => {
-                this.applyEdgeToGraph(data);
+                // Only apply dependency edges from Yjs
+                const edgeKind = data.metadata?.kind || (data.type === 'reference' ? 'dependency' : 'hierarchical');
+                if (edgeKind === 'dependency') {
+                    this.applyEdgeToGraph(data);
+                }
+            });
+
+            // Story 8.10: Reconcile hierarchical edges from parentId after nodes are loaded
+            reconcileHierarchicalEdges(this.graph, {
+                warnOrphans: false,
+                layoutMode: this.getLayoutMode(),
             });
 
             // Load layout mode

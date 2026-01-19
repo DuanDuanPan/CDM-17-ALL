@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import type { Graph, Node, Edge } from '@antv/x6';
+import type { Graph, Node } from '@antv/x6';
 import {
     useDrillPath,
     pushPath,
@@ -20,7 +20,9 @@ import {
     resetPath,
     restoreFromUrl,
 } from '@/lib/drillDownStore';
-import { isDependencyEdge } from '@/lib/edgeValidation';
+import {
+    getDirectChildrenByParentId,
+} from '@/lib/parentIdUtils';
 import {
     animateGraphZoomAndCenterToPoint,
     animateTranslateToCenterPoint,
@@ -211,7 +213,7 @@ export function useDrillDown({ graph, isReady }: UseDrillDownOptions): UseDrillD
 
     /**
      * Check if a node has hierarchical children (can be drilled into)
-     * Only considers hierarchy edges, not dependency edges
+     * Story 8.10: Uses parentId-based child lookup
      */
     const canDrillInto = useCallback(
         (nodeId: string): boolean => {
@@ -220,11 +222,9 @@ export function useDrillDown({ graph, isReady }: UseDrillDownOptions): UseDrillD
             const node = graph.getCellById(nodeId);
             if (!node || !node.isNode()) return false;
 
-            // Get outgoing edges that are NOT dependency edges
-            const outEdges = graph.getOutgoingEdges(node as Node) || [];
-            const hierarchyChildren = outEdges.filter((edge) => !isDependencyEdge(edge));
-
-            return hierarchyChildren.length > 0;
+            // Story 8.10: Use parentId-based children lookup
+            const children = getDirectChildrenByParentId(graph, nodeId);
+            return children.length > 0;
         },
         [graph]
     );
@@ -289,7 +289,8 @@ function applyVisibilityFilter(graph: Graph, rootNodeId: string | null): void {
     const allEdges = graph.getEdges();
 
     const nodesById = new Map<string, Node>(allNodes.map((node) => [node.id, node]));
-    const hierarchyChildrenMap = buildHierarchyChildrenMap(allEdges);
+    // Story 8.10: Build hierarchy map from parentId instead of edges
+    const hierarchyChildrenMap = buildHierarchyChildrenMapFromParentId(nodesById);
 
     // Validate root if in drill mode
     if (rootNodeId) {
@@ -326,19 +327,20 @@ function applyVisibilityFilter(graph: Graph, rootNodeId: string | null): void {
 }
 
 /**
- * Build a map of hierarchy (non-dependency) children from current edge list.
+ * Story 8.10: Build a map of hierarchy children from parentId.
+ * This replaces the edge-based buildHierarchyChildrenMap.
  */
-function buildHierarchyChildrenMap(edges: Edge[]): Map<string, string[]> {
+function buildHierarchyChildrenMapFromParentId(nodesById: Map<string, Node>): Map<string, string[]> {
     const map = new Map<string, string[]>();
 
-    for (const edge of edges) {
-        if (isDependencyEdge(edge)) continue;
-        const sourceId = edge.getSourceCellId();
-        const targetId = edge.getTargetCellId();
-        if (!sourceId || !targetId) continue;
-        const list = map.get(sourceId);
-        if (list) list.push(targetId);
-        else map.set(sourceId, [targetId]);
+    for (const [nodeId, node] of nodesById) {
+        const data = node.getData() as { parentId?: string } | null;
+        const parentId = data?.parentId;
+        if (!parentId) continue;
+
+        const list = map.get(parentId);
+        if (list) list.push(nodeId);
+        else map.set(parentId, [nodeId]);
     }
 
     return map;

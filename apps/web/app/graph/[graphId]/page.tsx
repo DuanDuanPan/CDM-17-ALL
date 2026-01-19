@@ -97,7 +97,7 @@ function GraphPageContent() {
     const isGraphReady = graph !== null;
 
     // Story 8.4: Outline View hooks
-    const { outlineData, reorderNode } = useOutlineData({ graph, isReady: isGraphReady });
+    const { outlineData, reorderNode } = useOutlineData({ graph, isReady: isGraphReady, layoutMode });
     const { centerNode } = useZoomShortcuts({ graph, isReady: isGraphReady });
 
     // Restore state from localStorage on client mount

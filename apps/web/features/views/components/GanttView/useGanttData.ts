@@ -107,53 +107,22 @@ export interface UseGanttDataReturn {
  */
 function findGanttParent(
   nodeId: string,
-  nodesMap: Map<string, YjsNodeData>,
-  edgesMap: Map<string, YjsEdgeData>
+  nodesMap: Map<string, YjsNodeData>
 ): string | null {
   const node = nodesMap.get(nodeId);
   if (!node) return null;
 
-  // Find parent edge (where target is this node)
-  let parentId: string | null = null;
-  for (const [, edge] of edgesMap) {
-    const edgeKind = edge.metadata?.kind || (edge.type === 'reference' ? 'dependency' : 'hierarchical');
-    if (edgeKind !== 'hierarchical') {
-      continue;
-    }
-    if (edge.target === nodeId) {
-      parentId = edge.source;
-      break;
-    }
-  }
+  // Story 8.10: Use parentId as the single source of truth for hierarchy.
+  // Yjs edges only store dependency edges; hierarchical structure is derived from nodes.parentId.
+  let currentParentId = node.parentId;
+  while (currentParentId) {
+    const current = nodesMap.get(currentParentId);
+    if (!current) return null;
 
-  if (!parentId) return null;
+    if (current.mindmapType === 'root') return current.id;
+    if (current.nodeType === NodeType.TASK) return current.id;
 
-  // Traverse up the tree
-  let current = nodesMap.get(parentId);
-  while (current) {
-    // Check if this is a ROOT or TASK node
-    if (current.mindmapType === 'root') {
-      return current.id;
-    }
-    if (current.nodeType === NodeType.TASK) {
-      return current.id;
-    }
-
-    // Find next parent
-    let nextParentId: string | null = null;
-    for (const [, edge] of edgesMap) {
-      const edgeKind = edge.metadata?.kind || (edge.type === 'reference' ? 'dependency' : 'hierarchical');
-      if (edgeKind !== 'hierarchical') {
-        continue;
-      }
-      if (edge.target === current.id) {
-        nextParentId = edge.source;
-        break;
-      }
-    }
-
-    if (!nextParentId) break;
-    current = nodesMap.get(nextParentId);
+    currentParentId = current.parentId;
   }
 
   return null;
@@ -280,7 +249,7 @@ export function useGanttData(yDoc: Y.Doc | null): UseGanttDataReturn {
       const progress = typeof props.progress === 'number' ? props.progress / 100 : 0;
 
       // Find Gantt parent (may skip non-TASK nodes)
-      const ganttParentId = findGanttParent(nodeId, nodesMap, edgesMap);
+      const ganttParentId = findGanttParent(nodeId, nodesMap);
 
       // Case 1: No dates at all -> unscheduled
       if (!startDate && !dueDate) {

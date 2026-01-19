@@ -1,7 +1,7 @@
 'use client';
 
 import type { Graph, Node } from '@antv/x6';
-import { isDependencyEdge } from '@/lib/edgeValidation';
+import { getDirectChildrenByParentId } from '@/lib/parentIdUtils';
 import { HIERARCHICAL_EDGE_GLOW_OPACITY, HIERARCHICAL_EDGE_SELECTED_ATTRS } from '@/lib/edgeStyles';
 
 export function areSetsEqual(a: Set<string>, b: Set<string>): boolean {
@@ -25,29 +25,12 @@ function getParentId(graph: Graph, nodeId: string): string | null {
     return typeof data.parentId === 'string' && data.parentId.length > 0 ? data.parentId : null;
 }
 
+/**
+ * Story 8.10: Get direct children using parentId-based lookup
+ */
 function getDirectChildren(graph: Graph, nodeId: string): string[] {
-    const node = getNodeById(graph, nodeId);
-    if (!node) return [];
-
-    const outgoingEdges = graph.getOutgoingEdges(node) ?? [];
-    const children: string[] = [];
-    const seen = new Set<string>();
-
-    outgoingEdges.forEach((edge) => {
-        // Skip dependency edges - only hierarchical edges define the tree
-        if (isDependencyEdge(edge)) return;
-
-        const targetId = edge.getTargetCellId();
-        if (!targetId || seen.has(targetId)) return;
-
-        const targetCell = graph.getCellById(targetId);
-        if (!targetCell || !targetCell.isNode()) return;
-
-        seen.add(targetId);
-        children.push(targetId);
-    });
-
-    return children;
+    const children = getDirectChildrenByParentId(graph, nodeId);
+    return children.map((node) => node.id);
 }
 
 function getSiblings(graph: Graph, nodeId: string): string[] {

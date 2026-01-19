@@ -95,35 +95,6 @@ function flattenTemplateNodes(
 }
 
 /**
- * Create hierarchical edges for parent-child relationships.
- */
-function createHierarchicalEdges(
-  yEdges: Y.Map<unknown>,
-  flatNodes: FlattenedNode[],
-  tempIdToNewId: Map<string, string>,
-  graphId: string
-): void {
-  flatNodes.forEach((node) => {
-    if (!node.parentTempId) return;
-
-    const childId = tempIdToNewId.get(node.tempId);
-    const parentId = tempIdToNewId.get(node.parentTempId);
-
-    if (childId && parentId) {
-      const edgeId = nanoid();
-      yEdges.set(edgeId, {
-        id: edgeId,
-        source: parentId,
-        target: childId,
-        type: 'hierarchical',
-        metadata: { kind: 'hierarchical' },
-        graphId,
-      });
-    }
-  });
-}
-
-/**
  * Create dependency edges from template edges.
  */
 function createDependencyEdges(
@@ -245,27 +216,8 @@ export function useTemplateInsert({
             });
           });
 
-          // Create hierarchical edges for parent-child relationships within template
-          createHierarchicalEdges(yEdges, flatNodes, tempIdToNewId, graphId);
-
           // Create dependency edges from template
           createDependencyEdges(yEdges, structure.edges, tempIdToNewId, graphId);
-
-          // Create edge from fallback parent to root node if needed
-          if (fallbackParentId && flatNodes.length > 0) {
-            const rootNewId = tempIdToNewId.get(flatNodes[0].tempId);
-            if (rootNewId) {
-              const edgeId = nanoid();
-              yEdges.set(edgeId, {
-                id: edgeId,
-                source: fallbackParentId,
-                target: rootNewId,
-                type: 'hierarchical',
-                metadata: { kind: 'hierarchical' },
-                graphId,
-              });
-            }
-          }
         });
 
         // Center on first new node

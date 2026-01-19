@@ -50,6 +50,7 @@ function createMockGraph() {
     const graph = {
         getCellById: vi.fn((id: string) => nodes.get(id) || null),
         getNodes: vi.fn(() => Array.from(nodes.values())),
+        getEdges: vi.fn(() => Array.from(edges.values())),
         getOutgoingEdges: vi.fn((cell: MockNode | string) => {
             const id = typeof cell === 'string' ? cell : cell.id;
             return Array.from(edges.values()).filter((edge) => edge.getSourceCellId() === id);
@@ -95,6 +96,14 @@ function createMockGraph() {
         ) => {
             const edge = createMockEdge(source, target, kind);
             edges.set(edge.id, edge);
+            // Story 8.10: Hierarchy derives from node.data.parentId (not edges).
+            // For tests convenience, adding a hierarchical edge also sets target.parentId.
+            if (kind === 'hierarchical') {
+                const targetNode = nodes.get(target);
+                if (targetNode) {
+                    targetNode.setData({ parentId: source });
+                }
+            }
             return edge;
         },
         emit: (event: string) => {

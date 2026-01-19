@@ -14,9 +14,7 @@ import * as Y from 'yjs';
 import { pasteFromClipboard } from '../clipboard/clipboardPaste';
 import {
     getFallbackParentId,
-    ensureHierarchicalEdges,
     createClipboardEdges,
-    createParentChildEdges,
 } from '../clipboard/pasteHelpers';
 import type { Node, Graph } from '@antv/x6';
 import type { ClipboardEdgeData } from '@cdm/types';
@@ -85,59 +83,6 @@ describe('Paste Helpers', () => {
         });
     });
 
-    describe('ensureHierarchicalEdges', () => {
-        let yDoc: Y.Doc;
-        let yEdges: Y.Map<unknown>;
-
-        beforeEach(() => {
-            yDoc = new Y.Doc();
-            yEdges = yDoc.getMap('edges');
-        });
-
-        describe('TC-Paste-2: Hierarchy Restoration', () => {
-            it('should create hierarchical edges for parent-child relations', () => {
-                const parentChildRelations = [
-                    { parentId: 'parent1', childId: 'child1' },
-                    { parentId: 'parent1', childId: 'child2' },
-                ];
-
-                yDoc.transact(() => {
-                    ensureHierarchicalEdges(yEdges, parentChildRelations, 'test-graph');
-                });
-
-                expect(yEdges.size).toBe(2);
-
-                const edges = Array.from(yEdges.values()) as Array<{ source: string; target: string }>;
-                const edgePairs = edges.map(e => `${e.source}->${e.target}`);
-
-                expect(edgePairs).toContain('parent1->child1');
-                expect(edgePairs).toContain('parent1->child2');
-            });
-
-            it('should not create duplicate edges', () => {
-                // Pre-existing edge
-                yEdges.set('existing', {
-                    id: 'existing',
-                    source: 'parent1',
-                    target: 'child1',
-                    kind: 'hierarchical',
-                });
-
-                const parentChildRelations = [
-                    { parentId: 'parent1', childId: 'child1' }, // Already exists
-                    { parentId: 'parent1', childId: 'child2' }, // New
-                ];
-
-                yDoc.transact(() => {
-                    ensureHierarchicalEdges(yEdges, parentChildRelations, 'test-graph');
-                });
-
-                // Should have original + 1 new
-                expect(yEdges.size).toBe(2);
-            });
-        });
-    });
-
     describe('createClipboardEdges', () => {
         let yDoc: Y.Doc;
         let yEdges: Y.Map<unknown>;
@@ -148,7 +93,7 @@ describe('Paste Helpers', () => {
         });
 
         describe('TC-Paste-4: Edge Reconstruction', () => {
-            it('should recreate edges with new node IDs', () => {
+            it('should ignore hierarchical edges (Story 8.10: hierarchy derives from parentId)', () => {
                 const clipboardEdges: ClipboardEdgeData[] = [
                     { sourceOriginalId: 'old-A', targetOriginalId: 'old-B', kind: 'hierarchical' },
                     { sourceOriginalId: 'old-B', targetOriginalId: 'old-C', kind: 'hierarchical' },
@@ -166,13 +111,8 @@ describe('Paste Helpers', () => {
                     createClipboardEdges(yEdges, clipboardEdges, idMap, 'test-graph', newEdgeIds);
                 });
 
-                expect(newEdgeIds).toHaveLength(2);
-
-                const edges = Array.from(yEdges.values()) as Array<{ source: string; target: string }>;
-                const edgePairs = edges.map(e => `${e.source}->${e.target}`);
-
-                expect(edgePairs).toContain('new-A->new-B');
-                expect(edgePairs).toContain('new-B->new-C');
+                expect(newEdgeIds).toHaveLength(0);
+                expect(yEdges.size).toBe(0);
             });
 
             it('should preserve dependency edges with their types', () => {
@@ -196,55 +136,13 @@ describe('Paste Helpers', () => {
                     createClipboardEdges(yEdges, clipboardEdges, idMap, 'test-graph', newEdgeIds);
                 });
 
+                expect(newEdgeIds).toHaveLength(1);
                 const edge = yEdges.get(newEdgeIds[0]) as Record<string, unknown>;
                 // Edge data is stored in metadata object
                 const metadata = edge.metadata as Record<string, unknown>;
                 expect(metadata.kind).toBe('dependency');
                 expect(metadata.dependencyType).toBe('FS');
-            });
-        });
-    });
-
-    describe('createParentChildEdges', () => {
-        let yDoc: Y.Doc;
-        let yEdges: Y.Map<unknown>;
-
-        beforeEach(() => {
-            yDoc = new Y.Doc();
-            yEdges = yDoc.getMap('edges');
-        });
-
-        describe('TC-Paste-2: Hierarchy Restoration (Parent-Child Edges)', () => {
-            it('should create edges for orphan nodes attached to fallback parent', () => {
-                // Paste context: nodes without original parents get attached to fallback
-                const parentChildRelations = [
-                    { parentId: 'fallback-parent', childId: 'orphan-1' },
-                    { parentId: 'fallback-parent', childId: 'orphan-2' },
-                ];
-
-                const clipboardEdges: ClipboardEdgeData[] = []; // No edges in clipboard
-                const idMap = new Map([
-                    ['original-orphan-1', 'orphan-1'],
-                    ['original-orphan-2', 'orphan-2'],
-                ]);
-
-                const newEdgeIds: string[] = [];
-
-                yDoc.transact(() => {
-                    createParentChildEdges(
-                        yEdges,
-                        parentChildRelations,
-                        clipboardEdges,
-                        idMap,
-                        'test-graph',
-                        newEdgeIds
-                    );
-                });
-
-                expect(newEdgeIds).toHaveLength(2);
-
-                const edges = Array.from(yEdges.values()) as Array<{ source: string; target: string }>;
-                expect(edges.every(e => e.source === 'fallback-parent')).toBe(true);
+                expect(edge.type).toBe('reference');
             });
         });
     });

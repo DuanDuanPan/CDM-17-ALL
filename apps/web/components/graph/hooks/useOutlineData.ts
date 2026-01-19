@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Graph, Node } from '@antv/x6';
-import { NodeType } from '@cdm/types';
-import { isDependencyEdge } from '@/lib/edgeValidation';
-import { HIERARCHICAL_EDGE_SHAPE } from '@/lib/edgeShapes';
-import { HIERARCHICAL_EDGE_ATTRS } from '@/lib/edgeStyles';
+import { NodeType, LayoutMode } from '@cdm/types';
+import {
+    getDirectChildrenByParentId,
+    getRootNodes as getRootNodesByParentId,
+    buildChildrenMap,
+    isDescendant,
+} from '@/lib/parentIdUtils';
+import { reconcileSingleNodeEdge } from '@/lib/edgeReconciler';
 
 // ─────────────────────────────────────────────────
 // Types
@@ -26,6 +30,8 @@ export interface OutlineNode {
 export interface UseOutlineDataOptions {
     graph: Graph | null;
     isReady: boolean;
+    /** Current layout mode (needed for correct edge routing during reconcile) */
+    layoutMode?: LayoutMode | null;
 }
 
 export interface UseOutlineDataReturn {
@@ -56,73 +62,25 @@ const isNodeType = (value: unknown): value is NodeType =>
 export function useOutlineData({
     graph,
     isReady,
+    layoutMode = null,
 }: UseOutlineDataOptions): UseOutlineDataReturn {
     const [version, setVersion] = useState(0);
 
     // ═══════════════════════════════════════════════
-    // Helper: Get direct children (follows useNodeCollapse pattern)
+    // Helper: Get direct children (Story 8.10: parentId-based)
     // ═══════════════════════════════════════════════
     const getDirectChildren = useCallback((nodeId: string): Node[] => {
         if (!graph) return [];
-        const cell = graph.getCellById(nodeId);
-        if (!cell?.isNode()) return [];
-
-        const node = cell as Node;
-        const outgoingEdges = graph.getOutgoingEdges(node) ?? [];
-        const children: Node[] = [];
-        const seen = new Set<string>();
-
-        outgoingEdges.forEach((edge) => {
-            // Skip dependency edges - only hierarchical edges define the tree
-            if (isDependencyEdge(edge)) return;
-            const targetId = edge.getTargetCellId();
-            if (!targetId || seen.has(targetId)) return;
-            const targetCell = graph.getCellById(targetId);
-            if (!targetCell?.isNode()) return;
-            seen.add(targetId);
-            children.push(targetCell as Node);
-        });
-
-        // Sort by data.order if available, otherwise stable by id
-        children.sort((a, b) => {
-            const orderA = a.getData()?.order ?? Infinity;
-            const orderB = b.getData()?.order ?? Infinity;
-            if (orderA !== orderB) return orderA - orderB;
-            return a.id.localeCompare(b.id);
-        });
-
-        return children;
+        return getDirectChildrenByParentId(graph, nodeId);
     }, [graph]);
 
     // ═══════════════════════════════════════════════
-    // Helper: Find root nodes (nodes without a parent edge)
+    // Helper: Find root nodes (Story 8.10: parentId-based)
     // ═══════════════════════════════════════════════
     const getRootNodes = useCallback((): Node[] => {
         if (!graph) return [];
-        const allNodes = graph.getNodes();
-
-        // Build set of all node IDs that are children
-        const childIds = new Set<string>();
-        allNodes.forEach((node) => {
-            const children = getDirectChildren(node.id);
-            children.forEach((c) => childIds.add(c.id));
-        });
-
-        // Root nodes have no parent (not in childIds)
-        const roots = allNodes.filter((n) => !childIds.has(n.id));
-
-        // Sort roots by order or label
-        roots.sort((a, b) => {
-            const orderA = a.getData()?.order ?? Infinity;
-            const orderB = b.getData()?.order ?? Infinity;
-            if (orderA !== orderB) return orderA - orderB;
-            const labelA = a.getData()?.label || '';
-            const labelB = b.getData()?.label || '';
-            return labelA.localeCompare(labelB);
-        });
-
-        return roots;
-    }, [graph, getDirectChildren]);
+        return getRootNodesByParentId(graph);
+    }, [graph]);
 
     // ═══════════════════════════════════════════════
     // Build tree recursively
@@ -179,7 +137,7 @@ export function useOutlineData({
     }, []);
 
     // ═══════════════════════════════════════════════
-    // Reorder node (update parent-child edge)
+    // Reorder node (Story 8.10: parentId-first, edge via reconcile)
     // ═══════════════════════════════════════════════
     const reorderNode = useCallback((
         nodeId: string,
@@ -195,35 +153,23 @@ export function useOutlineData({
         if (newParentId === nodeId) return;
 
         // Guard: prevent cycles (cannot move under its own descendant)
-        const isDescendant = (ancestorId: string, maybeDescendantId: string): boolean => {
-            const visited = new Set<string>();
-            const stack: string[] = [ancestorId];
-            while (stack.length > 0) {
-                const current = stack.pop();
-                if (!current || visited.has(current)) continue;
-                visited.add(current);
-                const children = getDirectChildren(current);
-                for (const child of children) {
-                    if (child.id === maybeDescendantId) return true;
-                    if (!visited.has(child.id)) stack.push(child.id);
-                }
-            }
-            return false;
-        };
-
-        if (newParentId && isDescendant(nodeId, newParentId)) return;
+        if (newParentId && isDescendant(graph, nodeId, newParentId)) return;
 
         const parentCell = newParentId ? graph.getCellById(newParentId) : null;
         const nextParentId = parentCell?.isNode() ? newParentId : null;
 
-        // Current hierarchical parent id (derived from incoming non-dependency edge)
-        const incomingEdges = graph.getIncomingEdges(node) ?? [];
-        const hierarchicalIncomingEdges = incomingEdges.filter((edge) => !isDependencyEdge(edge));
-        const currentParentId = hierarchicalIncomingEdges[0]?.getSourceCellId?.() ?? null;
+        // Current parentId from node data (Story 8.10: single source of truth)
+        const currentData = node.getData() || {};
+        const currentParentId = currentData.parentId || null;
+
+        // Build children map once for efficiency
+        const childrenMap = buildChildrenMap(graph);
 
         const getSiblings = (parentId: string | null): Node[] => {
             if (!graph) return [];
-            return parentId ? getDirectChildren(parentId) : getRootNodes();
+            return parentId
+                ? getDirectChildrenByParentId(graph, parentId, childrenMap)
+                : getRootNodesByParentId(graph);
         };
 
         const oldSiblings = getSiblings(currentParentId).filter((n) => n.id !== nodeId);
@@ -243,42 +189,26 @@ export function useOutlineData({
         };
 
         graph.batchUpdate(() => {
-            // 1) Update hierarchical edge only when parent changes
-            if (currentParentId !== nextParentId) {
-                // Remove existing hierarchical edges to this node (as target)
-                hierarchicalIncomingEdges.forEach((edge) => {
-                    graph.removeEdge(edge.id);
-                });
+            // 1) Update parentId (single source of truth)
+            node.setData({ ...currentData, parentId: nextParentId || undefined });
 
-                // Create new edge if nextParentId is provided
-                if (nextParentId) {
-                    graph.addEdge({
-                        shape: HIERARCHICAL_EDGE_SHAPE,
-                        source: { cell: nextParentId },
-                        target: { cell: nodeId },
-                        connector: { name: 'smooth' },
-                        attrs: HIERARCHICAL_EDGE_ATTRS,
-                        data: { type: 'hierarchical', metadata: { kind: 'hierarchical' } },
-                    });
-                }
-            }
-
-            // 2) Update node.data.parentId for consistency (always)
-            const data = node.getData() || {};
-            node.setData({ ...data, parentId: nextParentId || undefined });
-
-            // 3) Normalize sibling order for old parent (when moved across parents)
+            // 2) Normalize sibling order for old parent (when moved across parents)
             if (currentParentId !== nextParentId) {
                 normalizeOrder(oldSiblings);
             }
 
-            // 4) Normalize sibling order for new parent (apply siblingIndex)
+            // 3) Normalize sibling order for new parent (apply siblingIndex)
             normalizeOrder(newSiblings);
         });
 
-        // 4. Trigger refresh
+        // 4) Reconcile edge (Story 8.10: edge follows parentId)
+        if (currentParentId !== nextParentId) {
+            reconcileSingleNodeEdge(graph, nodeId, currentParentId || undefined, nextParentId || undefined, { layoutMode });
+        }
+
+        // 5) Trigger refresh
         refresh();
-    }, [graph, isReady, refresh, getDirectChildren, getRootNodes]);
+    }, [graph, isReady, refresh]);
 
     // ═══════════════════════════════════════════════
     // Listen to graph changes for auto-refresh (debounced)

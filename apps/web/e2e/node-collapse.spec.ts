@@ -57,6 +57,15 @@ test.describe('Node Collapse & Expand (Story 8.1)', () => {
     }, nodeId);
   }
 
+  async function getGraphNodeParentId(page: Page, nodeId: string): Promise<string | undefined> {
+    return page.evaluate((id) => {
+      const graph = (window as unknown as { __cdmGraph?: ExposedGraph }).__cdmGraph;
+      const cell = graph?.getCellById?.(id);
+      const data = cell?.getData?.() as { parentId?: unknown } | undefined;
+      return typeof data?.parentId === 'string' ? data.parentId : undefined;
+    }, nodeId);
+  }
+
   async function expectGraphNodeVisible(page: Page, nodeId: string, visible: boolean) {
     await expect.poll(async () => isGraphNodeVisible(page, nodeId)).toBe(visible);
   }
@@ -183,6 +192,111 @@ test.describe('Node Collapse & Expand (Story 8.1)', () => {
     expect(Math.abs(childBoxAfter!.y - childBoxBefore!.y)).toBeLessThan(6);
     expect(Math.abs(grandchildBoxAfter!.x - grandchildBoxBefore!.x)).toBeLessThan(6);
     expect(Math.abs(grandchildBoxAfter!.y - grandchildBoxBefore!.y)).toBeLessThan(6);
+  });
+
+  test('should not change parentId when clicking other nodes after collapse', async ({ page }) => {
+    await page.waitForSelector('[data-testid="layout-switcher"]');
+    await page.locator('[data-testid="layout-mindmap"]').click();
+    await page.waitForTimeout(400);
+
+    await expect
+      .poll(async () => page.evaluate(() => Boolean((window as unknown as { __cdmGraph?: ExposedGraph }).__cdmGraph)))
+      .toBe(true);
+
+    await page.evaluate(() => {
+      const graph = (window as unknown as { __cdmGraph?: ExposedGraph }).__cdmGraph;
+      if (!graph) return;
+      const now = new Date().toISOString();
+
+      const ensureNode = (
+        id: string,
+        label: string,
+        x: number,
+        y: number,
+        parentId: string,
+        width: number = 160,
+        height: number = 50
+      ) => {
+        if (graph.getCellById(id)) return;
+        graph.addNode({
+          shape: 'mind-node',
+          id,
+          x,
+          y,
+          width,
+          height,
+          data: {
+            id,
+            label,
+            type: 'topic',
+            parentId,
+            isEditing: false,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+      };
+
+      const ensureEdge = (source: string, target: string) => {
+        const exists = graph
+          .getEdges()
+          .some((e) => e.getSourceCellId?.() === source && e.getTargetCellId?.() === target);
+        if (exists) return;
+        graph.addEdge({
+          source: { cell: source },
+          target: { cell: target },
+          connector: { name: 'smooth' },
+          attrs: {
+            line: {
+              stroke: '#3b82f6',
+              strokeWidth: 2,
+              targetMarker: null,
+            },
+          },
+          data: { type: 'hierarchical', metadata: { kind: 'hierarchical' } },
+        });
+      };
+
+      ensureNode('collapse-parent', '折叠父节点', 200, 200, 'center-node');
+      // This node will be hidden after collapse, but its bbox would still match hit-tests if hidden nodes aren't filtered.
+      ensureNode('huge-hidden-child', '隐藏节点(大 bbox)', 0, 0, 'collapse-parent', 3000, 3000);
+
+      ensureNode('visible-parent', '可见父节点', 200, 650, 'center-node');
+      ensureNode('target-child', '目标子节点', 500, 500, 'visible-parent');
+
+      ensureEdge('center-node', 'collapse-parent');
+      ensureEdge('collapse-parent', 'huge-hidden-child');
+      ensureEdge('center-node', 'visible-parent');
+      ensureEdge('visible-parent', 'target-child');
+    });
+
+    const collapseParent = page.locator('.x6-node[data-cell-id="collapse-parent"]').first();
+    const hugeHiddenChild = page.locator('.x6-node[data-cell-id="huge-hidden-child"]').first();
+    const targetChild = page.locator('.x6-node[data-cell-id="target-child"]').first();
+
+    await expect(collapseParent).toBeVisible();
+    await expect(hugeHiddenChild).toBeVisible();
+    await expect(targetChild).toBeVisible();
+
+    await collapseParent.click();
+    await page.keyboard.press(collapseShortcut);
+    await expectGraphNodeCollapsed(page, 'collapse-parent', true);
+    await expectGraphNodeVisible(page, 'huge-hidden-child', false);
+
+    await expect.poll(async () => getGraphNodeParentId(page, 'target-child')).toBe('visible-parent');
+
+    const targetBox = await targetChild.boundingBox();
+    expect(targetBox).toBeTruthy();
+    const x = targetBox!.x + targetBox!.width / 2;
+    const y = targetBox!.y + targetBox!.height / 2;
+
+    // Simulate a click with minimal movement (< drag threshold) to prevent false reparenting.
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 2, y + 2);
+    await page.mouse.up();
+
+    await expect.poll(async () => getGraphNodeParentId(page, 'target-child')).toBe('visible-parent');
   });
 
   test('should collapse/expand subtree via collapse toggle button', async ({ page }) => {
