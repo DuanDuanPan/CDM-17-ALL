@@ -242,6 +242,23 @@ describe('useNodeCollapse', () => {
             expect(child.show).toHaveBeenCalled();
         });
 
+        it('should not show archived children when expanding', () => {
+            mockGraph.addNode('parent', { collapsed: true });
+            const child = mockGraph.addNode('child', { collapsed: false, isArchived: true });
+            mockGraph.addEdge('parent', 'child');
+
+            const { result } = renderHook(() =>
+                useNodeCollapse({ graph: mockGraph.graph, isReady: true })
+            );
+
+            act(() => {
+                result.current.expandNode('parent');
+            });
+
+            expect(child.show).not.toHaveBeenCalled();
+            expect(child.hide).toHaveBeenCalled();
+        });
+
         it('should not expand already expanded node', () => {
             const node = mockGraph.addNode('node-1', { collapsed: false });
 
@@ -295,7 +312,7 @@ describe('useNodeCollapse', () => {
         it('should collapse all descendants recursively', () => {
             const root = mockGraph.addNode('root', { collapsed: false });
             const child = mockGraph.addNode('child', { collapsed: false });
-            const grandchild = mockGraph.addNode('grandchild', { collapsed: false });
+            mockGraph.addNode('grandchild', { collapsed: false });
             mockGraph.addEdge('root', 'child');
             mockGraph.addEdge('child', 'grandchild');
 
@@ -316,7 +333,7 @@ describe('useNodeCollapse', () => {
         it('should expand all collapsed ancestors', () => {
             const root = mockGraph.addNode('root', { collapsed: true });
             const child = mockGraph.addNode('child', { collapsed: true });
-            const target = mockGraph.addNode('target', { collapsed: false });
+            mockGraph.addNode('target', { collapsed: false });
             mockGraph.addEdge('root', 'child');
             mockGraph.addEdge('child', 'target');
 

@@ -276,6 +276,11 @@ export function useDrillDown({ graph, isReady }: UseDrillDownOptions): UseDrillD
     };
 }
 
+function isNodeArchived(node: Node): boolean {
+    const data = node.getData() as { isArchived?: unknown } | null;
+    return data?.isArchived === true;
+}
+
 /**
  * Apply visibility filter to show only the subgraph rooted at the given node.
  * Uses hide()/show() to toggle visibility without removing cells.
@@ -287,6 +292,11 @@ export function useDrillDown({ graph, isReady }: UseDrillDownOptions): UseDrillD
 function applyVisibilityFilter(graph: Graph, rootNodeId: string | null): void {
     const allNodes = graph.getNodes();
     const allEdges = graph.getEdges();
+
+    const archivedNodeIds = new Set<string>();
+    allNodes.forEach((node) => {
+        if (isNodeArchived(node)) archivedNodeIds.add(node.id);
+    });
 
     const nodesById = new Map<string, Node>(allNodes.map((node) => [node.id, node]));
     // Story 8.10: Build hierarchy map from parentId instead of edges
@@ -303,23 +313,40 @@ function applyVisibilityFilter(graph: Graph, rootNodeId: string | null): void {
             resetPath();
             return;
         }
+
+        // Archived nodes should never be visible as a drill root.
+        if (isNodeArchived(rootCell as Node)) {
+            console.warn('[useDrillDown] Root node is archived, resetting to main view:', rootNodeId);
+            resetPath();
+            return;
+        }
     }
 
     const visibleNodeIds = rootNodeId
         ? computeVisibleInDrillMode(rootNodeId, nodesById, hierarchyChildrenMap)
         : computeVisibleInMainView(nodesById, hierarchyChildrenMap);
 
+    // Archived nodes are always hidden, regardless of drill/collapse visibility.
+    const effectiveVisibleNodeIds = new Set<string>();
+    visibleNodeIds.forEach((id) => {
+        if (!archivedNodeIds.has(id)) effectiveVisibleNodeIds.add(id);
+    });
+
     // Apply visibility in a single batch to reduce expensive reflows
     graph.batchUpdate(() => {
         allNodes.forEach((node) => {
-            if (visibleNodeIds.has(node.id)) node.show();
+            if (archivedNodeIds.has(node.id)) {
+                node.hide();
+                return;
+            }
+            if (effectiveVisibleNodeIds.has(node.id)) node.show();
             else node.hide();
         });
 
         allEdges.forEach((edge) => {
             const sourceId = edge.getSourceCellId();
             const targetId = edge.getTargetCellId();
-            const visible = Boolean(sourceId && targetId && visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId));
+            const visible = Boolean(sourceId && targetId && effectiveVisibleNodeIds.has(sourceId) && effectiveVisibleNodeIds.has(targetId));
             if (visible) edge.show();
             else edge.hide();
         });

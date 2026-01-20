@@ -123,6 +123,10 @@ test.describe('Clipboard Operations E2E', () => {
 
             // The cut node should be hidden (archived)
             await expect(createdNode).not.toBeVisible({ timeout: 15000 });
+
+            // Regression guard: archived nodes should not be re-shown by local visibility filters.
+            await page.waitForTimeout(500);
+            await expect(createdNode).not.toBeVisible();
         });
 
         test('paste after cut in same graph moves the node', async ({ page }) => {

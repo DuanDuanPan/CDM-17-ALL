@@ -275,6 +275,37 @@ describe('useDrillDown', () => {
     });
 
     // ----------------------------------------------------------
+    // Visibility Filtering Tests
+    // ----------------------------------------------------------
+    describe('Visibility Filtering', () => {
+        it('never shows archived nodes even if they are in the visible set', () => {
+            vi.mocked(drillDownStore.useDrillPath).mockReturnValue([]);
+
+            const mockGraph = createMockGraph([
+                { id: 'root', outEdges: [{ targetId: 'active' }, { targetId: 'archived' }] },
+                { id: 'active' },
+                { id: 'archived' },
+            ]);
+
+            const archivedNode = mockGraph.getCellById('archived') as unknown as Node;
+            archivedNode.setData({ isArchived: true });
+
+            renderHook(() => useDrillDown({ graph: mockGraph, isReady: true }));
+
+            expect(archivedNode.show).not.toHaveBeenCalled();
+            expect(archivedNode.hide).toHaveBeenCalled();
+
+            const edgeToArchived = mockGraph
+                .getEdges()
+                .find((edge) => edge.getTargetCellId() === 'archived');
+
+            expect(edgeToArchived).toBeDefined();
+            expect(edgeToArchived!.show).not.toHaveBeenCalled();
+            expect(edgeToArchived!.hide).toHaveBeenCalled();
+        });
+    });
+
+    // ----------------------------------------------------------
     // Navigation Action Tests
     // ----------------------------------------------------------
     describe('Navigation Actions', () => {

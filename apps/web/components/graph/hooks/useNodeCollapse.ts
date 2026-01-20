@@ -180,6 +180,12 @@ export function useNodeCollapse({
                     }
                 }
 
+                // Archived nodes are always hidden, regardless of collapse/expand state.
+                const descendantData = descendant.getData() || {};
+                if (descendantData.isArchived === true) {
+                    shouldBeVisible = false;
+                }
+
                 // Update node visibility
                 if (shouldBeVisible) {
                     descendant.show();
@@ -248,6 +254,15 @@ export function useNodeCollapse({
         const directChildren = getDirectChildren(nodeId);
         graph.batchUpdate(() => {
             directChildren.forEach((child) => {
+                const childData = child.getData() || {};
+                if (childData.isArchived === true) {
+                    child.hide();
+                    visibilityMapRef.current.set(child.id, false);
+                    const edges = graph.getConnectedEdges(child);
+                    edges?.forEach((edge) => edge.hide());
+                    return;
+                }
+
                 child.show();
                 visibilityMapRef.current.set(child.id, true);
 
@@ -264,7 +279,6 @@ export function useNodeCollapse({
                 });
 
                 // If this child is NOT collapsed, recursively show its descendants
-                const childData = child.getData() || {};
                 if (!childData.collapsed) {
                     applyDescendantVisibility(child.id, true);
                 }
@@ -372,6 +386,14 @@ export function useNodeCollapse({
                     const directChildren = getDirectChildren(node.id);
                     graph.batchUpdate(() => {
                         directChildren.forEach((child) => {
+                            const childData = child.getData() || {};
+                            if (childData.isArchived === true) {
+                                child.hide();
+                                const edges = graph.getConnectedEdges(child);
+                                edges?.forEach((edge) => edge.hide());
+                                return;
+                            }
+
                             child.show();
                             const edges = graph.getConnectedEdges(child);
                             edges?.forEach((edge) => {
@@ -385,7 +407,6 @@ export function useNodeCollapse({
                             });
 
                             // If child is not collapsed, show its descendants too
-                            const childData = child.getData() || {};
                             if (!childData.collapsed) {
                                 applyDescendantVisibility(child.id, true);
                             }
@@ -434,6 +455,16 @@ export function useNodeCollapse({
         if (!graph || !isReady) return;
 
         const handleNodeAdded = ({ node }: { node: Node }) => {
+            const data = node.getData() || {};
+            if (data.isArchived === true) {
+                graph.batchUpdate(() => {
+                    node.hide();
+                    const edges = graph.getConnectedEdges(node);
+                    edges?.forEach((edge) => edge.hide());
+                });
+                return;
+            }
+
             if (isVisibleByAncestors(node.id)) return;
 
             graph.batchUpdate(() => {
