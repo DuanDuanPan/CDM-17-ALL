@@ -6,7 +6,6 @@
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import { FileController } from './file.controller';
 import { FileService } from './file.service';
 
 @Module({
@@ -15,7 +14,6 @@ import { FileService } from './file.service';
             storage: memoryStorage(), // Store in memory, then save via FileService
         }),
     ],
-    controllers: [FileController],
     providers: [FileService],
     exports: [FileService],
 })

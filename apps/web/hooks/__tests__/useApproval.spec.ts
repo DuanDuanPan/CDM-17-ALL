@@ -10,6 +10,7 @@ import { useApproval } from '../useApproval';
 // Mock dependencies
 vi.mock('@/contexts', () => ({
     useCurrentUserId: () => 'test-user-id',
+    useGraphContextOptional: () => ({ graphId: 'graph-1' }),
 }));
 
 describe('useApproval', () => {
@@ -138,9 +139,10 @@ describe('useApproval', () => {
 
             // Check file upload call
             expect(fetch).toHaveBeenCalledWith(
-                expect.stringContaining('/api/files/upload'),
+                expect.stringContaining('/api/files/upload?'),
                 expect.objectContaining({
                     method: 'POST',
+                    headers: expect.objectContaining({ 'x-user-id': 'test-user-id' }),
                 })
             );
         });

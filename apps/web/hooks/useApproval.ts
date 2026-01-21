@@ -15,7 +15,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ApprovalPipeline, Deliverable } from '@cdm/types';
-import { useCurrentUserId } from '@/contexts';
+import { useCurrentUserId, useGraphContextOptional } from '@/contexts';
 
 // API base URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -103,6 +103,8 @@ export function useApproval(
 ): UseApprovalReturn {
     const { initialApproval = null, initialDeliverables = EMPTY_DELIVERABLES, onUpdate } = options;
     const currentUserId = useCurrentUserId();
+    const graphContext = useGraphContextOptional();
+    const graphId = graphContext?.graphId ?? null;
 
     // Use ref to track if this is the first mount and avoid re-syncing
     const isFirstMountRef = useRef(true);
@@ -262,12 +264,24 @@ export function useApproval(
             setIsUploading(true);
             setError(null);
             try {
+                if (!graphId) {
+                    throw new Error('graphId 缺失：无法上传文件（请确保在 GraphProvider 内使用）');
+                }
+
                 // Step 1: Upload file to file service
                 const formData = new FormData();
                 formData.append('file', file);
 
-                const uploadResponse = await fetch(`${API_BASE}/api/files/upload`, {
+                const params = new URLSearchParams({
+                    graphId,
+                    ownerType: 'DELIVERABLE',
+                    ownerId: nodeId,
+                });
+                const uploadResponse = await fetch(`${API_BASE}/api/files/upload?${params.toString()}`, {
                     method: 'POST',
+                    headers: {
+                        'x-user-id': currentUserId,
+                    },
                     body: formData,
                 });
 
@@ -325,7 +339,7 @@ export function useApproval(
                 setIsUploading(false);
             }
         },
-        [nodeId, approval, deliverables, onUpdate]
+        [nodeId, graphId, currentUserId, approval, deliverables, onUpdate]
     );
 
     /**

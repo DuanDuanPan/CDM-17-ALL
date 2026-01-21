@@ -79,6 +79,9 @@ model Graph {
   
   // Story 4.3: Contextual Comments
   comments Comment[]
+  
+  // Story 10.4: Unified File Storage
+  fileRecords FileRecord[]
 }
 
 model Node {
@@ -521,4 +524,50 @@ model NodeDataLink {
   @@unique([nodeId, assetId]) // Prevent duplicate links
   @@index([nodeId])
   @@index([assetId])
+}
+
+// ========================================
+// Story 10.4: Unified File Storage 
+// ========================================
+
+// Storage Type Enum - defines storage backend
+enum StorageType {
+  LOCAL  // Local disk storage
+  S3     // AWS S3 or compatible
+  MINIO  // MinIO object storage
+}
+
+// File Owner Type Enum - defines what entity owns the file
+enum FileOwnerType {
+  DELIVERABLE  // Task deliverable attachment
+  DATA_ASSET   // Data library asset
+  ATTACHMENT   // Comment attachment
+  TEMPLATE     // Template thumbnail or asset
+}
+
+// FileRecord - unified file metadata storage
+model FileRecord {
+  id            String         @id @default(uuid())
+  graphId       String
+  graph         Graph          @relation(fields: [graphId], references: [id], onDelete: Cascade)
+  
+  originalName  String         // Original filename (UTF-8)
+  storedName    String         // Stored filename (safe, unique)
+  mimeType      String
+  size          Int            // Size in bytes
+  storagePath   String         // Full storage path
+  storageType   StorageType    @default(LOCAL)
+  
+  thumbnailPath String?        // Optional thumbnail path
+  previewable   Boolean        @default(false)
+  
+  ownerType     FileOwnerType?
+  ownerId       String?        // ID of the owning entity
+  uploadedBy    String?        // User ID who uploaded
+  
+  createdAt     DateTime       @default(now())
+  deletedAt     DateTime?      // Soft delete timestamp
+
+  @@index([graphId])
+  @@index([ownerType, ownerId])
 }

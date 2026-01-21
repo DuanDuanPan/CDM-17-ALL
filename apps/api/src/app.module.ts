@@ -21,10 +21,11 @@ import { GraphsModule } from './modules/graphs/graphs.module'; // Dynamic Graph 
 import { DemoSeedService } from './demo/demo-seed.service'; // Story 5.1: For template instantiation
 import { ProductLibraryModule } from './modules/product-library'; // Story 2.7
 import { KnowledgeLibraryModule } from './modules/knowledge-library'; // Story 2.8
-import { FileModule } from './modules/file/file.module'; // Story 4.1: FIX-11
+import { FileModule } from './modules/file/file.module'; // Story 4.1: Legacy FileService (no routes)
 import { SubscriptionModule } from './modules/subscriptions/subscriptions.module'; // Story 4.4: Watch & Subscription
 import { DataManagementModule } from './modules/data-management'; // Story 9.1: Data Library
 import { PluginKernelModule } from './modules/plugin-kernel/plugin-kernel.module';
+import { FileStorageModule } from './modules/file-storage/file-storage.module'; // Story 10.4: Unified File Storage
 
 @Module({
   imports: [
@@ -36,9 +37,10 @@ import { PluginKernelModule } from './modules/plugin-kernel/plugin-kernel.module
     GraphsModule, // Dynamic Graph ID management
     ProductLibraryModule, // Story 2.7: Mock product library for PBS nodes
     KnowledgeLibraryModule, // Story 2.8: Mock knowledge library for Task nodes
-    FileModule, // Story 4.1: FIX-11 - File upload for deliverables
+    FileModule, // Story 4.1: Legacy FileService (used by DataManagementModule)
     SubscriptionModule, // Story 4.4: Watch & Subscription
     DataManagementModule, // Story 9.1: Data Library
+    FileStorageModule, // Story 10.4: Unified File Storage
 
     // Story 7.5: Kernel → plugin infrastructure contracts (global)
     PluginKernelModule,

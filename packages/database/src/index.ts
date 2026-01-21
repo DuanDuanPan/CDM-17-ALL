@@ -64,11 +64,13 @@ export { Database, db } from './Database';
 // Story 7.1: Added CommentAttachment export for AttachmentsRepository
 // Story 5.1: Added Template types for template library
 // Story 9.1: Added DataAsset, DataFolder, NodeDataLink for data library
-export type { User, Project, Graph, Node, Edge, Notification, NodePBS, NodeTask, NodeRequirement, NodeData, NodeApp, Comment, CommentRead, Subscription, CommentAttachment, Template, TemplateCategory, TemplateUsageLog, DataAsset, DataFolder, NodeDataLink } from '@prisma/client';
+// Story 10.4: Added FileRecord for unified file storage
+export type { User, Project, Graph, Node, Edge, Notification, NodePBS, NodeTask, NodeRequirement, NodeData, NodeApp, Comment, CommentRead, Subscription, CommentAttachment, Template, TemplateCategory, TemplateUsageLog, DataAsset, DataFolder, NodeDataLink, FileRecord } from '@prisma/client';
 
 // Story 5.1: Export enums for template library
 // Story 9.1: Export DataAssetFormat enum for data library
-export { NodeType, TemplateStatus, DataAssetFormat } from '@prisma/client';
+// Story 10.4: Added FileOwnerType, StorageType for unified file storage
+export { NodeType, TemplateStatus, DataAssetFormat, FileOwnerType, StorageType } from '@prisma/client';
 
 // HIGH-1 Fix: Export Prisma namespace as both type and value for DbNull access
 export { Prisma } from '@prisma/client';
