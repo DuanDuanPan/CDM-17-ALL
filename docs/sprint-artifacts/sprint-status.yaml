@@ -128,8 +128,8 @@ development_status:
   9-9-toolbar-redesign: done  # Round 2 Code Review passed (2026-01-14)
   9-10-property-panel-asset-binding: done  # Code review round 2 complete; all issues fixed (2026-01-14)
 
-  epic-10: backlog
-  10-1-graphs-service-repository-compliance: backlog
+  epic-10: in-progress
+  10-1-graphs-service-repository-compliance: done
   10-2-users-service-repository-compliance: backlog
   10-3-lint-hardening-debt-cleanup: backlog
   10-4-unified-file-storage-foundation: backlog

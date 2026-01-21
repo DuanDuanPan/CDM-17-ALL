@@ -1,6 +1,11 @@
+/**
+ * Story 10.1: GraphsService Repository Compliance
+ * Refactored to use GraphRepository instead of direct Prisma calls
+ */
+
 import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { prisma } from '@cdm/database';
 import { DemoSeedService } from '../../demo/demo-seed.service';
+import { GraphRepository } from './graph.repository';
 
 export interface CreateGraphDto {
     userId: string;
@@ -17,7 +22,7 @@ export interface GraphResponse {
     project: {
         id: string;
         name: string;
-        ownerId?: string;
+        ownerId?: string | null;
     };
     _count?: {
         nodes: number;
@@ -35,12 +40,16 @@ export interface GraphListResponse extends GraphResponse {
 /**
  * Graph管理服务
  * 提供图谱的CRUD操作，自动处理用户和项目的懒加载初始化
+ * Story 10.1: Refactored to use GraphRepository (Repository Pattern compliance)
  */
 @Injectable()
 export class GraphsService {
     private readonly logger = new Logger(GraphsService.name);
 
-    constructor(private readonly demoSeedService: DemoSeedService) { }
+    constructor(
+        private readonly graphRepository: GraphRepository,
+        private readonly demoSeedService: DemoSeedService,
+    ) { }
 
     /**
      * 创建新图谱
@@ -52,26 +61,14 @@ export class GraphsService {
         // 获取或创建用户的默认项目
         const projectId = await this.demoSeedService.getOrCreateDefaultProject(userId);
 
-        // 创建图谱
-        const graph = await prisma.graph.create({
-            data: {
-                name,
-                projectId,
-                data: {},
-            },
-            include: {
-                project: {
-                    select: {
-                        id: true,
-                        name: true,
-                        ownerId: true,
-                    },
-                },
-            },
+        // Story 10.1: Use GraphRepository.create() instead of direct prisma call
+        const graph = await this.graphRepository.create({
+            name,
+            projectId,
         });
 
         this.logger.log(`Created graph ${graph.id} for user ${userId}`);
-        return graph as GraphResponse;
+        return graph;
     }
 
     /**
@@ -81,56 +78,24 @@ export class GraphsService {
         // 确保用户存在（但不创建项目，只在创建图谱时创建）
         await this.demoSeedService.ensureUser(userId);
 
-        const graphs = await prisma.graph.findMany({
-            where: {
-                project: {
-                    ownerId: userId,
-                },
-            },
-            include: {
-                project: {
-                    select: {
-                        id: true,
-                        name: true,
-                    },
-                },
-                _count: {
-                    select: {
-                        nodes: true,
-                        edges: true,
-                    },
-                },
-            },
-            orderBy: {
-                updatedAt: 'desc',
-            },
-        });
+        // Story 10.1: Use GraphRepository.findByUserId() instead of direct prisma call
+        const graphs = await this.graphRepository.findByUserId(userId);
 
-        return graphs as GraphListResponse[];
+        return graphs;
     }
 
     /**
      * 获取单个图谱详情
      */
     async findOne(id: string): Promise<GraphResponse> {
-        const graph = await prisma.graph.findUnique({
-            where: { id },
-            include: {
-                project: {
-                    select: {
-                        id: true,
-                        name: true,
-                        ownerId: true,
-                    },
-                },
-            },
-        });
+        // Story 10.1: Use GraphRepository.findOneWithProject() instead of direct prisma call
+        const graph = await this.graphRepository.findOneWithProject(id);
 
         if (!graph) {
             throw new NotFoundException(`Graph ${id} not found`);
         }
 
-        return graph as GraphResponse;
+        return graph;
     }
 
     /**
@@ -143,24 +108,10 @@ export class GraphsService {
             throw new ForbiddenException('You do not own this graph');
         }
 
-        const updated = await prisma.graph.update({
-            where: { id },
-            data: {
-                name: data.name,
-                updatedAt: new Date(),
-            },
-            include: {
-                project: {
-                    select: {
-                        id: true,
-                        name: true,
-                        ownerId: true,
-                    },
-                },
-            },
-        });
+        // Story 10.1: Use GraphRepository.update() instead of direct prisma call
+        const updated = await this.graphRepository.update(id, { name: data.name });
 
-        return updated as GraphResponse;
+        return updated;
     }
 
     /**
@@ -173,7 +124,8 @@ export class GraphsService {
             throw new ForbiddenException('You do not own this graph');
         }
 
-        await prisma.graph.delete({ where: { id } });
+        // Story 10.1: Use GraphRepository.delete() instead of direct prisma call
+        await this.graphRepository.delete(id);
         this.logger.log(`Deleted graph ${id}`);
         return { message: 'Graph deleted successfully', id };
     }
@@ -182,7 +134,7 @@ export class GraphsService {
      * 检查图谱是否存在
      */
     async exists(id: string): Promise<boolean> {
-        const count = await prisma.graph.count({ where: { id } });
-        return count > 0;
+        // Story 10.1: Use existing GraphRepository.exists() method
+        return this.graphRepository.exists(id);
     }
 }

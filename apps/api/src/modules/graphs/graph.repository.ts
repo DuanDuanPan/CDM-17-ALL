@@ -45,6 +45,58 @@ export type GraphWithRelations = Prisma.GraphGetPayload<{
   };
 }>;
 
+/**
+ * Story 10.1: Type definitions for GraphsService refactoring
+ */
+// Include pattern for create/update/findOne operations (with ownerId for permission checks)
+const PROJECT_SELECT_WITH_OWNER = {
+  id: true,
+  name: true,
+  ownerId: true,
+} as const;
+
+// Include pattern for list operations (without ownerId)
+const PROJECT_SELECT_PUBLIC = {
+  id: true,
+  name: true,
+} as const;
+
+// Graph with project including ownerId (for create/update/findOne)
+export type GraphWithProjectOwner = Prisma.GraphGetPayload<{
+  include: {
+    project: {
+      select: typeof PROJECT_SELECT_WITH_OWNER;
+    };
+  };
+}>;
+
+// Graph with project and counts (for list operations)
+export type GraphWithProjectAndCount = Prisma.GraphGetPayload<{
+  include: {
+    project: {
+      select: typeof PROJECT_SELECT_PUBLIC;
+    };
+    _count: {
+      select: { nodes: true; edges: true };
+    };
+  };
+}>;
+
+/**
+ * Story 10.1: Create graph input data
+ */
+export interface CreateGraphData {
+  name: string;
+  projectId: string;
+}
+
+/**
+ * Story 10.1: Update graph input data
+ */
+export interface UpdateGraphData {
+  name?: string;
+}
+
 @Injectable()
 export class GraphRepository {
   /**
@@ -102,6 +154,101 @@ export class GraphRepository {
       select: { id: true },
     });
     return graph !== null;
+  }
+
+  // ============================================================
+  // Story 10.1: New CRUD methods for GraphsService refactoring
+  // ============================================================
+
+  /**
+   * Story 10.1: Create a new graph with project include
+   * Used by GraphsService.create()
+   */
+  async create(data: CreateGraphData): Promise<GraphWithProjectOwner> {
+    return prisma.graph.create({
+      data: {
+        name: data.name,
+        projectId: data.projectId,
+        data: {},
+      },
+      include: {
+        project: {
+          select: PROJECT_SELECT_WITH_OWNER,
+        },
+      },
+    });
+  }
+
+  /**
+   * Story 10.1: Find graphs by user ID with counts
+   * Used by GraphsService.findByUser()
+   * Returns graphs ordered by updatedAt desc
+   */
+  async findByUserId(userId: string): Promise<GraphWithProjectAndCount[]> {
+    return prisma.graph.findMany({
+      where: {
+        project: {
+          ownerId: userId,
+        },
+      },
+      include: {
+        project: {
+          select: PROJECT_SELECT_PUBLIC,
+        },
+        _count: {
+          select: {
+            nodes: true,
+            edges: true,
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+  }
+
+  /**
+   * Story 10.1: Find single graph with project including ownerId
+   * Used by GraphsService.findOne() and for permission checks in update/remove
+   */
+  async findOneWithProject(graphId: string): Promise<GraphWithProjectOwner | null> {
+    return prisma.graph.findUnique({
+      where: { id: graphId },
+      include: {
+        project: {
+          select: PROJECT_SELECT_WITH_OWNER,
+        },
+      },
+    });
+  }
+
+  /**
+   * Story 10.1: Update graph with project include
+   * Used by GraphsService.update()
+   * Story 10.1 Fix: Only update fields that are defined (prevent undefined → null)
+   */
+  async update(graphId: string, data: UpdateGraphData): Promise<GraphWithProjectOwner> {
+    return prisma.graph.update({
+      where: { id: graphId },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        updatedAt: new Date(),
+      },
+      include: {
+        project: {
+          select: PROJECT_SELECT_WITH_OWNER,
+        },
+      },
+    });
+  }
+
+  /**
+   * Story 10.1: Delete graph
+   * Used by GraphsService.remove()
+   */
+  async delete(graphId: string): Promise<void> {
+    await prisma.graph.delete({ where: { id: graphId } });
   }
 
   /**
