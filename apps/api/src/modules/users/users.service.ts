@@ -1,16 +1,17 @@
 /**
- * Story 4.1: Approval Driven Workflow
+ * Story 10.2: UsersService Repository 收敛
  * Users Service - Business logic for user queries
+ * Refactored to use Repository pattern - no direct prisma imports
  */
 
 import { Injectable } from '@nestjs/common';
-import { prisma } from '@cdm/database';
+import { UsersRepository, type UserBasicInfo } from './users.repository';
 
-export interface UserSearchResult {
-    id: string;
-    name: string | null;
-    email: string;
-}
+/**
+ * UserSearchResult type alias for backward compatibility
+ * Points to UserBasicInfo from repository
+ */
+export type UserSearchResult = UserBasicInfo;
 
 export interface UserListQuery {
     search?: string;
@@ -20,83 +21,31 @@ export interface UserListQuery {
 
 @Injectable()
 export class UsersService {
+    constructor(private readonly usersRepository: UsersRepository) { }
+
     /**
      * List all users with optional pagination
+     * Delegates to UsersRepository.findMany()
      */
     async list(query: UserListQuery = {}): Promise<{ users: UserSearchResult[]; total: number }> {
         const { limit = 50, offset = 0 } = query;
-
-        const [users, total] = await Promise.all([
-            prisma.user.findMany({
-                take: limit,
-                skip: offset,
-                orderBy: { name: 'asc' },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                },
-            }),
-            prisma.user.count(),
-        ]);
-
-        return { users, total };
+        return this.usersRepository.findMany({ limit, offset });
     }
 
     /**
      * Search users by name or email
      * Returns default list when query is empty
+     * Delegates to UsersRepository.search()
      */
     async search(q: string, limit = 20): Promise<UserSearchResult[]> {
-        const keyword = q?.trim() || '';
-
-        // If no search keyword, return default user list
-        if (keyword.length === 0) {
-            const users = await prisma.user.findMany({
-                take: limit,
-                orderBy: { name: 'asc' },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                },
-            });
-            return users;
-        }
-
-        // Search by name or email
-        const users = await prisma.user.findMany({
-            where: {
-                OR: [
-                    { name: { contains: keyword, mode: 'insensitive' } },
-                    { email: { contains: keyword, mode: 'insensitive' } },
-                ],
-            },
-            take: limit,
-            orderBy: { name: 'asc' },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-            },
-        });
-
-        return users;
+        return this.usersRepository.search(q, limit);
     }
 
     /**
      * Get user by ID
+     * Delegates to UsersRepository.findById()
      */
     async findById(id: string): Promise<UserSearchResult | null> {
-        const user = await prisma.user.findUnique({
-            where: { id },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-            },
-        });
-
-        return user;
+        return this.usersRepository.findById(id);
     }
 }

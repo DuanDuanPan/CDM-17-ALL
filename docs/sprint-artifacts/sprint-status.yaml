@@ -130,7 +130,7 @@ development_status:
 
   epic-10: in-progress
   10-1-graphs-service-repository-compliance: done
-  10-2-users-service-repository-compliance: backlog
+  10-2-users-service-repository-compliance: done
   10-3-lint-hardening-debt-cleanup: backlog
   10-4-unified-file-storage-foundation: backlog
   10-5-migrate-callers-to-file-storage: backlog
