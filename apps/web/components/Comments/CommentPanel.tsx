@@ -2,6 +2,7 @@
 
 /**
  * Story 4.3: Contextual Comments & Mentions
+ * Story 10.5: Added graphId for FileStorageService
  * CommentPanel Component - Side panel overlay for viewing and adding comments
  *
  * Story 7.5: Refactored to use Hook-First pattern
@@ -198,6 +199,7 @@ export function CommentPanel({
                     replyToName={replyToName || undefined}
                     onCancelReply={handleCancelReply}
                     userId={userId}
+                    graphId={mindmapId}
                 />
             </div>
         </div>

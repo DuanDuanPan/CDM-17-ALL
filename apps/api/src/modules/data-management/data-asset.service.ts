@@ -1,6 +1,7 @@
 /**
  * Story 9.1: Data Library (数据资源库)
  * Story 9.5: Data Upload & Node Linking
+ * Story 10.5: Migrated to FileStorageService
  * Data Asset Service - Business logic for data assets
  *
  * GR-2 Compliance: Folder and Link services extracted to separate files
@@ -12,10 +13,11 @@ import {
   NotFoundException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { FileOwnerType } from '../file-storage/constants';
 import { DataAssetRepository } from './data-asset.repository';
 import { DataFolderService } from './data-folder.service';
 import { NodeDataLinkService } from './node-data-link.service';
-import { FileService } from '../file/file.service';
+import { FileStorageService } from '../file-storage/file-storage.service';
 import { getDataAssetFormatFromFilename } from './utils/format-detection';
 import type {
   DataAsset as PrismaDataAsset,
@@ -37,6 +39,12 @@ import type {
 } from '@cdm/types';
 import type { CreateNodeDataLinksBatchDto, UpdateDataFolderDto } from './dto';
 
+/**
+ * Story 10.5: FileRecord owner type for data assets
+ * Uses shared constant for type safety
+ */
+const DATA_ASSET_OWNER_TYPE = FileOwnerType.DATA_ASSET;
+
 @Injectable()
 export class DataAssetService {
   private readonly logger = new Logger(DataAssetService.name);
@@ -45,7 +53,7 @@ export class DataAssetService {
     private readonly assetRepo: DataAssetRepository,
     private readonly folderService: DataFolderService,
     private readonly linkService: NodeDataLinkService,
-    private readonly fileService: FileService
+    private readonly fileStorageService: FileStorageService
   ) { }
 
   // ========================================
@@ -76,53 +84,77 @@ export class DataAssetService {
 
   /**
    * Story 9.5: Upload a file and create data asset
+   * Story 10.5: Migrated to FileStorageService
    * AC#1: Upload file, create DataAsset with graphId, fileSize, storagePath
    * AC#2: Auto-detect format from file extension
-   * GR-1.1.6: Rollback on DB failure - delete uploaded file
+   * 
+   * Storage contract (Story 10.5):
+   * - DB stores FileRecord.id (fileId) in DataAsset.storagePath
+   * - API returns `/api/files/{fileId}` for frontend backward compatibility
    */
   async uploadAsset(
     file: Express.Multer.File,
     graphId: string,
     folderId?: string
   ): Promise<DataAsset> {
-    // Store file using FileService (handles UTF-8 filename decoding)
-    const storedFile = await this.fileService.storeFile(file);
+    // Create asset record first to get ID for ownerId
+    // storagePath is temporarily null, will be updated after file upload
+    const format = getDataAssetFormatFromFilename(file.originalname);
 
-    // Use decoded filename from storedFile for format detection and asset name
-    const decodedFileName = storedFile.originalName;
+    const asset = await this.assetRepo.create({
+      name: file.originalname, // Will be overwritten after upload with decoded name
+      format,
+      fileSize: file.size,
+      storagePath: '', // Placeholder, will update after upload
+      version: 'v1.0.0',
+      tags: [],
+      graph: { connect: { id: graphId } },
+      folder: folderId ? { connect: { id: folderId } } : undefined,
+      secretLevel: 'internal',
+    });
 
-    // Auto-detect format from filename (AC#2)
-    const format = getDataAssetFormatFromFilename(decodedFileName);
-
-    // Build storagePath as accessible URL
-    const storagePath = `/api/files/${storedFile.id}`;
-
+    let uploadedFileId: string | null = null;
     try {
-      // Create DataAsset record with properly decoded filename
-      const asset = await this.assetRepo.create({
-        name: decodedFileName,
-        format,
-        fileSize: file.size,
-        storagePath,
-        version: 'v1.0.0',
-        tags: [],
-        graph: { connect: { id: graphId } },
-        folder: folderId ? { connect: { id: folderId } } : undefined,
-        secretLevel: 'internal',
+      // Upload file via FileStorageService
+      const uploaded = await this.fileStorageService.upload(file, graphId, {
+        ownerType: DATA_ASSET_OWNER_TYPE,
+        ownerId: asset.id,
+      });
+      uploadedFileId = uploaded.id;
+
+      // Update asset with correct storagePath (fileId) and decoded name
+      const updatedAsset = await this.assetRepo.update(asset.id, {
+        storagePath: uploaded.id, // Store fileId, not URL
+        name: uploaded.originalName, // Use decoded UTF-8 filename
       });
 
       this.logger.log(
-        `Uploaded data asset: ${asset.id} (${asset.name}), format: ${format}, size: ${file.size}`
+        `Uploaded data asset: ${asset.id} (${uploaded.originalName}), format: ${format}, size: ${file.size}`
       );
-      return this.toSimpleAssetResponse(asset);
+
+      // Return with storagePath mapped to accessible URL for frontend
+      return this.toSimpleAssetResponse(updatedAsset);
     } catch (error) {
-      // Rollback: delete uploaded file if DB creation fails (GR-1.1.6)
+      // Rollback: delete asset record; if file was already uploaded, delete it too (best-effort)
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Failed to create asset record, rolling back file: ${storedFile.id}`,
-        error instanceof Error ? error.stack : String(error),
+        `Failed to upload file, rolling back asset: ${asset.id}. Cause: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
       );
-      await this.fileService.deleteFile(storedFile.id);
-      throw new InternalServerErrorException('Failed to create data asset');
+
+      if (uploadedFileId) {
+        try {
+          await this.fileStorageService.delete(uploadedFileId);
+        } catch (cleanupError) {
+          // Don't mask original failure; log and continue rollback.
+          if (!(cleanupError instanceof NotFoundException)) {
+            this.logger.warn(`Rollback: failed to delete uploaded file ${uploadedFileId}: ${String(cleanupError)}`);
+          }
+        }
+      }
+
+      await this.assetRepo.hardDelete(asset.id);
+      throw new InternalServerErrorException(`Failed to upload data asset: ${errorMessage}`);
     }
   }
 
@@ -252,6 +284,7 @@ export class DataAssetService {
 
   /**
    * Hard delete a data asset (permanent) - removes links and physical file
+   * Story 10.5: Uses FileStorageService.delete()
    */
   async hardDeleteAsset(id: string): Promise<void> {
     const existing = await this.assetRepo.findById(id);
@@ -259,12 +292,20 @@ export class DataAssetService {
       throw new NotFoundException(`Data asset ${id} not found`);
     }
 
-    // Unlink from all nodes first (explicitly), then delete file, then delete record.
+    // Unlink from all nodes first, then delete file, then delete record.
     await this.linkService.deleteLinksByAsset(id);
 
-    const fileId = this.extractFileIdFromStoragePath(existing.storagePath);
+    // Story 10.5: storagePath now stores fileId directly
+    const fileId = existing.storagePath;
     if (fileId) {
-      await this.fileService.deleteFile(fileId);
+      try {
+        await this.fileStorageService.delete(fileId);
+      } catch (error) {
+        // Log but don't fail if file already deleted or not found
+        if (!(error instanceof NotFoundException)) {
+          this.logger.warn(`Failed to delete file ${fileId}: ${String(error)}`);
+        }
+      }
     }
 
     await this.assetRepo.hardDelete(id);
@@ -273,15 +314,23 @@ export class DataAssetService {
 
   /**
    * Empty trash for a graph (permanent delete all soft-deleted assets)
+   * Story 10.5: Uses FileStorageService.delete()
    */
   async emptyTrash(graphId: string): Promise<{ deletedCount: number }> {
     const deleted = await this.assetRepo.findDeleted(graphId);
 
     // Best-effort physical file cleanup
     for (const asset of deleted) {
-      const fileId = this.extractFileIdFromStoragePath(asset.storagePath);
+      // Story 10.5: storagePath now stores fileId directly
+      const fileId = asset.storagePath;
       if (fileId) {
-        await this.fileService.deleteFile(fileId);
+        try {
+          await this.fileStorageService.delete(fileId);
+        } catch (error) {
+          if (!(error instanceof NotFoundException)) {
+            this.logger.warn(`Failed to delete file ${fileId}: ${String(error)}`);
+          }
+        }
       }
     }
 
@@ -373,7 +422,8 @@ export class DataAssetService {
       description: asset.description,
       format: asset.format,
       fileSize: asset.fileSize,
-      storagePath: asset.storagePath,
+      // Story 10.5: Map storagePath (fileId) to accessible URL for frontend
+      storagePath: asset.storagePath ? `/api/files/${asset.storagePath}` : null,
       thumbnail: asset.thumbnail,
       version: asset.version,
       tags: asset.tags,
@@ -394,7 +444,8 @@ export class DataAssetService {
       description: asset.description,
       format: asset.format,
       fileSize: asset.fileSize,
-      storagePath: asset.storagePath,
+      // Story 10.5: Map storagePath (fileId) to accessible URL for frontend
+      storagePath: asset.storagePath ? `/api/files/${asset.storagePath}` : null,
       thumbnail: asset.thumbnail,
       version: asset.version,
       tags: asset.tags,
@@ -405,20 +456,5 @@ export class DataAssetService {
       createdAt: asset.createdAt.toISOString(),
       updatedAt: asset.updatedAt.toISOString(),
     };
-  }
-
-  private extractFileIdFromStoragePath(storagePath?: string | null): string | null {
-    if (!storagePath) return null;
-
-    try {
-      const url = new URL(storagePath, 'http://localhost');
-      const match = url.pathname.match(/\/api\/files\/([^/]+)$/);
-      if (match) return match[1] ?? null;
-    } catch {
-      // Ignore URL parsing errors; fallback to regex below.
-    }
-
-    const match = storagePath.match(/\/api\/files\/([^/?#]+)/);
-    return match ? (match[1] ?? null) : null;
   }
 }

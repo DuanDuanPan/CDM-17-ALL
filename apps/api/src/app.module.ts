@@ -1,6 +1,7 @@
 /**
  * App Module - Microkernel Configuration
  * Story 7.5: Plugin Migration
+ * Story 10.5: Removed legacy FileModule, unified file storage
  *
  * Kernel responsibilities:
  * - Load plugin server modules
@@ -21,11 +22,11 @@ import { GraphsModule } from './modules/graphs/graphs.module'; // Dynamic Graph 
 import { DemoSeedService } from './demo/demo-seed.service'; // Story 5.1: For template instantiation
 import { ProductLibraryModule } from './modules/product-library'; // Story 2.7
 import { KnowledgeLibraryModule } from './modules/knowledge-library'; // Story 2.8
-import { FileModule } from './modules/file/file.module'; // Story 4.1: Legacy FileService (no routes)
 import { SubscriptionModule } from './modules/subscriptions/subscriptions.module'; // Story 4.4: Watch & Subscription
 import { DataManagementModule } from './modules/data-management'; // Story 9.1: Data Library
 import { PluginKernelModule } from './modules/plugin-kernel/plugin-kernel.module';
 import { FileStorageModule } from './modules/file-storage/file-storage.module'; // Story 10.4: Unified File Storage
+import { FileStorageService } from './modules/file-storage/file-storage.service'; // Story 10.5: For injection token
 
 @Module({
   imports: [
@@ -37,9 +38,8 @@ import { FileStorageModule } from './modules/file-storage/file-storage.module'; 
     GraphsModule, // Dynamic Graph ID management
     ProductLibraryModule, // Story 2.7: Mock product library for PBS nodes
     KnowledgeLibraryModule, // Story 2.8: Mock knowledge library for Task nodes
-    FileModule, // Story 4.1: Legacy FileService (used by DataManagementModule)
     SubscriptionModule, // Story 4.4: Watch & Subscription
-    DataManagementModule, // Story 9.1: Data Library
+    DataManagementModule, // Story 9.1: Data Library (Story 10.5: uses FileStorageModule)
     FileStorageModule, // Story 10.4: Unified File Storage
 
     // Story 7.5: Kernel → plugin infrastructure contracts (global)
@@ -48,7 +48,11 @@ import { FileStorageModule } from './modules/file-storage/file-storage.module'; 
     // Story 7.5: Plugin server modules
     MindmapCoreServerModule.register(),
     WorkflowApprovalServerModule.register(),
-    CommentsServerModule.register(),
+    // Story 10.5: CommentsServerModule with FileStorageModule for attachments
+    CommentsServerModule.forRoot({
+      imports: [FileStorageModule],
+      fileStorageServiceClass: FileStorageService,
+    }),
 
     // Story 5.1: Template Library Plugin
     TemplatesServerModule.forRoot({

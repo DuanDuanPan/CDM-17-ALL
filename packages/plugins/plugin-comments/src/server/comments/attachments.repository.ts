@@ -55,6 +55,17 @@ export class AttachmentsRepository {
   }
 
   /**
+   * Story 10.5: Update attachment record
+   * Used by AttachmentsController.upload to set storagePath after file upload
+   */
+  async update(id: string, data: Partial<Pick<CommentAttachment, 'storagePath' | 'fileName'>>): Promise<CommentAttachment> {
+    return prisma.commentAttachment.update({
+      where: { id },
+      data,
+    });
+  }
+
+  /**
    * Find attachments by comment ID
    */
   async findByCommentId(commentId: string): Promise<CommentAttachment[]> {

@@ -1,6 +1,7 @@
 /**
  * Story 9.1: Data Library (数据资源库)
  * Story 9.5: Data Upload & Node Linking
+ * Story 10.5: Migrated to FileStorageModule
  * Data Management Module - Encapsulates data library functionality
  *
  * GR-2 Compliance: Services and repositories extracted to separate files
@@ -18,10 +19,10 @@ import {
 } from './data-asset.repository';
 import { DataLibrarySeedService } from './mock-data';
 import { DataManagementAuthGuard } from './guards/data-management-auth.guard';
-import { FileModule } from '../file/file.module';
+import { FileStorageModule } from '../file-storage/file-storage.module';
 
 @Module({
-  imports: [FileModule],
+  imports: [FileStorageModule], // Story 10.5: Replaced FileModule with FileStorageModule
   controllers: [DataAssetController],
   providers: [
     // Services
@@ -39,4 +40,3 @@ import { FileModule } from '../file/file.module';
   exports: [DataAssetService, DataFolderService, NodeDataLinkService],
 })
 export class DataManagementModule { }
-

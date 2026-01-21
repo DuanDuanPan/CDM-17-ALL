@@ -1,5 +1,6 @@
 /**
  * Story 4.3+: Comment Attachments
+ * Story 10.5: Added graphId for FileStorageService
  * useAttachmentUpload Hook - File upload with progress tracking
  */
 
@@ -21,6 +22,7 @@ export interface UseAttachmentUploadOptions {
     maxFiles?: number;  // Default: 5
     maxSize?: number;   // Default: 10MB
     userId: string;
+    graphId?: string;   // Story 10.5: Required for file storage isolation
 }
 
 export interface UseAttachmentUploadReturn {
@@ -36,6 +38,7 @@ export function useAttachmentUpload({
     maxFiles = 5,
     maxSize = 10 * 1024 * 1024,
     userId,
+    graphId,
 }: UseAttachmentUploadOptions): UseAttachmentUploadReturn {
     const [files, setFiles] = useState<UploadingFile[]>([]);
 
@@ -52,6 +55,11 @@ export function useAttachmentUpload({
         // Validate file size
         if (file.size > maxSize) {
             throw new Error(`文件大小不能超过 ${Math.round(maxSize / 1024 / 1024)}MB`);
+        }
+
+        // Story 10.5: graphId is required
+        if (!graphId) {
+            throw new Error('无法上传附件：未知的图谱 ID');
         }
 
         const id = generateId();
@@ -73,6 +81,9 @@ export function useAttachmentUpload({
             const formData = new FormData();
             formData.append('file', file);
 
+            // Story 10.5: Build URL with graphId query parameter
+            const uploadUrl = `/api/comments/attachments/upload?graphId=${encodeURIComponent(graphId)}`;
+
             // Use XMLHttpRequest for progress tracking
             const result = await new Promise<CommentAttachment>((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
@@ -90,13 +101,21 @@ export function useAttachmentUpload({
                     if (xhr.status >= 200 && xhr.status < 300) {
                         resolve(JSON.parse(xhr.responseText));
                     } else {
-                        reject(new Error(xhr.responseText || '上传失败'));
+                        // Handle both JSON and text error responses
+                        let errorMessage = '上传失败';
+                        try {
+                            const errorData = JSON.parse(xhr.responseText);
+                            errorMessage = errorData.error || errorData.message || errorMessage;
+                        } catch {
+                            errorMessage = xhr.responseText || errorMessage;
+                        }
+                        reject(new Error(errorMessage));
                     }
                 };
 
                 xhr.onerror = () => reject(new Error('网络错误'));
 
-                xhr.open('POST', '/api/comments/attachments/upload');
+                xhr.open('POST', uploadUrl);
                 xhr.setRequestHeader('x-user-id', userId);
                 xhr.send(formData);
             });
@@ -121,7 +140,7 @@ export function useAttachmentUpload({
                 } : f)
             );
         }
-    }, [files.length, maxFiles, maxSize, userId]);
+    }, [files.length, maxFiles, maxSize, userId, graphId]);
 
     // Remove a file from the list
     const remove = useCallback((id: string) => {

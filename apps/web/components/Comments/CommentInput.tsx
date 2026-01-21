@@ -2,6 +2,7 @@
 
 /**
  * Story 4.3: Contextual Comments & Mentions
+ * Story 10.5: Added graphId for FileStorageService
  * CommentInput Component - Textarea with @mention suggestions and attachments
  *
  * Story 7.5: Refactored to use Hook-First pattern
@@ -23,6 +24,7 @@ interface CommentInputProps {
     onCancelReply?: () => void;
     disabled?: boolean;
     userId: string;  // Required for attachment upload
+    graphId?: string;  // Story 10.5: Required for file storage isolation
 }
 
 export function CommentInput({
@@ -32,6 +34,7 @@ export function CommentInput({
     onCancelReply,
     disabled = false,
     userId,
+    graphId,
 }: CommentInputProps) {
     const [content, setContent] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,7 +61,7 @@ export function CommentInput({
         clear: clearFiles,
         getAttachmentIds,
         isUploading,
-    } = useAttachmentUpload({ userId, maxFiles: 5, maxSize: 10 * 1024 * 1024 });
+    } = useAttachmentUpload({ userId, graphId, maxFiles: 5, maxSize: 10 * 1024 * 1024 });
 
     // Handle content change and detect @mentions
     const handleChange = useCallback(

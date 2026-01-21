@@ -2,6 +2,7 @@
 
 /**
  * CommentsPanelContent - Comments panel content for unified left sidebar
+ * Story 10.5: Added graphId for FileStorageService
  * 
  * Extracted from CommentPanel to work within the left sidebar layout.
  * Displays comments for the selected node.
@@ -182,6 +183,7 @@ export function CommentsPanelContent({
                     replyToName={replyToName || undefined}
                     onCancelReply={handleCancelReply}
                     userId={userId}
+                    graphId={mindmapId}
                 />
             </div>
         </div>

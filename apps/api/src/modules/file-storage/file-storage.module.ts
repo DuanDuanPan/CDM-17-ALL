@@ -1,13 +1,15 @@
 /**
  * Story 10.4: File Storage Module
  * Registers Controller, Service, Repository, and Adapter
+ * 
+ * Story 10.5: Removed FileModule import to break circular dependency.
+ * Legacy FileService fallback has been removed per Epic 10 constraints.
  */
 
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { GraphsModule } from '../graphs/graphs.module';
-import { FileModule } from '../file/file.module';
 import { FileStorageController } from './file-storage.controller';
 import { FileStorageService } from './file-storage.service';
 import { FileStorageRepository } from './file-storage.repository';
@@ -21,8 +23,6 @@ import { FileStorageAuthGuard } from './guards/file-storage-auth.guard';
         MulterModule.register({
             storage: memoryStorage(),
         }),
-        // Legacy file service fallback for /api/files/:id compatibility
-        FileModule,
         // Graph existence validation
         GraphsModule,
     ],

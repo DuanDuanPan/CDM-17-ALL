@@ -1,7 +1,9 @@
 /**
  * Story 4.3+: Comment Attachments
- * Attachments Controller - File upload, download, delete endpoints
  * Story 7.1: Refactored to use AttachmentsRepository
+ * Story 10.5: Migrated to FileStorageService
+ * 
+ * Attachments Controller - File upload, download, delete endpoints
  * NOTE: Fine-grained permission control deferred to future story
  */
 
@@ -11,6 +13,7 @@ import {
     Get,
     Delete,
     Param,
+    Query,
     Headers,
     Res,
     HttpCode,
@@ -18,19 +21,38 @@ import {
     UnauthorizedException,
     BadRequestException,
     NotFoundException,
+    InternalServerErrorException,
     UseInterceptors,
     UploadedFile,
+    Inject,
+    Optional,
+    Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import type { Response } from 'express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { existsSync, mkdirSync, unlinkSync, createReadStream } from 'fs';
-import { randomBytes } from 'crypto';
 import { AttachmentsRepository } from './attachments.repository';
 
+// Story 10.5: FileStorageService injection token and interface
+// Matches the interface from file-storage.service.ts
+export const FILE_STORAGE_SERVICE = 'FILE_STORAGE_SERVICE';
+
+export interface IFileStorageService {
+    upload(file: Express.Multer.File, graphId: string, options?: {
+        ownerType?: string;
+        ownerId?: string;
+        uploadedBy?: string;
+    }): Promise<{
+        id: string;
+        originalName: string;
+        mimeType: string;
+        size: number;
+    }>;
+    download(fileId: string): Promise<{ buffer: Buffer; record: { originalName: string; mimeType: string; size: number } }>;
+    delete(fileId: string): Promise<void>;
+}
+
 // Configuration
-const UPLOAD_DIR = join(process.cwd(), 'uploads', 'comments');
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = [
     // Images
@@ -46,33 +68,7 @@ const ALLOWED_MIME_TYPES = [
     'application/x-zip-compressed',
 ];
 
-// Ensure upload directory exists
-if (!existsSync(UPLOAD_DIR)) {
-    mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-
-// Multer storage configuration
-const storage = diskStorage({
-    destination: (
-        _req: Express.Request,
-        _file: Express.Multer.File,
-        cb: (error: Error | null, destination: string) => void
-    ) => {
-        cb(null, UPLOAD_DIR);
-    },
-    filename: (
-        _req: Express.Request,
-        file: Express.Multer.File,
-        cb: (error: Error | null, filename: string) => void
-    ) => {
-        // Generate unique filename: timestamp + random + original extension
-        const uniqueId = `${Date.now()}-${randomBytes(8).toString('hex')}`;
-        const ext = extname(file.originalname);
-        cb(null, `${uniqueId}${ext}`);
-    },
-});
-
-// File filter for validation
+// File filter for validation (custom error type for Multer)
 const fileFilter = (
     _req: Express.Request,
     file: Express.Multer.File,
@@ -85,28 +81,36 @@ const fileFilter = (
     }
 };
 
+// Story 10.5: FileRecord owner type for attachments
+const ATTACHMENT_OWNER_TYPE = 'ATTACHMENT';
+
 @Controller('comments/attachments')
 export class AttachmentsController {
+    private readonly logger = new Logger(AttachmentsController.name);
+
     constructor(
         private readonly attachmentsRepository: AttachmentsRepository,
-    ) {}
+        @Optional() @Inject(FILE_STORAGE_SERVICE)
+        private readonly fileStorageService?: IFileStorageService,
+    ) { }
 
     /**
      * Upload a file attachment
-     * POST /comments/attachments/upload
-     * Returns the attachment ID for use when creating a comment
+     * POST /comments/attachments/upload?graphId=xxx
+     * Story 10.5: graphId is now required for file storage isolation
      */
     @Post('upload')
     @HttpCode(HttpStatus.CREATED)
     @UseInterceptors(
         FileInterceptor('file', {
-            storage,
+            storage: memoryStorage(), // Story 10.5: Use memoryStorage for FileStorageService
             fileFilter,
             limits: { fileSize: MAX_FILE_SIZE },
         })
     )
     async upload(
         @UploadedFile() file: Express.Multer.File,
+        @Query('graphId') graphId: string,
         @Headers('x-user-id') userId?: string
     ) {
         if (!userId) {
@@ -117,34 +121,75 @@ export class AttachmentsController {
             throw new BadRequestException('No file uploaded');
         }
 
+        // Story 10.5: graphId is required for FileStorageService
+        if (!graphId?.trim()) {
+            throw new BadRequestException('graphId is required');
+        }
+
+        // Check if FileStorageService is available
+        if (!this.fileStorageService) {
+            throw new InternalServerErrorException(
+                'FileStorageService not configured. Did you forget to pass FileStorageModule to CommentsServerModule.forRoot()?'
+            );
+        }
+        const fileStorageService = this.fileStorageService;
+
         // Decode UTF-8 filename (Multer may return Latin-1 encoded string)
         let decodedFileName = file.originalname;
         try {
-            // Try to decode if it looks like corrupted UTF-8
             decodedFileName = Buffer.from(file.originalname, 'latin1').toString('utf8');
         } catch {
-            // If decoding fails, use original
             decodedFileName = file.originalname;
         }
 
-        // Create attachment record (pending association with comment)
-        // Story 7.1: Refactored to use AttachmentsRepository
+        // Story 10.5: Create attachment record first to get ID for ownerId
         const attachment = await this.attachmentsRepository.create({
             fileName: decodedFileName,
             fileSize: file.size,
             mimeType: file.mimetype,
-            storagePath: file.filename, // Just the filename, not full path
+            storagePath: '', // Placeholder, will update after upload
             uploaderId: userId,
-            // commentId is undefined by default - will be set when comment is created
         });
 
-        return {
-            id: attachment.id,
-            fileName: attachment.fileName,
-            fileSize: attachment.fileSize,
-            mimeType: attachment.mimeType,
-            url: `/api/comments/attachments/${attachment.id}`,
-        };
+        let uploadedFileId: string | null = null;
+        try {
+            // Upload file via FileStorageService
+            const uploaded = await fileStorageService.upload(file, graphId.trim(), {
+                ownerType: ATTACHMENT_OWNER_TYPE,
+                ownerId: attachment.id,
+                uploadedBy: userId,
+            });
+            uploadedFileId = uploaded.id;
+
+            // Update attachment with fileId as storagePath
+            await this.attachmentsRepository.update(attachment.id, {
+                storagePath: uploaded.id, // Store fileId, not path
+                fileName: uploaded.originalName, // Use decoded name from FileStorageService
+            });
+
+            return {
+                id: attachment.id,
+                fileName: uploaded.originalName,
+                fileSize: file.size,
+                mimeType: file.mimetype,
+                url: `/api/comments/attachments/${attachment.id}`,
+            };
+        } catch (error) {
+            // Rollback: delete attachment record; if file was already uploaded, delete it too (best-effort)
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Failed to upload attachment. Cause: ${errorMessage}`);
+            if (uploadedFileId) {
+                try {
+                    await fileStorageService.delete(uploadedFileId);
+                } catch (cleanupError) {
+                    if (!(cleanupError instanceof NotFoundException)) {
+                        this.logger.warn(`Rollback: failed to delete uploaded file ${uploadedFileId}: ${String(cleanupError)}`);
+                    }
+                }
+            }
+            await this.attachmentsRepository.delete(attachment.id);
+            throw new InternalServerErrorException(`Failed to upload attachment: ${errorMessage}`);
+        }
     }
 
     /**
@@ -162,36 +207,33 @@ export class AttachmentsController {
             throw new UnauthorizedException('User ID required');
         }
 
-        // Story 7.1: Refactored to use AttachmentsRepository
         const attachment = await this.attachmentsRepository.findById(id);
 
         if (!attachment) {
             throw new NotFoundException('Attachment not found');
         }
 
-        // TODO: Add fine-grained permission control in future story
-        // Current behavior: any authenticated user can download any attachment
-
-        const filePath = join(UPLOAD_DIR, attachment.storagePath);
-        if (!existsSync(filePath)) {
-            throw new NotFoundException('File not found on disk');
+        // Story 10.5: storagePath now stores fileId
+        if (!this.fileStorageService) {
+            throw new InternalServerErrorException('FileStorageService not configured');
         }
 
+        const { buffer, record } = await this.fileStorageService.download(attachment.storagePath);
+
         // Set appropriate headers
-        res.setHeader('Content-Type', attachment.mimeType);
-        res.setHeader('Content-Length', attachment.fileSize);
+        res.setHeader('Content-Type', record.mimeType);
+        res.setHeader('Content-Length', buffer.length);
 
         // For images, allow inline display; for others, force download
-        const isImage = attachment.mimeType.startsWith('image/');
+        const isImage = record.mimeType.startsWith('image/');
         const disposition = isImage ? 'inline' : 'attachment';
+        const encodedFilename = encodeURIComponent(record.originalName);
         res.setHeader(
             'Content-Disposition',
-            `${disposition}; filename="${encodeURIComponent(attachment.fileName)}"`
+            `${disposition}; filename*=UTF-8''${encodedFilename}`
         );
 
-        // Stream the file
-        const fileStream = createReadStream(filePath);
-        fileStream.pipe(res);
+        res.send(buffer);
     }
 
     /**
@@ -208,7 +250,6 @@ export class AttachmentsController {
             throw new UnauthorizedException('User ID required');
         }
 
-        // Story 7.1: Refactored to use AttachmentsRepository
         const attachment = await this.attachmentsRepository.findById(id);
 
         if (!attachment) {
@@ -220,14 +261,19 @@ export class AttachmentsController {
             throw new UnauthorizedException('只有上传者可以删除附件');
         }
 
-        // Delete file from disk
-        const filePath = join(UPLOAD_DIR, attachment.storagePath);
-        if (existsSync(filePath)) {
-            unlinkSync(filePath);
+        // Story 10.5: Delete file via FileStorageService
+        if (this.fileStorageService && attachment.storagePath) {
+            try {
+                await this.fileStorageService.delete(attachment.storagePath);
+            } catch (error) {
+                // Log but don't fail if file already deleted
+                if (!(error instanceof NotFoundException)) {
+                    this.logger.warn(`Failed to delete file ${attachment.storagePath}: ${String(error)}`);
+                }
+            }
         }
 
         // Delete database record
-        // Story 7.1: Refactored to use AttachmentsRepository
         await this.attachmentsRepository.delete(id);
 
         return { success: true };

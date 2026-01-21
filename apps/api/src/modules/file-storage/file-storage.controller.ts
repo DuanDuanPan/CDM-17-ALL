@@ -1,6 +1,10 @@
 /**
  * Story 10.4: File Storage Controller
  * Unified API endpoints for file upload/download/preview/delete
+ * 
+ * Story 10.5: Removed legacy FileService fallback - all file operations
+ * now go through FileStorageService only. Historical files are not preserved
+ * per Epic 10 constraints.
  */
 
 import {
@@ -9,7 +13,6 @@ import {
     Get,
     Headers,
     MaxFileSizeValidator,
-    NotFoundException,
     Param,
     ParseFilePipe,
     Post,
@@ -25,72 +28,13 @@ import { FileStorageService } from './file-storage.service';
 import { FileResponseDto } from './dto/file-response.dto';
 import { UploadFileDto } from './dto/upload-file.dto';
 import { FileStorageAuthGuard } from './guards/file-storage-auth.guard';
-import { FileService } from '../file/file.service';
-import { isPreviewableMimeType } from './constants/previewable-types';
-
-// Max file size: 10MB (memory upload)
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+import { MAX_FILE_SIZE } from './constants';
 
 @Controller('files')
 export class FileStorageController {
     constructor(
         private readonly fileStorageService: FileStorageService,
-        private readonly legacyFileService: FileService,
     ) { }
-
-    private async resolveFileForDownload(id: string): Promise<{
-        buffer: Buffer;
-        mimeType: string;
-        originalName: string;
-    }> {
-        try {
-            const { buffer, record } = await this.fileStorageService.download(id);
-            return { buffer, mimeType: record.mimeType, originalName: record.originalName };
-        } catch (error) {
-            if (error instanceof NotFoundException) {
-                const { buffer, metadata } = await this.legacyFileService.getFile(id);
-                return { buffer, mimeType: metadata.mimeType, originalName: metadata.originalName };
-            }
-            throw error;
-        }
-    }
-
-    private async resolveFileMetadata(id: string): Promise<FileResponseDto> {
-        try {
-            return await this.fileStorageService.getMetadata(id);
-        } catch (error) {
-            if (!(error instanceof NotFoundException)) {
-                throw error;
-            }
-
-            const legacy = this.legacyFileService.getFileMetadata(id);
-            if (legacy) {
-                return {
-                    id: legacy.id,
-                    originalName: legacy.originalName,
-                    mimeType: legacy.mimeType,
-                    size: legacy.size,
-                    storagePath: `legacy/${legacy.id}`,
-                    storageType: 'LOCAL',
-                    previewable: isPreviewableMimeType(legacy.mimeType),
-                    createdAt: new Date(legacy.uploadedAt),
-                };
-            }
-
-            // Fallback: derive metadata from disk scan
-            const { metadata } = await this.legacyFileService.getFile(id);
-            return {
-                id: metadata.id,
-                originalName: metadata.originalName,
-                mimeType: metadata.mimeType,
-                size: metadata.size,
-                storagePath: `legacy/${metadata.id}`,
-                storageType: 'LOCAL',
-                previewable: isPreviewableMimeType(metadata.mimeType),
-                createdAt: new Date(metadata.uploadedAt),
-            };
-        }
-    }
 
     /**
      * POST /api/files/upload
@@ -125,12 +69,11 @@ export class FileStorageController {
      */
     @Get(':id')
     async downloadCompat(@Param('id') id: string, @Res() res: Response): Promise<void> {
-        const { buffer, mimeType, originalName } = await this.resolveFileForDownload(id);
-
-        const encodedFilename = encodeURIComponent(originalName);
+        const { buffer, record } = await this.fileStorageService.download(id);
+        const encodedFilename = encodeURIComponent(record.originalName);
 
         res.set({
-            'Content-Type': mimeType,
+            'Content-Type': record.mimeType,
             'Content-Length': buffer.length.toString(),
             'Content-Disposition': `attachment; filename*=UTF-8''${encodedFilename}`,
         });
@@ -144,11 +87,11 @@ export class FileStorageController {
      */
     @Get(':id/download')
     async download(@Param('id') id: string, @Res() res: Response): Promise<void> {
-        const { buffer, mimeType, originalName } = await this.resolveFileForDownload(id);
-        const encodedFilename = encodeURIComponent(originalName);
+        const { buffer, record } = await this.fileStorageService.download(id);
+        const encodedFilename = encodeURIComponent(record.originalName);
 
         res.set({
-            'Content-Type': mimeType,
+            'Content-Type': record.mimeType,
             'Content-Length': buffer.length.toString(),
             'Content-Disposition': `attachment; filename*=UTF-8''${encodedFilename}`,
         });
@@ -162,11 +105,11 @@ export class FileStorageController {
      */
     @Get(':id/preview')
     async preview(@Param('id') id: string, @Res() res: Response): Promise<void> {
-        const { buffer, mimeType, originalName } = await this.resolveFileForDownload(id);
-        const encodedFilename = encodeURIComponent(originalName);
+        const { buffer, record } = await this.fileStorageService.download(id);
+        const encodedFilename = encodeURIComponent(record.originalName);
 
         res.set({
-            'Content-Type': mimeType,
+            'Content-Type': record.mimeType,
             'Content-Length': buffer.length.toString(),
             'Content-Disposition': `inline; filename*=UTF-8''${encodedFilename}`,
         });
@@ -180,7 +123,7 @@ export class FileStorageController {
      */
     @Get(':id/metadata')
     async getMetadata(@Param('id') id: string): Promise<FileResponseDto> {
-        return this.resolveFileMetadata(id);
+        return this.fileStorageService.getMetadata(id);
     }
 
     /**
@@ -190,15 +133,7 @@ export class FileStorageController {
     @Delete(':id')
     @UseGuards(FileStorageAuthGuard)
     async deleteFile(@Param('id') id: string): Promise<{ deleted: boolean }> {
-        try {
-            await this.fileStorageService.delete(id);
-        } catch (error) {
-            if (error instanceof NotFoundException) {
-                await this.legacyFileService.deleteFile(id);
-            } else {
-                throw error;
-            }
-        }
+        await this.fileStorageService.delete(id);
         return { deleted: true };
     }
 }

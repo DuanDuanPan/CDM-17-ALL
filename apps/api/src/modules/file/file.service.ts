@@ -1,6 +1,10 @@
 /**
  * Story 4.1: FIX-11 - File Upload Service
  * Handles file storage and retrieval for deliverables
+ *
+ * @deprecated Story 10.5: Legacy FileService. Replaced by FileStorageService.
+ * This service is kept for historical reference only and should not be used
+ * for new code paths.
  */
 
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
@@ -27,6 +31,7 @@ export interface FileMetadata {
 }
 
 @Injectable()
+/** @deprecated Story 10.5: Legacy FileService (use FileStorageService instead). */
 export class FileService {
     private readonly logger = new Logger(FileService.name);
     private readonly uploadDir: string;

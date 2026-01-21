@@ -1,6 +1,7 @@
 /**
  * Plugin Comments - Server Entry Point
  * Story 7.5: Plugin Migration
+ * Story 10.5: FileStorageService integration via module import
  * 
  * This module provides the backend (NestJS) module for the comments plugin.
  * Includes contextual comments, mentions, and attachments functionality.
@@ -9,7 +10,7 @@
  */
 
 import { Module, DynamicModule } from '@nestjs/common';
-import { CommentsModule, CommentsModuleOptions } from './comments/comments.module';
+import { CommentsModule } from './comments/comments.module';
 
 // Re-export modules
 export { CommentsModule, CommentsModuleOptions } from './comments/comments.module';
@@ -32,12 +33,23 @@ export { AttachmentsRepository } from './comments/attachments.repository';
 // Re-export gateway
 export { CommentsGateway } from './comments/comments.gateway';
 
+// Re-export file storage token
+export { FILE_STORAGE_SERVICE, IFileStorageService } from './comments/attachments.controller';
+
 /**
  * Options for configuring the CommentsServerModule
  */
 export interface CommentsServerModuleOptions {
-    /** Modules to import (e.g., NotificationModule, UsersModule) */
+    /** 
+     * Modules to import (e.g., FileStorageModule)
+     * Story 10.5: When FileStorageModule is included, attachments will use unified storage
+     */
     imports?: any[];
+    /**
+     * Story 10.5: FileStorageService class for injection token alias
+     * Required when using FileStorageModule for attachment uploads
+     */
+    fileStorageServiceClass?: any;
 }
 
 /**
@@ -49,11 +61,15 @@ export interface CommentsServerModuleOptions {
  * ```typescript
  * // In apps/api/src/app.module.ts
  * import { CommentsServerModule } from '@cdm/plugin-comments/server';
+ * import { FileStorageModule } from './modules/file-storage/file-storage.module';
+ * import { FileStorageService } from './modules/file-storage/file-storage.service';
  * 
  * @Module({
  *   imports: [
+ *     FileStorageModule,
  *     CommentsServerModule.forRoot({
- *       imports: [NotificationModule, UsersModule],
+ *       imports: [FileStorageModule],
+ *       fileStorageServiceClass: FileStorageService,
  *     }),
  *   ],
  * })
@@ -69,7 +85,10 @@ export class CommentsServerModule {
         return {
             module: CommentsServerModule,
             imports: [
-                CommentsModule.forRoot({ imports: options.imports }),
+                CommentsModule.forRoot({
+                    imports: options.imports,
+                    fileStorageServiceClass: options.fileStorageServiceClass,
+                }),
             ],
             exports: [CommentsModule],
         };

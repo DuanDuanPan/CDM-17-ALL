@@ -3,7 +3,12 @@
  * Creates test users and template library for development
  */
 
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { resolve } from 'path';
+
+// Load .env from project root
+config({ path: resolve(__dirname, '../../../.env') });
+
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, TemplateStatus } from '@prisma/client';
 

@@ -1,5 +1,6 @@
 /**
  * Story 4.3+: Comment Attachments
+ * Story 10.5: Forward graphId for FileStorageService
  * Next.js API Route - Upload attachment proxy
  */
 
@@ -17,10 +18,22 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Story 10.5: Get graphId from query parameter
+        const graphId = request.nextUrl.searchParams.get('graphId');
+        if (!graphId) {
+            return NextResponse.json(
+                { error: 'graphId is required' },
+                { status: 400 }
+            );
+        }
+
         // Forward the multipart form data to the backend
         const formData = await request.formData();
 
-        const response = await fetch(`${API_BASE}/api/comments/attachments/upload`, {
+        // Story 10.5: Forward graphId to backend as query parameter
+        const backendUrl = `${API_BASE}/api/comments/attachments/upload?graphId=${encodeURIComponent(graphId)}`;
+
+        const response = await fetch(backendUrl, {
             method: 'POST',
             headers: {
                 'x-user-id': userId,
@@ -28,7 +41,10 @@ export async function POST(request: NextRequest) {
             body: formData,
         });
 
-        const data = await response.json();
+        const contentType = response.headers.get('content-type') || '';
+        const data = contentType.includes('application/json')
+            ? await response.json()
+            : { error: await response.text() };
 
         if (!response.ok) {
             return NextResponse.json(data, { status: response.status });

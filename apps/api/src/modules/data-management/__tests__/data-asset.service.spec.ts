@@ -1,5 +1,6 @@
 /**
  * Story 9.1 & 9.5: Data Library / Upload
+ * Story 10.5: Migrated to FileStorageService
  * Unit tests for DataAssetService (Repository + delegated services mocked)
  */
 
@@ -39,9 +40,10 @@ describe('DataAssetService', () => {
     deleteLinksByAsset: jest.fn(),
   };
 
-  const fileService = {
-    storeFile: jest.fn(),
-    deleteFile: jest.fn(),
+  // Story 10.5: FileStorageService mock (replaces FileService)
+  const fileStorageService = {
+    upload: jest.fn(),
+    delete: jest.fn(),
   };
 
   let service: DataAssetService;
@@ -63,7 +65,7 @@ describe('DataAssetService', () => {
       assetRepo as any,
       folderService as any,
       linkService as any,
-      fileService as any
+      fileStorageService as any
     );
   });
 
@@ -84,7 +86,7 @@ describe('DataAssetService', () => {
       description: null,
       format: 'STEP',
       fileSize: 123,
-      storagePath: null,
+      storagePath: 'file-1', // Story 10.5: DB stores fileId
       thumbnail: null,
       version: 'v1.0.0',
       tags: ['卫星'],
@@ -129,11 +131,13 @@ describe('DataAssetService', () => {
     expect(result.page).toBe(2);
     expect(result.pageSize).toBe(10);
     expect(result.totalPages).toBe(1);
+    // Story 10.5: API returns URL, not fileId
     expect(result.assets[0]).toEqual(
       expect.objectContaining({
         id: 'asset-1',
         name: '卫星总体结构',
         format: 'STEP',
+        storagePath: '/api/files/file-1', // API returns URL
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
         folder: expect.objectContaining({
@@ -239,23 +243,23 @@ describe('DataAssetService', () => {
     expect(result.folder).toBeNull();
   });
 
-  it('uploadAsset: creates asset with detected format and /api/files storagePath', async () => {
+  /**
+   * Story 10.5: Updated upload test for FileStorageService
+   * - Service now uses FileStorageService.upload() with graphId
+   * - DB stores fileId in storagePath, not URL
+   * - API returns /api/files/{fileId} for frontend compatibility
+   */
+  it('uploadAsset: creates asset with detected format and fileId storagePath', async () => {
     const now = new Date('2026-01-01T00:00:00.000Z');
-    fileService.storeFile.mockResolvedValueOnce({
-      id: 'file-1',
-      originalName: 'test.vtk',
-      mimeType: 'application/octet-stream',
-      size: 10,
-      uploadedAt: now.toISOString(),
-    });
 
-    assetRepo.create.mockResolvedValueOnce({
+    // Step 1: Create asset first (storagePath placeholder)
+    const createdAsset = {
       id: 'asset-1',
       name: 'test.vtk',
       description: null,
-      format: 'VTK', // VTK format is correctly detected from .vtk extension
+      format: 'VTK',
       fileSize: 10,
-      storagePath: '/api/files/file-1',
+      storagePath: '', // Placeholder before upload
       thumbnail: null,
       version: 'v1.0.0',
       tags: [],
@@ -265,56 +269,147 @@ describe('DataAssetService', () => {
       secretLevel: 'internal',
       createdAt: now,
       updatedAt: now,
+    };
+    assetRepo.create.mockResolvedValueOnce(createdAsset);
+
+    // Step 2: FileStorageService.upload returns file metadata
+    fileStorageService.upload.mockResolvedValueOnce({
+      id: 'file-1',
+      originalName: 'test.vtk',
+      mimeType: 'application/octet-stream',
+      size: 10,
     });
+
+    // Step 3: Update asset with fileId
+    const updatedAsset = {
+      ...createdAsset,
+      storagePath: 'file-1', // DB stores fileId
+      name: 'test.vtk',
+    };
+    assetRepo.update.mockResolvedValueOnce(updatedAsset);
 
     const result = await service.uploadAsset(
       {
         originalname: 'test.vtk',
         size: 10,
         buffer: Buffer.from('x'),
+        mimetype: 'application/octet-stream',
       } as any,
       'graph-1'
     );
 
-    expect(fileService.storeFile).toHaveBeenCalled();
-    expect(assetRepo.create).toHaveBeenCalledWith(
+    // Verify FileStorageService.upload was called with graphId
+    expect(fileStorageService.upload).toHaveBeenCalledWith(
+      expect.objectContaining({ originalname: 'test.vtk' }),
+      'graph-1',
       expect.objectContaining({
-        name: 'test.vtk',
-        format: 'VTK', // VTK format is correctly detected from .vtk extension
-        fileSize: 10,
-        storagePath: '/api/files/file-1',
-        graph: { connect: { id: 'graph-1' } },
+        ownerType: 'DATA_ASSET',
+        ownerId: 'asset-1',
       })
     );
 
+    // Verify asset update with fileId
+    expect(assetRepo.update).toHaveBeenCalledWith(
+      'asset-1',
+      expect.objectContaining({
+        storagePath: 'file-1',
+      })
+    );
+
+    // Story 10.5: API returns URL for frontend
     expect(result).toEqual(
       expect.objectContaining({
         id: 'asset-1',
         name: 'test.vtk',
-        format: 'VTK', // VTK format is correctly detected from .vtk extension
-        storagePath: '/api/files/file-1',
+        format: 'VTK',
+        storagePath: '/api/files/file-1', // API returns URL
       })
     );
   });
 
-  it('uploadAsset: rolls back stored file when db create fails', async () => {
-    fileService.storeFile.mockResolvedValueOnce({
-      id: 'file-rollback',
-      originalName: 'fail.pdf',
-      mimeType: 'application/pdf',
-      size: 10,
-      uploadedAt: new Date('2026-01-01T00:00:00.000Z').toISOString(),
-    });
-    assetRepo.create.mockRejectedValueOnce(new Error('db down'));
+  /**
+   * Story 10.5: Updated rollback test for FileStorageService
+   */
+  it('uploadAsset: rolls back asset record when file upload fails', async () => {
+    const now = new Date('2026-01-01T00:00:00.000Z');
+
+    // Create asset succeeds
+    const createdAsset = {
+      id: 'asset-rollback',
+      name: 'fail.pdf',
+      description: null,
+      format: 'PDF',
+      fileSize: 10,
+      storagePath: '',
+      thumbnail: null,
+      version: 'v1.0.0',
+      tags: [],
+      graphId: 'graph-1',
+      folderId: null,
+      creatorId: null,
+      secretLevel: 'internal',
+      createdAt: now,
+      updatedAt: now,
+    };
+    assetRepo.create.mockResolvedValueOnce(createdAsset);
+
+    // File upload fails
+    fileStorageService.upload.mockRejectedValueOnce(new Error('storage down'));
+    assetRepo.hardDelete.mockResolvedValueOnce(undefined);
 
     await expect(
       service.uploadAsset(
-        { originalname: 'fail.pdf', size: 10, buffer: Buffer.from('x') } as any,
+        { originalname: 'fail.pdf', size: 10, buffer: Buffer.from('x'), mimetype: 'application/pdf' } as any,
         'graph-1'
       )
     ).rejects.toBeInstanceOf(InternalServerErrorException);
 
-    expect(fileService.deleteFile).toHaveBeenCalledWith('file-rollback');
+    // Story 10.5: Rollback deletes asset record (not file, since upload failed)
+    expect(assetRepo.hardDelete).toHaveBeenCalledWith('asset-rollback');
+  });
+
+  it('uploadAsset: rolls back uploaded file when asset update fails after upload', async () => {
+    const now = new Date('2026-01-01T00:00:00.000Z');
+
+    const createdAsset = {
+      id: 'asset-update-fails',
+      name: 'test.vtk',
+      description: null,
+      format: 'VTK',
+      fileSize: 10,
+      storagePath: '',
+      thumbnail: null,
+      version: 'v1.0.0',
+      tags: [],
+      graphId: 'graph-1',
+      folderId: null,
+      creatorId: null,
+      secretLevel: 'internal',
+      createdAt: now,
+      updatedAt: now,
+    };
+    assetRepo.create.mockResolvedValueOnce(createdAsset);
+
+    fileStorageService.upload.mockResolvedValueOnce({
+      id: 'file-orphan',
+      originalName: 'test.vtk',
+      mimeType: 'application/octet-stream',
+      size: 10,
+    });
+
+    assetRepo.update.mockRejectedValueOnce(new Error('db down'));
+    fileStorageService.delete.mockResolvedValueOnce(undefined);
+    assetRepo.hardDelete.mockResolvedValueOnce(undefined);
+
+    await expect(
+      service.uploadAsset(
+        { originalname: 'test.vtk', size: 10, buffer: Buffer.from('x'), mimetype: 'application/octet-stream' } as any,
+        'graph-1',
+      )
+    ).rejects.toBeInstanceOf(InternalServerErrorException);
+
+    expect(fileStorageService.delete).toHaveBeenCalledWith('file-orphan');
+    expect(assetRepo.hardDelete).toHaveBeenCalledWith('asset-update-fails');
   });
 
   it('softDeleteAsset: sets isDeleted and deletedAt via repository', async () => {
@@ -346,7 +441,7 @@ describe('DataAssetService', () => {
       description: null,
       format: 'STEP',
       fileSize: 123,
-      storagePath: null,
+      storagePath: 'file-1', // Story 10.5: DB stores fileId
       thumbnail: null,
       version: 'v1.0.0',
       tags: ['卫星'],
@@ -366,6 +461,7 @@ describe('DataAssetService', () => {
       expect.objectContaining({
         id: 'asset-1',
         name: '卫星总体结构',
+        storagePath: '/api/files/file-1', // API returns URL
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
         folder: expect.objectContaining({ id: 'folder-1' }),
@@ -373,30 +469,40 @@ describe('DataAssetService', () => {
     );
   });
 
+  /**
+   * Story 10.5: Updated hardDeleteAsset test
+   * - storagePath now stores fileId directly (no URL parsing needed)
+   * - Uses FileStorageService.delete()
+   */
   it('hardDeleteAsset: unlinks, deletes physical file, and deletes record', async () => {
-    assetRepo.findById.mockResolvedValueOnce({ id: 'asset-1', storagePath: '/api/files/file-1' });
+    assetRepo.findById.mockResolvedValueOnce({ id: 'asset-1', storagePath: 'file-1' }); // fileId, not URL
     linkService.deleteLinksByAsset.mockResolvedValueOnce(1);
-    fileService.deleteFile.mockResolvedValueOnce(undefined);
+    fileStorageService.delete.mockResolvedValueOnce(undefined);
     assetRepo.hardDelete.mockResolvedValueOnce({ id: 'asset-1' });
 
     await service.hardDeleteAsset('asset-1');
 
     expect(linkService.deleteLinksByAsset).toHaveBeenCalledWith('asset-1');
-    expect(fileService.deleteFile).toHaveBeenCalledWith('file-1');
+    expect(fileStorageService.delete).toHaveBeenCalledWith('file-1');
     expect(assetRepo.hardDelete).toHaveBeenCalledWith('asset-1');
   });
 
+  /**
+   * Story 10.5: Updated emptyTrash test
+   * - storagePath now stores fileId directly
+   * - Uses FileStorageService.delete()
+   */
   it('emptyTrash: best-effort deletes files then deletes db records', async () => {
     assetRepo.findDeleted.mockResolvedValueOnce([
-      { id: 'asset-1', storagePath: '/api/files/file-1' },
+      { id: 'asset-1', storagePath: 'file-1' }, // fileId, not URL
       { id: 'asset-2', storagePath: null },
     ]);
-    fileService.deleteFile.mockResolvedValueOnce(undefined);
+    fileStorageService.delete.mockResolvedValueOnce(undefined);
     assetRepo.emptyTrash.mockResolvedValueOnce(2);
 
     const result = await service.emptyTrash('graph-1');
 
-    expect(fileService.deleteFile).toHaveBeenCalledWith('file-1');
+    expect(fileStorageService.delete).toHaveBeenCalledWith('file-1');
     expect(assetRepo.emptyTrash).toHaveBeenCalledWith('graph-1');
     expect(result).toEqual({ deletedCount: 2 });
   });
