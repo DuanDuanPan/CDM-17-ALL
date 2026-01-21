@@ -65,16 +65,16 @@ So that **删除重复实现，消除不一致的 MIME 校验/路径生成/文�
   - [x] 5.5 验证文件存储路径统一为 `uploads/{graphId}/`
 
 - [x] **Review Follow-ups (AI)** - Code Review 2026-01-21
-  - [x] [AI-Review][HIGH] 添加 AttachmentsController 单元测试 [`attachments.controller.ts`]
+  - [ ] [AI-Review][HIGH] 添加 AttachmentsController 单元测试 [`attachments.controller.ts`]（未实现：当前只有 `AttachmentsRepository` 单测；Controller 单测需后续补齐）
   - [x] [AI-Review][HIGH] 替换 console.warn 为 NestJS Logger [`attachments.controller.ts:181,266`]
   - [x] [AI-Review][HIGH] 修复错误消息传播不一致 [`route.ts:45-47`, `useAttachmentUpload.ts:104`]
   - [ ] [AI-Review][HIGH] 添加评论附件上传 E2E 测试 (需要后续 Story)
   - [x] [AI-Review][MEDIUM] 增强错误日志包含原始错误信息 [`data-asset.service.ts`, `attachments.controller.ts`]
-  - [x] [AI-Review][MEDIUM] 考虑移除 @Optional() 以在启动时发现配置错误 [`attachments.controller.ts:90-91`]
+  - [x] [AI-Review][MEDIUM] 考虑移除 @Optional() 以在启动时发现配置错误（最终选择：保留 @Optional()，并在运行时抛出更明确的配置错误）[`attachments.controller.ts:90-134`]
   - [x] [AI-Review][MEDIUM] FileOwnerType 类型安全改进 [`data-asset.service.ts:16,45`]
   - [x] [AI-Review][LOW] 清理 FileService 废弃实现 [`file.service.ts`]
   - [x] [AI-Review][LOW] 文件头注释补充 Story 编号 [`CommentInput.tsx`, `CommentPanel.tsx`, `CommentsPanelContent.tsx`]
-  - [x] [AI-Review][LOW] 提取 MAX_FILE_SIZE 为共享常量 [`attachments.controller.ts`, `file-storage.controller.ts`]
+  - [x] [AI-Review][LOW] 提取 MAX_FILE_SIZE 为共享常量（仅 `apps/api`；plugin-comments 保持本地常量避免插件依赖内核实现）[`apps/api/src/modules/file-storage/constants.ts`]
 
 ---
 
@@ -87,6 +87,17 @@ So that **删除重复实现，消除不一致的 MIME 校验/路径生成/文�
 - ❌ 保留旧的直接磁盘操作 → 双写导致不一致
 - ❌ 不更新前端调用 → 旧 API 路径 404
 - ❌ 混用 `FileService` 和 `FileStorageService` → 文件元数据丢失
+
+### 🔒 Security Notes（文件上传/下载）
+
+- **不要信任 MIME**：`file.mimetype` 来自客户端；当前保留评论附件的 `ALLOWED_MIME_TYPES` allowlist + 10MB 上限（不要放宽）。如后续要更强校验，可考虑 content sniffing / magic-bytes（不在本 Story 范围）。
+- **路径安全**：落盘路径必须由服务端生成（`{graphId}/{fileId}{ext}`），不要拼接用户文件名，避免 path traversal。
+- **文件名回显**：下载/预览响应使用 `Content-Disposition: filename*=UTF-8''...` 进行 UTF-8 编码，避免乱码/注入。
+- **权限语义**：评论附件仍要求 `x-user-id`（上传/下载/删除），删除仅允许上传者；细粒度权限按 Epic 10 延后。
+- **大小/内存**：附件链路使用 `memoryStorage()`，必须保持 size limit（10MB）以限制内存风险。
+- 参考：
+  - OWASP File Upload Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html
+  - RFC 6266 / RFC 5987: Content-Disposition / filename*（UTF-8 编码）
 
 ### 📁 现有实现分析（需迁移）
 
@@ -241,6 +252,7 @@ curl -X POST 'http://localhost:3001/api/comments/attachments/upload?graphId=xxx'
 - [Source: apps/web/app/api/comments/attachments/upload/route.ts] - Next.js 代理透传 graphId（Task 4.4）
 - [Source: apps/web/features/data-library/hooks/useDataUpload.ts] - 数据资源上传已携带 graphId（Task 4.2）
 - [Source: docs/project-context.md#Repository Pattern] - Repository 规范
+- [Validation: docs/sprint-artifacts/validation-report-2026-01-21T22-06-17+0800.md] - validate-create-story 报告（改进前审查记录）
 
 ---
 
@@ -353,3 +365,4 @@ GPT-5.2 (Codex CLI) - 2026-01-21
 | `docs/sprint-artifacts/sprint-status.yaml`                                       | Modified - 10-5 状态更新                                                                                        |
 | `docs/sprint-artifacts/10-5-migrate-callers-to-file-storage.md`                  | Modified - Story 文档（补齐 Dev Agent Record + Review Follow-ups）                                              |
 | `docs/sprint-artifacts/validation-report-2026-01-21T19-40-23+0800.md`            | New - 自动验证报告（生成产物）                                                                                  |
+| `docs/sprint-artifacts/validation-report-2026-01-21T22-06-17+0800.md`            | New - validate-create-story 报告（改进前审查记录）                                                               |
