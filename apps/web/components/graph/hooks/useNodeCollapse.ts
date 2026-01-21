@@ -45,6 +45,20 @@ export interface UseNodeCollapseReturn {
     hasChildren: (nodeId: string) => boolean;
 }
 
+function bumpVisibilityBump(node: Node) {
+    const data = node.getData() || {};
+    const current = typeof data._visibilityBump === 'number' ? data._visibilityBump : 0;
+    node.setData({ ...data, _visibilityBump: current + 1 });
+}
+
+function showNodeWithVisibilityBump(node: Node) {
+    const wasVisible = node.isVisible();
+    node.show();
+    if (!wasVisible) {
+        bumpVisibilityBump(node);
+    }
+}
+
 /**
  * useNodeCollapse - Hook for managing node collapse/expand functionality
  * 
@@ -188,7 +202,7 @@ export function useNodeCollapse({
 
                 // Update node visibility
                 if (shouldBeVisible) {
-                    descendant.show();
+                    showNodeWithVisibilityBump(descendant);
                 } else {
                     descendant.hide();
                 }
@@ -263,7 +277,7 @@ export function useNodeCollapse({
                     return;
                 }
 
-                child.show();
+                showNodeWithVisibilityBump(child);
                 visibilityMapRef.current.set(child.id, true);
 
                 // Update edges
@@ -284,6 +298,21 @@ export function useNodeCollapse({
                 }
             });
         });
+
+        // Fix: Schedule edge view refresh after expand to ensure correct routing.
+        // Use DOUBLE requestAnimationFrame to ensure React has finished rendering.
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    const allEdges = graph.getEdges?.() ?? [];
+                    allEdges.forEach((edge) => {
+                        if (!edge.isVisible()) return;
+                        const view = edge.findView?.(graph) as { update?: () => void } | null;
+                        view?.update?.();
+                    });
+                });
+            });
+        }
     }, [graph, isReady, getNodeById, isVisibleByAncestors, getDirectChildren, applyDescendantVisibility]);
 
     /**
@@ -394,7 +423,7 @@ export function useNodeCollapse({
                                 return;
                             }
 
-                            child.show();
+                            showNodeWithVisibilityBump(child);
                             const edges = graph.getConnectedEdges(child);
                             edges?.forEach((edge) => {
                                 const source = edge.getSourceCell();

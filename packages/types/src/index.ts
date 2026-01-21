@@ -39,6 +39,8 @@ export interface MindNodeData extends NodeData {
   archivedAt?: string | null; // 归档时间
   // Story 4.1: Approval Workflow - approval data stored at Node level, NOT in props
   approval?: import('./approval').ApprovalPipeline | null;
+  // Internal: Visibility bump counter for triggering re-measure on hidden->visible transition
+  _visibilityBump?: number;
 }
 
 // Story 2.2: Import edge types for EdgeData extension

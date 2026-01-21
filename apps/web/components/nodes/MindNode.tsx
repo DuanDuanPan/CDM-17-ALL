@@ -52,7 +52,7 @@ export function MindNode({ node }: MindNodeProps) {
     const {
         getData, isEditing, setIsEditing, isSelected, label, setLabel,
         description, setDescription, tags, appRunning, setAppRunning,
-        unreadCount, isWatched, isCollapsed,
+        unreadCount, isWatched, isCollapsed, visibilityBump,
     } = useNodeDataSync(node);
 
     const { handleAppExecute } = useAppExecution({ node, getData, appRunning, setAppRunning });
@@ -100,28 +100,38 @@ export function MindNode({ node }: MindNodeProps) {
     // Auto-resize logic
     useLayoutEffect(() => {
         if (!containerRef.current || !node) return;
+        // Never measure/resize while the node is hidden (offsetWidth/Height will be 0 and can corrupt size).
+        // This is critical for ORDINARY nodes which don't enforce a minimum width.
+        if (typeof node.isVisible === 'function' && !node.isVisible()) return;
         const container = containerRef.current;
-        const width = container.offsetWidth;
-        const height = container.offsetHeight;
+        const measuredWidth = container.offsetWidth;
+        const measuredHeight = container.offsetHeight;
         const renderer = getNodeRenderer(nodeType);
+        const currentSize = node.getSize();
 
         if (renderer) {
             const RICH_NODE_WIDTH = 240;
             const minHeight = 100;
-            const newHeight = Math.max(height + 8, minHeight);
-            const currentSize = node.getSize();
+            const newHeight = measuredHeight > 0
+                ? Math.max(measuredHeight + 8, minHeight)
+                : Math.max(currentSize.height, minHeight);
             if (currentSize.width !== RICH_NODE_WIDTH || Math.abs(currentSize.height - newHeight) > 2) {
                 node.resize(RICH_NODE_WIDTH, newHeight);
             }
         } else {
-            const newWidth = nodeType === NodeType.ORDINARY ? width : Math.max(width, 180);
-            const newHeight = Math.max(height, nodeType === NodeType.ORDINARY ? 40 : 80);
-            const currentSize = node.getSize();
+            const resolvedWidth = measuredWidth > 0 ? measuredWidth : currentSize.width;
+            const defaultWidth = nodeType === NodeType.ORDINARY ? 160 : 180;
+            const baseWidth = resolvedWidth > 0 ? resolvedWidth : defaultWidth;
+            const newWidth = nodeType === NodeType.ORDINARY ? baseWidth : Math.max(baseWidth, 180);
+
+            const resolvedHeight = measuredHeight > 0 ? measuredHeight : currentSize.height;
+            const minHeight = nodeType === NodeType.ORDINARY ? 40 : 80;
+            const newHeight = Math.max(resolvedHeight > 0 ? resolvedHeight : minHeight, minHeight);
             if (Math.abs(currentSize.width - newWidth) > 2 || Math.abs(currentSize.height - newHeight) > 2) {
                 node.resize(newWidth, newHeight);
             }
         }
-    }, [node, label, description, tags, nodeType, isTaskDone, approvalDecoration]);
+    }, [node, label, description, tags, nodeType, visibilityBump]);
 
     // Story 4.3: Open comments panel
     const handleOpenComments = useCallback(

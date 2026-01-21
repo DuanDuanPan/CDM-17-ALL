@@ -147,6 +147,15 @@ export function useDrillDown({ graph, isReady }: UseDrillDownOptions): UseDrillD
         const currentRootId = drillPath.length > 0 ? drillPath[drillPath.length - 1] : null;
         applyVisibilityFilter(graph, currentRootId);
 
+        // Fix: Clear all selections when drill path changes.
+        // This prevents selection state from leaking between subgraph and main view.
+        try {
+            const selectedCells = graph.getSelectedCells?.() ?? [];
+            if (selectedCells.length > 0) {
+                graph.cleanSelection?.();
+            }
+        } catch { /* Selection plugin may not be available */ }
+
         if (typeof window === 'undefined') return;
 
         // Cancel any previously scheduled viewport updates (path changed again)
@@ -339,8 +348,22 @@ function applyVisibilityFilter(graph: Graph, rootNodeId: string | null): void {
                 node.hide();
                 return;
             }
-            if (effectiveVisibleNodeIds.has(node.id)) node.show();
-            else node.hide();
+            const wasVisible = node.isVisible();
+            const shouldBeVisible = effectiveVisibleNodeIds.has(node.id);
+
+            if (shouldBeVisible && !wasVisible) {
+                // Fix: Node transitioning from hidden to visible needs re-measure.
+                // Trigger React re-render by bumping a visibility counter in data.
+                // This causes MindNode's useLayoutEffect to re-run and correct sizing.
+                node.show();
+                const data = node.getData() || {};
+                const bump = (typeof data._visibilityBump === 'number' ? data._visibilityBump : 0) + 1;
+                node.setData({ ...data, _visibilityBump: bump });
+            } else if (shouldBeVisible) {
+                node.show();
+            } else {
+                node.hide();
+            }
         });
 
         allEdges.forEach((edge) => {
@@ -351,6 +374,40 @@ function applyVisibilityFilter(graph: Graph, rootNodeId: string | null): void {
             else edge.hide();
         });
     });
+
+    // Fix: Clear selection for hidden nodes to prevent stale selection state.
+    // This addresses issues where nodes selected in a subgraph (while hidden in main view)
+    // cause styling anomalies when returning to main view.
+    try {
+        const selectedCells = graph.getSelectedCells?.() ?? [];
+        const hiddenSelectedCells = selectedCells.filter((cell) => {
+            if (cell.isNode()) return !effectiveVisibleNodeIds.has(cell.id);
+            if (cell.isEdge()) {
+                const sourceId = cell.getSourceCellId?.();
+                const targetId = cell.getTargetCellId?.();
+                return !(sourceId && targetId && effectiveVisibleNodeIds.has(sourceId) && effectiveVisibleNodeIds.has(targetId));
+            }
+            return false;
+        });
+        if (hiddenSelectedCells.length > 0) {
+            graph.unselect?.(hiddenSelectedCells);
+        }
+    } catch { /* Selection plugin may not be available */ }
+
+    // Fix: Schedule edge view refresh after visibility changes.
+    // Use DOUBLE requestAnimationFrame to ensure React has finished rendering.
+    // Single RAF fires before React completes, causing stale bounding box reads.
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                allEdges.forEach((edge) => {
+                    if (!edge.isVisible()) return;
+                    const view = edge.findView?.(graph) as { update?: () => void } | null;
+                    view?.update?.();
+                });
+            });
+        });
+    }
 }
 
 /**

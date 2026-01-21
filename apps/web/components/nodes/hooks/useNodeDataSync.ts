@@ -39,6 +39,8 @@ export interface UseNodeDataSyncReturn {
     isWatched: boolean;
     /** Story 8.1: Whether node is collapsed */
     isCollapsed: boolean;
+    /** Visibility bump counter for triggering re-measure */
+    visibilityBump: number;
 }
 
 /**
@@ -65,6 +67,12 @@ export function useNodeDataSync(node: Node): UseNodeDataSyncReturn {
 
     // Story 8.1: Collapsed state
     const [isCollapsed, setIsCollapsed] = useState(() => !!getData().collapsed);
+
+    // Visibility bump for re-measure on hidden->visible transition
+    const [visibilityBump, setVisibilityBump] = useState(() => {
+        const data = getData();
+        return typeof data._visibilityBump === 'number' ? data._visibilityBump : 0;
+    });
 
     // Subscribe to unread count changes
     useEffect(() => {
@@ -95,6 +103,10 @@ export function useNodeDataSync(node: Node): UseNodeDataSyncReturn {
             }
             // Story 8.1: Sync collapsed state
             setIsCollapsed(!!data.collapsed);
+            // Sync visibility bump
+            if (typeof data._visibilityBump === 'number') {
+                setVisibilityBump(data._visibilityBump);
+            }
             if (!data.isEditing) {
                 setLabel(data.label ?? '');
                 setDescription(data.description ?? '');
@@ -121,6 +133,7 @@ export function useNodeDataSync(node: Node): UseNodeDataSyncReturn {
         unreadCount,
         isWatched,
         isCollapsed,
+        visibilityBump,
     };
 }
 

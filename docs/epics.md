@@ -1274,3 +1274,139 @@ So that **我可以以图谱根节点为单一真相源（SoT）进行结构化�
 **When** 点击"删除/移除"按钮
 **Then** 操作应仅**解除关联**（移除 `NodeDataLink`），不删除资产实体
 **And** 资产物理删除仅在 `文件夹` 视图中允许
+
+## Epic 10: 架构重构 v2 (Repository 收敛 + 统一文件存储 + 插件迁移)
+
+**目标**: 基于 `docs/analysis/refactoring-proposal-2026-01-20.md`，收敛核心 Service 的 Repository 规范、将分散的文件处理实现统一为 `FileStorageService`，并完成 `subscriptions` / `data-management` 的插件化迁移，以降低维护成本、减少重复实现和跨模块耦合。
+
+**范围与约束（已决策）**:
+- ✅ 新增统一 `FileRecord` 模型；忽略历史数据（上线前会清空 uploads + 相关表/目录）
+- ✅ API 路由无需向后兼容（允许调整现有路径与调用方）
+- ✅ 暂不做细粒度权限控制（先把能力统一起来）
+- ✅ Repository 限制规则仅强制核心 Service/Controller；允许例外：listener / demo / test / 插件代码
+- ✅ `subscriptions` 先迁移为插件，再统一依赖/数据访问方式
+- ✅ 本地磁盘存储路径固定，并按 `graphId` 分层
+
+### Story 10.1: GraphsService Repository 收敛 (Graphs Service Repository Compliance)
+
+As a **后端开发者**,
+I want **让 `graphs.service.ts` 不再直接调用 `prisma.*`，而是通过 Repository 层访问数据库**,
+So that **核心业务层与 ORM 解耦，符合架构规范且便于测试/演进。**
+
+**Acceptance Criteria:**
+
+**Given** `apps/api/src/modules/graphs/graphs.service.ts` 直接导入并使用 `prisma`
+**When** 完成重构
+**Then** `graphs.service.ts` 不再导入 `@cdm/database` 的 `prisma`
+**And** 所有 Graph CRUD/查询通过 Repository（可复用或扩展 `GraphRepository`，但需保持职责清晰）
+**And** `pnpm lint` 不再报告核心 Service 的 `no-restricted-imports` 违规
+
+### Story 10.2: UsersService Repository 收敛 (Users Service Repository Compliance)
+
+As a **后端开发者**,
+I want **引入 `UsersRepository` 并重构 `users.service.ts` 不再直接调用 `prisma.*`**,
+So that **用户查询逻辑与数据访问解耦，避免 Service 层 ORM 侵入。**
+
+**Acceptance Criteria:**
+
+**Given** `apps/api/src/modules/users/users.service.ts` 直接导入并使用 `prisma`
+**When** 完成重构
+**Then** `users.service.ts` 不再导入 `@cdm/database` 的 `prisma`
+**And** `list/search` 等查询通过 `UsersRepository` 完成
+**And** 现有 API 行为不变（分页/排序/模糊搜索）
+
+### Story 10.3: ESLint 规则收紧 + 技术债清理 (Lint Hardening & Debt Cleanup)
+
+As a **架构维护者**,
+I want **将 Repository 规则从 warn 升级到 error，并清理核心模块的明显 lint debt**,
+So that **规则可执行且在后续迭代中不会再次回退。**
+
+**Acceptance Criteria:**
+
+**Given** 当前 `no-restricted-imports` 仍可能以 warn 形式存在
+**When** 执行规则升级
+**Then** 核心 Service/Controller 中的 `prisma` 直接导入会导致 `pnpm lint` 失败
+**And** 规则显式允许例外目录/文件（listener / demo / test / 插件代码）
+**And** 清理本阶段涉及的未使用变量/显著 `any`（只处理与本 Epic 改动相关的部分）
+
+### Story 10.4: 统一文件存储基础设施 (Unified File Storage Foundation)
+
+As a **开发者**,
+I want **新增 `file-storage` 内核模块与 `FileRecord` 数据模型**,
+So that **上传/下载/预览等文件能力有统一入口，且元数据持久化。**
+
+**Acceptance Criteria:**
+
+**Given** 系统存在多套文件处理实现
+**When** 引入 `FileStorageModule` 后
+**Then** 具备统一的上传/下载/预览/元数据/删除 API（以 `/api/files/*` 为入口）
+**And** 上传必须提供 `graphId`，本地磁盘存储按 `graphId` 分层
+**And** 新增 `FileRecord` 表用于持久化元数据（无需迁移历史数据）
+
+### Story 10.5: 迁移现有文件使用方到 FileStorageService (Migrate Callers to Unified Storage)
+
+As a **开发者**,
+I want **将审批交付物 / 数据资源 / 评论附件的文件读写统一迁移到 `FileStorageService`**,
+So that **删除重复实现，消除不一致的 MIME 校验/路径生成/文件名解码逻辑。**
+
+**Acceptance Criteria:**
+
+**Given** `FileService`、`DataAssetService`、`AttachmentsController` 各自实现上传/下载
+**When** 完成迁移
+**Then** 这三处不再各自写磁盘/生成路径（统一走 `FileStorageService`）
+**And** 允许调整 API 路由与前端调用方（无需兼容旧路径）
+**And** 旧实现被标记可删除或已删除（以实际代码为准）
+
+### Story 10.6: 文件预览增强（缩略图）(Thumbnail/Preview Enhancement)
+
+As a **用户**,
+I want **对可预览文件提供统一的 preview/thumbnail 能力**,
+So that **在数据资源库/评论/交付物场景中有一致的预览体验。**
+
+**Acceptance Criteria:**
+
+**Given** 文件已通过 `FileStorageService` 上传
+**When** 访问 preview/thumbnail 接口
+**Then** 可返回可用的内联预览响应（图片/文本/部分文档按策略）
+**And** 缩略图按需生成并可访问（不要求权限控制）
+
+### Story 10.7: subscriptions 插件化迁移 (Migrate Subscriptions to Plugin)
+
+As a **架构师**,
+I want **将 `apps/api/src/modules/subscriptions` 迁移到 `packages/plugins/plugin-subscriptions`**,
+So that **订阅能力成为可独立演进的业务插件，并为后续依赖收敛打基础。**
+
+**Acceptance Criteria:**
+
+**Given** `subscriptions` 目前位于 `apps/api/src/modules/`
+**When** 完成迁移
+**Then** 后端仍可正常创建/取消订阅并触发通知节流逻辑
+**And** 允许插件内部暂时保留 `prisma` 直接访问（后续再统一数据访问方式）
+**And** `apps/api` 通过插件方式加载该模块（无循环依赖）
+
+### Story 10.8: data-management 插件化迁移 (Migrate Data Management to Plugin)
+
+As a **架构师**,
+I want **将 `apps/api/src/modules/data-management` 迁移到 `packages/plugins/plugin-data-library`（或同等命名）**,
+So that **数据资源库能力可独立演进，且边界更清晰。**
+
+**Acceptance Criteria:**
+
+**Given** `data-management` 当前与内核模块存在耦合（含文件上传/链接逻辑）
+**When** 完成迁移
+**Then** DataAsset/Folder/NodeLink 的主要 API 行为不变
+**And** 文件能力对接 `FileStorageService`
+**And** 插件与内核依赖方向清晰（内核不依赖该插件）
+
+### Story 10.9: 删除冗余文件实现 + 文档更新 (Cleanup & Docs)
+
+As a **维护者**,
+I want **移除旧 `FileService` 等冗余实现并更新文档**,
+So that **代码库保持整洁，后续不再误用旧接口。**
+
+**Acceptance Criteria:**
+
+**Given** 已完成文件统一与插件迁移
+**When** 执行清理
+**Then** 旧文件处理实现与死代码被删除或不再被引用
+**And** 更新相关文档/开发指引（含本 Epic 的决策与新 API 入口）

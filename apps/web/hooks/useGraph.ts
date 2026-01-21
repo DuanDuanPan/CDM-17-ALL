@@ -83,7 +83,7 @@ export function useGraph({ container, width = '100%', height = '100%' }: UseGrap
       rubberband: true,            // Story 2.6 AC1.2: Enable rubberband selection box
       modifiers: undefined,        // No modifier needed for rubberband (direct drag)
       strict: false,               // Story 2.6 AC1.3: Intersect mode (not strict contain)
-      movable: true,               // Allow moving selected group together
+      movable: false,              // Default to false; useLayoutPlugin enables it only in free mode
       showNodeSelectionBox: true,  // Story 2.6 AC1.4: Visual feedback with selection box
       showEdgeSelectionBox: false, // Story 2.2: Disable edge box, use highlight instead
       pointerEvents: 'none',

@@ -47,6 +47,7 @@ next-env.d.ts
 # Playwright artifacts
 apps/web/playwright-report
 apps/web/test-results
+apps/web/.playwright-browsers
 
 # Claude
 .claude/audio

@@ -166,8 +166,19 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     let pendingStructuralChanges = 0;
     let pendingSizeChanges = 0;
 
+    // Fix: Suppress size-triggered recalculation during/after selection changes.
+    // When nodes are selected, React Shape components may re-render causing node:change:size
+    // events that are purely cosmetic (e.g., selection box styling). These should not
+    // trigger layout recalculation.
+    let selectionSuppressionTimer: ReturnType<typeof setTimeout> | null = null;
+    let isSelectionSuppressed = false;
+
     const scheduleRecalculate = (reason: 'structure' | 'size') => {
       if (!isDocumentVisible()) return;
+      // Skip size-triggered recalculation if we're in a selection-suppression window
+      if (reason === 'size' && isSelectionSuppressed) {
+        return;
+      }
       if (reason === 'size') {
         pendingSizeChanges += 1;
       } else {
@@ -202,6 +213,17 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     const handleNodeVisibilityChange = () => scheduleRecalculate('structure');
     const handleNodeSizeChange = () => scheduleRecalculate('size');
 
+    // Fix: Suppress size-triggered layout recalculation during selection changes
+    const handleSelectionChanged = () => {
+      isSelectionSuppressed = true;
+      if (selectionSuppressionTimer) clearTimeout(selectionSuppressionTimer);
+      // Suppress for 300ms after selection change to avoid cosmetic resize triggers
+      selectionSuppressionTimer = setTimeout(() => {
+        isSelectionSuppressed = false;
+        selectionSuppressionTimer = null;
+      }, 300);
+    };
+
     // Listen for node add/remove events
     graph.on('node:added', handleNodeAdded);
     graph.on('node:removed', handleNodeRemoved);
@@ -211,17 +233,24 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
     graph.on('node:change:visible', handleNodeVisibilityChange);
     // When a node auto-resizes after render (React shape), recalculate layout to prevent overlap
     graph.on('node:change:size', handleNodeSizeChange);
+    // Fix: Listen for selection changes to suppress cosmetic size changes
+    graph.on('selection:changed', handleSelectionChanged);
 
     return () => {
       if (recalcTimer) {
         clearTimeout(recalcTimer);
         recalcTimer = null;
       }
+      if (selectionSuppressionTimer) {
+        clearTimeout(selectionSuppressionTimer);
+        selectionSuppressionTimer = null;
+      }
       if (graph && typeof graph.off === 'function') {
         graph.off('node:added', handleNodeAdded);
         graph.off('node:removed', handleNodeRemoved);
         graph.off('node:change:visible', handleNodeVisibilityChange);
         graph.off('node:change:size', handleNodeSizeChange);
+        graph.off('selection:changed', handleSelectionChanged);
       }
     };
   }, [graph, isReady, currentMode, addToast, isDocumentVisible]);
@@ -257,15 +286,21 @@ export function useLayoutPlugin(graph: Graph | null, isReady: boolean, currentMo
         return;
       }
 
+      // Fix: Skip reparent logic if mousedown was not on a node.
+      // This happens during rubberband selection where mousedown starts on blank canvas
+      // but mouseup ends on a node. Without this check, the reparent logic would
+      // incorrectly trigger because the drag distance threshold cannot be evaluated.
+      if (!mouseDownPosRef.current) {
+        return;
+      }
+
       // Story 8.10: Check drag threshold to distinguish click from drag
-      if (mouseDownPosRef.current) {
-        const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
-        const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
-        if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) {
-          // This is a click, not a drag - skip reparenting
-          mouseDownPosRef.current = null;
-          return;
-        }
+      const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
+      const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
+      if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) {
+        // This is a click, not a drag - skip reparenting
+        mouseDownPosRef.current = null;
+        return;
       }
       mouseDownPosRef.current = null;
 
