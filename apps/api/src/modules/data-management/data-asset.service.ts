@@ -117,7 +117,10 @@ export class DataAssetService {
       return this.toSimpleAssetResponse(asset);
     } catch (error) {
       // Rollback: delete uploaded file if DB creation fails (GR-1.1.6)
-      this.logger.error(`Failed to create asset record, rolling back file: ${storedFile.id}`);
+      this.logger.error(
+        `Failed to create asset record, rolling back file: ${storedFile.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       await this.fileService.deleteFile(storedFile.id);
       throw new InternalServerErrorException('Failed to create data asset');
     }

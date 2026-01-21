@@ -6,7 +6,7 @@ export default [
         ignores: ['dist/**', 'node_modules/**'],
     },
     /**
-     * Story 7.1: Backend Repository Pattern Refactor
+     * Story 10.3: ESLint 规则收紧 (从 Story 7.1 迁移后升级)
      * Prohibit direct prisma imports in Services and Controllers.
      * Data access should go through Repository classes.
      *
@@ -14,13 +14,15 @@ export default [
      * - *.repository.ts files
      * - Database package internals
      *
-     * Note: Set to "warn" during migration, change to "error" after validation
+     * Exceptions (with targeted eslint-disable comments):
+     * - demo-seed.service.ts: Demo/seed 脚本允许直接使用 prisma
+     * - subscriptions.service.ts: 临时例外，Story 10.7 插件化后删除
      */
     {
         files: ['**/*.service.ts', '**/*.controller.ts'],
         rules: {
             'no-restricted-imports': [
-                'warn',
+                'error',
                 {
                     paths: [
                         {

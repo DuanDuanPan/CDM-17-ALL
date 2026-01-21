@@ -148,7 +148,10 @@ export class SubscriptionListener implements OnModuleInit, OnModuleDestroy {
         await this.processThrottledNotification(recipientId, event);
       }
     } catch (error) {
-      this.logger.error(`Failed to process node change notification: ${error}`);
+      this.logger.error(
+        'Failed to process node change notification',
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 
@@ -158,7 +161,7 @@ export class SubscriptionListener implements OnModuleInit, OnModuleDestroy {
    */
   private async findAncestorSubscribers(
     nodeId: string,
-    mindmapId: string
+    _mindmapId: string, // 前缀表示有意忽略（预留参数用于未来优化）
   ): Promise<{ userId: string; nodeId: string }[]> {
     const ancestorSubscribers: { userId: string; nodeId: string }[] = [];
 

@@ -10,6 +10,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SubscriptionRepository } from './subscriptions.repository';
+// TODO(Story-10.7): 迁移到 plugin-subscriptions 并统一数据访问方式。
+// eslint-disable-next-line no-restricted-imports -- 临时例外：Story 10.7 插件化迁移后删除此 prisma 直接访问
 import { prisma, type Subscription } from '@cdm/database';
 import type {
   CheckSubscriptionResponse,

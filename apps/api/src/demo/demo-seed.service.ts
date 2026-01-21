@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+// eslint-disable-next-line no-restricted-imports -- Demo/seed 脚本允许直接使用 prisma（Epic 10：demo 例外）
 import { prisma } from '@cdm/database';
 
 /**
