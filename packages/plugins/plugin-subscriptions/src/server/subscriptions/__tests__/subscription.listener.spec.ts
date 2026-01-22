@@ -1,14 +1,14 @@
 /**
- * Story 4.4: Watch & Subscription
- * Story 4.5: Smart Notification Center - Noise Aggregation
+ * Story 10.7: subscriptions 插件化迁移
  * Unit Tests for SubscriptionListener (Throttling Logic)
+ * 
+ * Migrated from apps/api/src/modules/subscriptions/__tests__/subscription.listener.spec.ts
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- Test mocks commonly use any */
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { SubscriptionListener, NodeChangedEvent, THROTTLE_WINDOW_MS, MAX_CHANGED_NODES } from '../subscription.listener';
+import { SubscriptionListener, NodeChangedEvent, THROTTLE_WINDOW_MS, MAX_CHANGED_NODES, INotificationService, NOTIFICATION_SERVICE } from '../subscription.listener';
 import { SubscriptionRepository } from '../subscriptions.repository';
-import { NotificationService } from '../../notification/notification.service';
 
 // Mock prisma
 jest.mock('@cdm/database', () => ({
@@ -22,6 +22,7 @@ jest.mock('@cdm/database', () => ({
         user: {
             findUnique: jest.fn(),
         },
+        $queryRaw: jest.fn(),
     },
 }));
 
@@ -31,7 +32,7 @@ describe('SubscriptionListener', () => {
     let listener: SubscriptionListener;
     let mockEventEmitter: jest.Mocked<EventEmitter2>;
     let mockSubscriptionRepo: jest.Mocked<SubscriptionRepository>;
-    let mockNotificationService: jest.Mocked<NotificationService>;
+    let mockNotificationService: jest.Mocked<INotificationService>;
 
     const mockUserId = 'user-1';
     const mockNodeId = 'node-1';
@@ -47,11 +48,12 @@ describe('SubscriptionListener', () => {
 
         mockSubscriptionRepo = {
             findSubscribersByNode: jest.fn(),
+            findSubscribersByNodes: jest.fn(),
         } as unknown as jest.Mocked<SubscriptionRepository>;
 
         mockNotificationService = {
             createAndNotify: jest.fn(),
-        } as unknown as jest.Mocked<NotificationService>;
+        } as unknown as jest.Mocked<INotificationService>;
 
         listener = new SubscriptionListener(
             mockEventEmitter,
@@ -60,7 +62,7 @@ describe('SubscriptionListener', () => {
         );
 
         // Default: no parent chain (no ancestor subscribers)
-        (prisma.node.findUnique as jest.Mock).mockResolvedValue({ parentId: null });
+        (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ parentId: null, depth: 0 }]);
     });
 
     afterEach(() => {
@@ -106,7 +108,7 @@ describe('SubscriptionListener', () => {
             mockSubscriptionRepo.findSubscribersByNode.mockResolvedValue([subscriber]);
             (prisma.graph.findUnique as jest.Mock).mockResolvedValue({ id: mockGraphId });
             (prisma.user.findUnique as jest.Mock).mockResolvedValue({ name: '张三' });
-            mockNotificationService.createAndNotify.mockResolvedValue({} as any);
+            mockNotificationService.createAndNotify.mockResolvedValue();
 
             // Send multiple events within throttle window - should not send immediately
             await listener.handleNodeChanged(createNodeChangedEvent({ userId: 'actor-1', nodeName: 'Node A' }));
@@ -149,7 +151,7 @@ describe('SubscriptionListener', () => {
             mockSubscriptionRepo.findSubscribersByNode.mockResolvedValue([subscriber]);
             (prisma.graph.findUnique as jest.Mock).mockResolvedValue({ id: mockGraphId });
             (prisma.user.findUnique as jest.Mock).mockResolvedValue({ name: '张三' });
-            mockNotificationService.createAndNotify.mockResolvedValue({} as any);
+            mockNotificationService.createAndNotify.mockResolvedValue();
 
             await listener.handleNodeChanged(createNodeChangedEvent({ userId: 'actor-1', nodeName: 'Node A' }));
 

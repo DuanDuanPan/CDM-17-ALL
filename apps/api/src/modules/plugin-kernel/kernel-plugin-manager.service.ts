@@ -13,6 +13,7 @@ import { Plugin, PluginManager, type PluginContext, type PluginLogger } from '@c
 import { NodesService, EdgesService } from '@cdm/plugin-mindmap-core/server';
 import { ApprovalService } from '@cdm/plugin-workflow-approval/server';
 import { CommentsService } from '@cdm/plugin-comments/server';
+import { SubscriptionService } from '@cdm/plugin-subscriptions/server'; // Story 10.7
 
 interface KernelPluginContext extends PluginContext {
   moduleRef: ModuleRef;
@@ -98,12 +99,34 @@ class CommentsServerPlugin extends Plugin {
   }
 }
 
+// Story 10.7: Subscriptions Server Plugin
+class SubscriptionsServerPlugin extends Plugin {
+  constructor() {
+    super({
+      name: 'plugin-subscriptions',
+      version: '0.0.1',
+      description: 'Subscriptions server plugin (Nest module)',
+      dependencies: [],
+      enabledByDefault: true,
+    });
+  }
+
+  async load(): Promise<void> {
+    const moduleRef = (this.context as PluginContextWithModuleRef).moduleRef;
+    if (!moduleRef) {
+      throw new Error('Kernel plugin context missing moduleRef');
+    }
+
+    requireProvider(moduleRef, SubscriptionService, 'SubscriptionService');
+  }
+}
+
 @Injectable()
 export class KernelPluginManagerService implements OnModuleInit {
   private readonly logger = new Logger(KernelPluginManagerService.name);
   private manager: PluginManager | undefined;
 
-  constructor(private readonly moduleRef: ModuleRef) {}
+  constructor(private readonly moduleRef: ModuleRef) { }
 
   getManager(): PluginManager | undefined {
     return this.manager;
@@ -129,7 +152,8 @@ export class KernelPluginManagerService implements OnModuleInit {
     this.manager
       .register(new MindmapCoreServerPlugin())
       .register(new WorkflowApprovalServerPlugin())
-      .register(new CommentsServerPlugin());
+      .register(new CommentsServerPlugin())
+      .register(new SubscriptionsServerPlugin()); // Story 10.7
 
     await this.manager.load();
     await this.manager.enableAll();

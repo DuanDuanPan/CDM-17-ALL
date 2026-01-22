@@ -15,6 +15,7 @@
   "dependencies": {
     "@cdm/database": "workspace:*",
     "@cdm/plugin-comments": "workspace:*",
+    "@cdm/plugin-subscriptions": "workspace:*",
     "@cdm/plugin-mindmap-core": "workspace:*",
     "@cdm/plugin-template": "workspace:*",
     "@cdm/plugin-workflow-approval": "workspace:*",

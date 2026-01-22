@@ -88,10 +88,10 @@
 ### Controller: `subscriptions`
 | 方法 | 路径 | Handler | 参数提示 | 源文件 |
 |---|---|---|---|---|
-| DELETE | `/api/subscriptions` | `subscriptions.controller#unsubscribe` | query:nodeId,nodeId；header:x-user-id,x-user-id | `apps/api/src/modules/subscriptions/subscriptions.controller.ts` |
-| GET | `/api/subscriptions` | `subscriptions.controller#listSubscriptions` | header:x-user-id | `apps/api/src/modules/subscriptions/subscriptions.controller.ts` |
-| POST | `/api/subscriptions` | `subscriptions.controller#subscribe` | header:x-user-id；body | `apps/api/src/modules/subscriptions/subscriptions.controller.ts` |
-| GET | `/api/subscriptions/check` | `subscriptions.controller#checkSubscription` | query:nodeId；header:x-user-id,x-user-id | `apps/api/src/modules/subscriptions/subscriptions.controller.ts` |
+| DELETE | `/api/subscriptions` | `subscriptions.controller#unsubscribe` | query:nodeId,nodeId；header:x-user-id,x-user-id | `packages/plugins/plugin-subscriptions/src/server/subscriptions/subscriptions.controller.ts` |
+| GET | `/api/subscriptions` | `subscriptions.controller#listSubscriptions` | header:x-user-id | `packages/plugins/plugin-subscriptions/src/server/subscriptions/subscriptions.controller.ts` |
+| POST | `/api/subscriptions` | `subscriptions.controller#subscribe` | header:x-user-id；body | `packages/plugins/plugin-subscriptions/src/server/subscriptions/subscriptions.controller.ts` |
+| GET | `/api/subscriptions/check` | `subscriptions.controller#checkSubscription` | query:nodeId；header:x-user-id,x-user-id | `packages/plugins/plugin-subscriptions/src/server/subscriptions/subscriptions.controller.ts` |
 
 ### Controller: `users`
 | 方法 | 路径 | Handler | 参数提示 | 源文件 |

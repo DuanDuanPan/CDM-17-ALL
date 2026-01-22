@@ -15,6 +15,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter'; // Story 4.1
 import { MindmapCoreServerModule } from '@cdm/plugin-mindmap-core/server';
 import { WorkflowApprovalServerModule } from '@cdm/plugin-workflow-approval/server';
 import { CommentsServerModule } from '@cdm/plugin-comments/server';
+import { SubscriptionsServerModule } from '@cdm/plugin-subscriptions/server'; // Story 10.7
 import { TemplatesServerModule } from '@cdm/plugin-template/server'; // Story 5.1
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -22,7 +23,8 @@ import { GraphsModule } from './modules/graphs/graphs.module'; // Dynamic Graph 
 import { DemoSeedService } from './demo/demo-seed.service'; // Story 5.1: For template instantiation
 import { ProductLibraryModule } from './modules/product-library'; // Story 2.7
 import { KnowledgeLibraryModule } from './modules/knowledge-library'; // Story 2.8
-import { SubscriptionModule } from './modules/subscriptions/subscriptions.module'; // Story 4.4: Watch & Subscription
+import { NotificationModule } from './modules/notification/notification.module'; // Story 10.7: For plugin-subscriptions
+import { NotificationService } from './modules/notification/notification.service'; // Story 10.7: For injection token
 import { DataManagementModule } from './modules/data-management'; // Story 9.1: Data Library
 import { PluginKernelModule } from './modules/plugin-kernel/plugin-kernel.module';
 import { FileStorageModule } from './modules/file-storage/file-storage.module'; // Story 10.4: Unified File Storage
@@ -38,7 +40,7 @@ import { FileStorageService } from './modules/file-storage/file-storage.service'
     GraphsModule, // Dynamic Graph ID management
     ProductLibraryModule, // Story 2.7: Mock product library for PBS nodes
     KnowledgeLibraryModule, // Story 2.8: Mock knowledge library for Task nodes
-    SubscriptionModule, // Story 4.4: Watch & Subscription
+    NotificationModule, // Story 10.7: Needed by SubscriptionsServerModule
     DataManagementModule, // Story 9.1: Data Library (Story 10.5: uses FileStorageModule)
     FileStorageModule, // Story 10.4: Unified File Storage
 
@@ -52,6 +54,12 @@ import { FileStorageService } from './modules/file-storage/file-storage.service'
     CommentsServerModule.forRoot({
       imports: [FileStorageModule],
       fileStorageServiceClass: FileStorageService,
+    }),
+
+    // Story 10.7: Subscriptions Plugin
+    SubscriptionsServerModule.forRoot({
+      imports: [NotificationModule],
+      notificationServiceClass: NotificationService,
     }),
 
     // Story 5.1: Template Library Plugin

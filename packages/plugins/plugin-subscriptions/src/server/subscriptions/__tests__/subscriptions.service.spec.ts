@@ -1,6 +1,8 @@
 /**
- * Story 4.4: Watch & Subscription
+ * Story 10.7: subscriptions 插件化迁移
  * Unit Tests for SubscriptionService
+ * 
+ * Migrated from apps/api/src/modules/subscriptions/__tests__/subscriptions.service.spec.ts
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- Test mocks commonly use any */
 
