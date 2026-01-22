@@ -136,6 +136,6 @@ development_status:
   10-5-migrate-callers-to-file-storage: done
   10-6-thumbnail-preview-enhancement: done
   10-7-plugin-subscriptions-migration: done
-  10-8-plugin-data-management-migration: backlog
+  10-8-plugin-data-management-migration: ready-for-dev
   10-9-cleanup-docs: backlog
   epic-10-retrospective: optional
