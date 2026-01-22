@@ -1,5 +1,6 @@
 /**
  * Story 10.4: FileStorageService Unit Tests
+ * Story 10.6: Added thumbnail generation tests
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
@@ -8,12 +9,14 @@ import { FileStorageService } from '../file-storage.service';
 import { FileStorageRepository } from '../file-storage.repository';
 import { STORAGE_ADAPTER, StorageAdapter } from '../adapters/storage-adapter.interface';
 import { GraphRepository } from '../../graphs/graph.repository';
+import { ThumbnailService } from '../thumbnail.service';
 
 describe('FileStorageService', () => {
     let service: FileStorageService;
     let mockStorageAdapter: jest.Mocked<StorageAdapter>;
     let mockRepository: jest.Mocked<FileStorageRepository>;
     let mockGraphRepository: jest.Mocked<GraphRepository>;
+    let mockThumbnailService: jest.Mocked<ThumbnailService>;
 
     const mockFile: Express.Multer.File = {
         fieldname: 'file',
@@ -69,6 +72,12 @@ describe('FileStorageService', () => {
             update: jest.fn().mockResolvedValue(mockFileRecord),
         } as unknown as jest.Mocked<FileStorageRepository>;
 
+        // Story 10.6: Mock ThumbnailService
+        mockThumbnailService = {
+            canGenerateThumbnail: jest.fn().mockReturnValue(false),
+            generate: jest.fn().mockResolvedValue(Buffer.from('thumbnail data')),
+        } as unknown as jest.Mocked<ThumbnailService>;
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 FileStorageService,
@@ -83,6 +92,10 @@ describe('FileStorageService', () => {
                 {
                     provide: GraphRepository,
                     useValue: mockGraphRepository,
+                },
+                {
+                    provide: ThumbnailService,
+                    useValue: mockThumbnailService,
                 },
             ],
         }).compile();
@@ -207,6 +220,106 @@ describe('FileStorageService', () => {
             expect(mockRepository.findByGraphId).toHaveBeenCalledWith('graph-456');
             expect(result).toHaveLength(1);
             expect(result[0].id).toBe('file-123');
+        });
+    });
+
+    // Story 10.6: Thumbnail tests
+    describe('upload with thumbnail', () => {
+        const imageFile: Express.Multer.File = {
+            fieldname: 'file',
+            originalname: 'test-image.png',
+            encoding: '7bit',
+            mimetype: 'image/png',
+            size: 2048,
+            buffer: Buffer.from('image data'),
+            stream: null as never,
+            destination: '',
+            filename: '',
+            path: '',
+        };
+
+        it('should generate thumbnail for image uploads', async () => {
+            mockThumbnailService.canGenerateThumbnail.mockReturnValue(true);
+            const mockImageRecord = {
+                ...mockFileRecord,
+                mimeType: 'image/png',
+                thumbnailPath: 'thumbnails/graph-456/file-123.webp',
+            };
+            mockRepository.create.mockResolvedValue(mockImageRecord);
+
+            const result = await service.upload(imageFile, 'graph-456');
+
+            expect(mockThumbnailService.canGenerateThumbnail).toHaveBeenCalledWith('image/png');
+            expect(mockThumbnailService.generate).toHaveBeenCalledWith(imageFile.buffer);
+            expect(mockStorageAdapter.write).toHaveBeenCalledTimes(2); // file + thumbnail
+            expect(result.thumbnailUrl).toBe('/api/files/file-123/thumbnail');
+        });
+
+        it('should not generate thumbnail for non-image files', async () => {
+            mockThumbnailService.canGenerateThumbnail.mockReturnValue(false);
+
+            await service.upload(mockFile, 'graph-456');
+
+            expect(mockThumbnailService.canGenerateThumbnail).toHaveBeenCalledWith('text/plain');
+            expect(mockThumbnailService.generate).not.toHaveBeenCalled();
+            expect(mockStorageAdapter.write).toHaveBeenCalledTimes(1); // file only
+        });
+
+        it('should continue upload even if thumbnail generation fails', async () => {
+            mockThumbnailService.canGenerateThumbnail.mockReturnValue(true);
+            mockThumbnailService.generate.mockRejectedValue(new Error('sharp error'));
+
+            const result = await service.upload(imageFile, 'graph-456');
+
+            expect(result.id).toBe('file-123'); // Upload still succeeds
+        });
+    });
+
+    describe('getThumbnail', () => {
+        it('should return thumbnail when thumbnailPath exists', async () => {
+            const recordWithThumbnail = {
+                ...mockFileRecord,
+                mimeType: 'image/png',
+                thumbnailPath: 'thumbnails/graph-456/file-123.webp',
+            };
+            mockRepository.findByIdActive.mockResolvedValue(recordWithThumbnail);
+            mockStorageAdapter.read.mockResolvedValue(Buffer.from('thumb data'));
+
+            const result = await service.getThumbnail('file-123');
+
+            expect(result).not.toBeNull();
+            expect(result?.mimeType).toBe('image/webp');
+            expect(result?.hasThumbnail).toBe(true);
+        });
+
+        it('should fallback to original for images without thumbnail', async () => {
+            const recordWithoutThumbnail = {
+                ...mockFileRecord,
+                mimeType: 'image/png',
+                thumbnailPath: null,
+            };
+            mockRepository.findByIdActive.mockResolvedValue(recordWithoutThumbnail);
+            mockStorageAdapter.read.mockResolvedValue(Buffer.from('image data'));
+
+            const result = await service.getThumbnail('file-123');
+
+            expect(result).not.toBeNull();
+            expect(result?.mimeType).toBe('image/png');
+            expect(result?.hasThumbnail).toBe(false);
+        });
+
+        it('should return null for non-image files', async () => {
+            mockRepository.findByIdActive.mockResolvedValue(mockFileRecord); // text/plain
+
+            const result = await service.getThumbnail('file-123');
+
+            expect(result).toBeNull();
+        });
+
+        it('should throw NotFoundException for non-existent file', async () => {
+            mockRepository.findByIdActive.mockResolvedValue(null);
+
+            await expect(service.getThumbnail('non-existent')).rejects.toThrow(NotFoundException);
         });
     });
 });

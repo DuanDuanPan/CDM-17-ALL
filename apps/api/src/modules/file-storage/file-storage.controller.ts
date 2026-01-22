@@ -1,10 +1,12 @@
 /**
  * Story 10.4: File Storage Controller
  * Unified API endpoints for file upload/download/preview/delete
- * 
+ *
  * Story 10.5: Removed legacy FileService fallback - all file operations
  * now go through FileStorageService only. Historical files are not preserved
  * per Epic 10 constraints.
+ *
+ * Story 10.6: Added thumbnail endpoint for image previews
  */
 
 import {
@@ -115,6 +117,29 @@ export class FileStorageController {
         });
 
         res.send(buffer);
+    }
+
+    /**
+     * Story 10.6: GET /api/files/:id/thumbnail
+     * Returns thumbnail for images, or falls back to original image
+     * Non-image files return 404
+     */
+    @Get(':id/thumbnail')
+    async thumbnail(@Param('id') id: string, @Res() res: Response): Promise<void> {
+        const result = await this.fileStorageService.getThumbnail(id);
+
+        if (!result) {
+            res.status(404).json({ message: 'Thumbnail not available for this file type' });
+            return;
+        }
+
+        res.set({
+            'Content-Type': result.mimeType,
+            'Content-Length': result.buffer.length.toString(),
+            'Cache-Control': 'public, max-age=86400',  // 24 hours
+        });
+
+        res.send(result.buffer);
     }
 
     /**

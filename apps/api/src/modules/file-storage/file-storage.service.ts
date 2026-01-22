@@ -1,6 +1,8 @@
 /**
  * Story 10.4: File Storage Service
  * Business logic layer for unified file upload/download/preview/delete operations
+ *
+ * Story 10.6: Added thumbnail generation for image uploads
  */
 
 import { BadRequestException, Inject, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
@@ -11,6 +13,7 @@ import { STORAGE_ADAPTER, StorageAdapter } from './adapters/storage-adapter.inte
 import { FileStorageRepository } from './file-storage.repository';
 import { GraphRepository } from '../graphs/graph.repository';
 import { isPreviewableMimeType } from './constants/previewable-types';
+import { ThumbnailService } from './thumbnail.service';
 
 export interface UploadOptions {
     ownerType?: FileOwnerType;
@@ -26,6 +29,7 @@ export interface FileMetadataDto {
     storagePath: string;
     storageType: StorageType;
     previewable: boolean;
+    thumbnailUrl?: string;  // Story 10.6: Thumbnail endpoint URL
     createdAt: Date;
 }
 
@@ -38,6 +42,7 @@ export class FileStorageService {
         private readonly storageAdapter: StorageAdapter,
         private readonly repository: FileStorageRepository,
         private readonly graphRepository: GraphRepository,
+        private readonly thumbnailService: ThumbnailService,
     ) { }
 
     /**
@@ -69,6 +74,43 @@ export class FileStorageService {
     }
 
     /**
+     * Build thumbnail storage path: thumbnails/{graphId}/{fileId}.webp
+     */
+    private buildThumbnailPath(graphId: string, fileId: string): string {
+        return `thumbnails/${graphId}/${fileId}.webp`;
+    }
+
+    /**
+     * Build thumbnail URL from file ID
+     */
+    private buildThumbnailUrl(fileId: string): string {
+        return `/api/files/${fileId}/thumbnail`;
+    }
+
+    /**
+     * Generate FileMetadataDto with optional thumbnailUrl
+     */
+    private toFileMetadataDto(record: FileRecord): FileMetadataDto {
+        const dto: FileMetadataDto = {
+            id: record.id,
+            originalName: record.originalName,
+            mimeType: record.mimeType,
+            size: record.size,
+            storagePath: record.storagePath,
+            storageType: record.storageType,
+            previewable: record.previewable,
+            createdAt: record.createdAt,
+        };
+        // Include thumbnailUrl if thumbnail exists
+        if (record.thumbnailPath) {
+            dto.thumbnailUrl = this.buildThumbnailUrl(record.id);
+        }
+        return dto;
+    }
+
+
+
+    /**
      * Upload a file
      * @param file - Express.Multer.File from multipart upload
      * @param graphId - Required: Graph ID for file isolation
@@ -97,6 +139,20 @@ export class FileStorageService {
         // Write to storage adapter
         await this.storageAdapter.write(storagePath, file.buffer);
 
+        // Story 10.6: Generate thumbnail for images
+        let thumbnailPath: string | undefined;
+        if (this.thumbnailService.canGenerateThumbnail(file.mimetype)) {
+            try {
+                const thumbBuffer = await this.thumbnailService.generate(file.buffer);
+                thumbnailPath = this.buildThumbnailPath(trimmedGraphId, fileId);
+                await this.storageAdapter.write(thumbnailPath, thumbBuffer);
+                this.logger.log(`Generated thumbnail: ${thumbnailPath}`);
+            } catch (error) {
+                // Thumbnail generation failure should not block upload
+                this.logger.warn(`Failed to generate thumbnail for ${originalName}: ${String(error)}`);
+            }
+        }
+
         let record: FileRecord;
         try {
             // Create database record via repository
@@ -110,14 +166,18 @@ export class FileStorageService {
                 storagePath,
                 storageType: 'LOCAL',
                 previewable,
+                thumbnailPath,  // Story 10.6: Persist thumbnail path
                 ownerType: options?.ownerType,
                 ownerId: options?.ownerId,
                 uploadedBy: options?.uploadedBy,
             });
         } catch (error) {
-            // Rollback: remove file from storage if DB write fails
+            // Rollback: remove file and thumbnail from storage if DB write fails
             try {
                 await this.storageAdapter.delete(storagePath);
+                if (thumbnailPath) {
+                    await this.storageAdapter.delete(thumbnailPath);
+                }
             } catch (rollbackError) {
                 this.logger.warn(
                     `Failed to rollback file after DB error: ${storagePath}: ${String(rollbackError)}`,
@@ -128,16 +188,7 @@ export class FileStorageService {
 
         this.logger.log(`Uploaded file: ${originalName} -> ${storagePath}`);
 
-        return {
-            id: record.id,
-            originalName: record.originalName,
-            mimeType: record.mimeType,
-            size: record.size,
-            storagePath: record.storagePath,
-            storageType: record.storageType,
-            previewable: record.previewable,
-            createdAt: record.createdAt,
-        };
+        return this.toFileMetadataDto(record);
     }
 
     /**
@@ -172,17 +223,55 @@ export class FileStorageService {
             throw new NotFoundException(`File not found: ${fileId}`);
         }
 
-        return {
-            id: record.id,
-            originalName: record.originalName,
-            mimeType: record.mimeType,
-            size: record.size,
-            storagePath: record.storagePath,
-            storageType: record.storageType,
-            previewable: record.previewable,
-            createdAt: record.createdAt,
-        };
+        return this.toFileMetadataDto(record);
     }
+
+    /**
+     * Story 10.6: Get thumbnail for a file
+     * Returns thumbnail buffer and metadata, or falls back to original for images
+     */
+    async getThumbnail(fileId: string): Promise<{
+        buffer: Buffer;
+        mimeType: string;
+        hasThumbnail: boolean;
+    } | null> {
+        const record = await this.repository.findByIdActive(fileId);
+        if (!record) {
+            throw new NotFoundException(`File not found: ${fileId}`);
+        }
+
+        // If thumbnail exists, return it
+        if (record.thumbnailPath) {
+            try {
+                const buffer = await this.storageAdapter.read(record.thumbnailPath);
+                return {
+                    buffer,
+                    mimeType: 'image/webp',
+                    hasThumbnail: true,
+                };
+            } catch {
+                this.logger.warn(`Thumbnail file missing for ${fileId}, falling back to original`);
+            }
+        }
+
+        // Fallback: return original if it's an image
+        if (record.mimeType.startsWith('image/')) {
+            try {
+                const buffer = await this.storageAdapter.read(record.storagePath);
+                return {
+                    buffer,
+                    mimeType: record.mimeType,
+                    hasThumbnail: false,
+                };
+            } catch {
+                this.logger.warn(`Original file missing for ${fileId}`);
+            }
+        }
+
+        // Non-image files return null (404 in controller)
+        return null;
+    }
+
 
     /**
      * Delete a file (soft delete in DB, remove from storage)
@@ -211,16 +300,7 @@ export class FileStorageService {
      */
     async listByGraph(graphId: string): Promise<FileMetadataDto[]> {
         const records = await this.repository.findByGraphId(graphId);
-        return records.map((r) => ({
-            id: r.id,
-            originalName: r.originalName,
-            mimeType: r.mimeType,
-            size: r.size,
-            storagePath: r.storagePath,
-            storageType: r.storageType,
-            previewable: r.previewable,
-            createdAt: r.createdAt,
-        }));
+        return records.map((r) => this.toFileMetadataDto(r));
     }
 
     /**
@@ -228,15 +308,6 @@ export class FileStorageService {
      */
     async listByOwner(ownerType: FileOwnerType, ownerId: string): Promise<FileMetadataDto[]> {
         const records = await this.repository.findByOwner(ownerType, ownerId);
-        return records.map((r) => ({
-            id: r.id,
-            originalName: r.originalName,
-            mimeType: r.mimeType,
-            size: r.size,
-            storagePath: r.storagePath,
-            storageType: r.storageType,
-            previewable: r.previewable,
-            createdAt: r.createdAt,
-        }));
+        return records.map((r) => this.toFileMetadataDto(r));
     }
 }

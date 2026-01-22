@@ -1,9 +1,11 @@
 /**
  * Story 10.4: File Storage Module
  * Registers Controller, Service, Repository, and Adapter
- * 
+ *
  * Story 10.5: Removed FileModule import to break circular dependency.
  * Legacy FileService fallback has been removed per Epic 10 constraints.
+ *
+ * Story 10.6: Added ThumbnailService for image thumbnail generation.
  */
 
 import { Module } from '@nestjs/common';
@@ -16,6 +18,7 @@ import { FileStorageRepository } from './file-storage.repository';
 import { LocalDiskAdapter } from './adapters/local-disk.adapter';
 import { STORAGE_ADAPTER } from './adapters/storage-adapter.interface';
 import { FileStorageAuthGuard } from './guards/file-storage-auth.guard';
+import { ThumbnailService } from './thumbnail.service';
 
 @Module({
     imports: [
@@ -31,6 +34,7 @@ import { FileStorageAuthGuard } from './guards/file-storage-auth.guard';
         FileStorageService,
         FileStorageRepository,
         FileStorageAuthGuard,
+        ThumbnailService,  // Story 10.6
         {
             provide: STORAGE_ADAPTER,
             useClass: LocalDiskAdapter,
@@ -39,3 +43,4 @@ import { FileStorageAuthGuard } from './guards/file-storage-auth.guard';
     exports: [FileStorageService],
 })
 export class FileStorageModule { }
+
