@@ -416,6 +416,12 @@ export class DataAssetService {
   // ========================================
 
   private toAssetResponse(asset: PrismaDataAsset & { folder?: PrismaDataFolder | null }): DataAssetWithFolder {
+    // Story 10.6: For IMAGE format with storagePath, use FileStorageService thumbnail endpoint
+    let thumbnail = asset.thumbnail;
+    if (asset.format === 'IMAGE' && asset.storagePath && !thumbnail) {
+      thumbnail = `/api/files/${asset.storagePath}/thumbnail`;
+    }
+
     return {
       id: asset.id,
       name: asset.name,
@@ -424,7 +430,7 @@ export class DataAssetService {
       fileSize: asset.fileSize,
       // Story 10.5: Map storagePath (fileId) to accessible URL for frontend
       storagePath: asset.storagePath ? `/api/files/${asset.storagePath}` : null,
-      thumbnail: asset.thumbnail,
+      thumbnail,
       version: asset.version,
       tags: asset.tags,
       graphId: asset.graphId,
@@ -438,6 +444,12 @@ export class DataAssetService {
   }
 
   private toSimpleAssetResponse(asset: PrismaDataAsset): DataAsset {
+    // Story 10.6: For IMAGE format with storagePath, use FileStorageService thumbnail endpoint
+    let thumbnail = asset.thumbnail;
+    if (asset.format === 'IMAGE' && asset.storagePath && !thumbnail) {
+      thumbnail = `/api/files/${asset.storagePath}/thumbnail`;
+    }
+
     return {
       id: asset.id,
       name: asset.name,
@@ -446,7 +458,7 @@ export class DataAssetService {
       fileSize: asset.fileSize,
       // Story 10.5: Map storagePath (fileId) to accessible URL for frontend
       storagePath: asset.storagePath ? `/api/files/${asset.storagePath}` : null,
-      thumbnail: asset.thumbnail,
+      thumbnail,
       version: asset.version,
       tags: asset.tags,
       graphId: asset.graphId,
