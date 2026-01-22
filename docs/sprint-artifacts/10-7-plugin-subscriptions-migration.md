@@ -90,7 +90,7 @@ So that **订阅能力成为可独立演进的业务插件，并为后续依赖�
 
 ### Review Follow-ups Round 2 (AI - 2026-01-22)
 
-- [x] [AI-Review][CRITICAL] 所有变更已提交 Git - commit `48df866`。 [git log]
+- [x] [AI-Review][CRITICAL] 所有变更已提交 Git - commit `7aec517`。 [git log]
 - [x] [AI-Review][MEDIUM] Controller 验证：DTO 定义在 `@cdm/types` 中，采用 Zod 运行时验证（非 class-validator）。符合项目规范，无需修改。
 - [x] [AI-Review][MEDIUM] 缺少 Repository 单元测试 - 已创建 `subscriptions.repository.spec.ts`，13 个新测试通过。 [packages/plugins/plugin-subscriptions/src/server/subscriptions/__tests__/subscriptions.repository.spec.ts]
 - [x] [AI-Review][LOW] YjsNodeChangedEvent 已添加可选 `actorId` 字段，`handleYjsNodeChanged()` 已映射到 `userId`。 [packages/plugins/plugin-subscriptions/src/server/subscriptions/subscription.listener.ts:53]
