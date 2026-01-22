@@ -2,6 +2,7 @@
  * KernelPluginManagerService
  *
  * Story 7.5: Kernel Purification
+ * Story 10.8: Added plugin-data-library registration
  * Provides a thin "kernel loader" that uses the shared `@cdm/plugins` PluginManager
  * to register and validate server-side plugins at bootstrap time.
  */
@@ -14,6 +15,7 @@ import { NodesService, EdgesService } from '@cdm/plugin-mindmap-core/server';
 import { ApprovalService } from '@cdm/plugin-workflow-approval/server';
 import { CommentsService } from '@cdm/plugin-comments/server';
 import { SubscriptionService } from '@cdm/plugin-subscriptions/server'; // Story 10.7
+import { DataAssetService } from '@cdm/plugin-data-library/server'; // Story 10.8
 
 interface KernelPluginContext extends PluginContext {
   moduleRef: ModuleRef;
@@ -121,6 +123,28 @@ class SubscriptionsServerPlugin extends Plugin {
   }
 }
 
+// Story 10.8: Data Library Server Plugin
+class DataLibraryServerPlugin extends Plugin {
+  constructor() {
+    super({
+      name: 'plugin-data-library',
+      version: '0.0.1',
+      description: 'Data library server plugin (Nest module)',
+      dependencies: [],
+      enabledByDefault: true,
+    });
+  }
+
+  async load(): Promise<void> {
+    const moduleRef = (this.context as PluginContextWithModuleRef).moduleRef;
+    if (!moduleRef) {
+      throw new Error('Kernel plugin context missing moduleRef');
+    }
+
+    requireProvider(moduleRef, DataAssetService, 'DataAssetService');
+  }
+}
+
 @Injectable()
 export class KernelPluginManagerService implements OnModuleInit {
   private readonly logger = new Logger(KernelPluginManagerService.name);
@@ -153,9 +177,11 @@ export class KernelPluginManagerService implements OnModuleInit {
       .register(new MindmapCoreServerPlugin())
       .register(new WorkflowApprovalServerPlugin())
       .register(new CommentsServerPlugin())
-      .register(new SubscriptionsServerPlugin()); // Story 10.7
+      .register(new SubscriptionsServerPlugin()) // Story 10.7
+      .register(new DataLibraryServerPlugin()); // Story 10.8
 
     await this.manager.load();
     await this.manager.enableAll();
   }
 }
+

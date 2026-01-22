@@ -2,6 +2,7 @@
  * App Module - Microkernel Configuration
  * Story 7.5: Plugin Migration
  * Story 10.5: Removed legacy FileModule, unified file storage
+ * Story 10.8: Migrated DataManagementModule to plugin-data-library
  *
  * Kernel responsibilities:
  * - Load plugin server modules
@@ -17,6 +18,7 @@ import { WorkflowApprovalServerModule } from '@cdm/plugin-workflow-approval/serv
 import { CommentsServerModule } from '@cdm/plugin-comments/server';
 import { SubscriptionsServerModule } from '@cdm/plugin-subscriptions/server'; // Story 10.7
 import { TemplatesServerModule } from '@cdm/plugin-template/server'; // Story 5.1
+import { DataLibraryServerModule } from '@cdm/plugin-data-library/server'; // Story 10.8
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { GraphsModule } from './modules/graphs/graphs.module'; // Dynamic Graph ID
@@ -25,7 +27,6 @@ import { ProductLibraryModule } from './modules/product-library'; // Story 2.7
 import { KnowledgeLibraryModule } from './modules/knowledge-library'; // Story 2.8
 import { NotificationModule } from './modules/notification/notification.module'; // Story 10.7: For plugin-subscriptions
 import { NotificationService } from './modules/notification/notification.service'; // Story 10.7: For injection token
-import { DataManagementModule } from './modules/data-management'; // Story 9.1: Data Library
 import { PluginKernelModule } from './modules/plugin-kernel/plugin-kernel.module';
 import { FileStorageModule } from './modules/file-storage/file-storage.module'; // Story 10.4: Unified File Storage
 import { FileStorageService } from './modules/file-storage/file-storage.service'; // Story 10.5: For injection token
@@ -41,7 +42,6 @@ import { FileStorageService } from './modules/file-storage/file-storage.service'
     ProductLibraryModule, // Story 2.7: Mock product library for PBS nodes
     KnowledgeLibraryModule, // Story 2.8: Mock knowledge library for Task nodes
     NotificationModule, // Story 10.7: Needed by SubscriptionsServerModule
-    DataManagementModule, // Story 9.1: Data Library (Story 10.5: uses FileStorageModule)
     FileStorageModule, // Story 10.4: Unified File Storage
 
     // Story 7.5: Kernel → plugin infrastructure contracts (global)
@@ -67,8 +67,15 @@ import { FileStorageService } from './modules/file-storage/file-storage.service'
       imports: [GraphsModule],
       demoSeedServiceProvider: DemoSeedService,
     }),
+
+    // Story 10.8: Data Library Plugin (migrated from DataManagementModule)
+    DataLibraryServerModule.forRoot({
+      imports: [FileStorageModule],
+      fileStorageServiceClass: FileStorageService,
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule { }
+
