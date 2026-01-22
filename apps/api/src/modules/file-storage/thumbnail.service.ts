@@ -28,12 +28,6 @@ export const THUMBNAIL_SUPPORTED_TYPES = new Set([
     'image/webp',
 ]);
 
-/**
- * Check if a MIME type supports thumbnail generation
- */
-export function canGenerateThumbnail(mimeType: string): boolean {
-    return THUMBNAIL_SUPPORTED_TYPES.has(mimeType);
-}
 
 @Injectable()
 export class ThumbnailService {
@@ -43,23 +37,25 @@ export class ThumbnailService {
      * Check if the given MIME type supports thumbnail generation
      */
     canGenerateThumbnail(mimeType: string): boolean {
-        return canGenerateThumbnail(mimeType);
+        return THUMBNAIL_SUPPORTED_TYPES.has(mimeType);
     }
 
     /**
-     * Generate a thumbnail from an image buffer
-     * @param buffer - Original image buffer
+     * Generate a thumbnail from an image buffer or local file path
+     * @param input - Original image buffer or local file path
      * @param options - Thumbnail generation options
      * @returns Thumbnail buffer (default: webp format)
      */
-    async generate(buffer: Buffer, options: ThumbnailOptions = {}): Promise<Buffer> {
+    async generate(input: Buffer | string, options: ThumbnailOptions = {}): Promise<Buffer> {
         const { width, height, format } = { ...DEFAULT_OPTIONS, ...options };
 
         try {
-            const thumbnailBuffer = await sharp(buffer)
+            const thumbnailBuffer = await sharp(input)
+                .rotate()
                 .resize(width, height, {
                     fit: 'cover',      // Crop to fill the dimensions
                     position: 'center',
+                    withoutEnlargement: true,
                 })
                 .toFormat(format, { quality: 80 })
                 .toBuffer();
@@ -67,7 +63,11 @@ export class ThumbnailService {
             this.logger.debug(`Generated ${format} thumbnail: ${width}x${height}`);
             return thumbnailBuffer;
         } catch (error) {
-            this.logger.error(`Failed to generate thumbnail: ${String(error)}`);
+            if (error instanceof Error) {
+                this.logger.error(`Failed to generate thumbnail: ${error.message}`, error.stack);
+            } else {
+                this.logger.error(`Failed to generate thumbnail: ${String(error)}`);
+            }
             throw error;
         }
     }

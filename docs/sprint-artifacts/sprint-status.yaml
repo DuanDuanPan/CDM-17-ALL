@@ -134,7 +134,7 @@ development_status:
   10-3-lint-hardening-debt-cleanup: done
   10-4-unified-file-storage-foundation: done
   10-5-migrate-callers-to-file-storage: done
-  10-6-thumbnail-preview-enhancement: review
+  10-6-thumbnail-preview-enhancement: done
   10-7-plugin-subscriptions-migration: backlog
   10-8-plugin-data-management-migration: backlog
   10-9-cleanup-docs: backlog

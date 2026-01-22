@@ -181,6 +181,20 @@ describe('FileStorageService', () => {
             expect(mockRepository.softDelete).toHaveBeenCalledWith('file-123');
         });
 
+        it('should delete thumbnail when thumbnailPath exists', async () => {
+            const recordWithThumbnail = {
+                ...mockFileRecord,
+                mimeType: 'image/png',
+                thumbnailPath: 'thumbnails/graph-456/file-123.webp',
+            };
+            mockRepository.findByIdActive.mockResolvedValue(recordWithThumbnail);
+
+            await service.delete('file-123');
+
+            expect(mockStorageAdapter.delete).toHaveBeenCalledWith(recordWithThumbnail.storagePath);
+            expect(mockStorageAdapter.delete).toHaveBeenCalledWith(recordWithThumbnail.thumbnailPath);
+        });
+
         it('should throw NotFoundException for non-existent file', async () => {
             mockRepository.findByIdActive.mockResolvedValue(null);
 

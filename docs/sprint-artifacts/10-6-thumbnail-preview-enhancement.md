@@ -1,6 +1,6 @@
 # Story 10.6: 文件预览增强（缩略图）(Thumbnail/Preview Enhancement)
 
-Status: review
+Status: done
 
 <!-- Note: Backend complete. Frontend Task 4 deferred for separate implementation. -->
 
@@ -47,6 +47,14 @@ So that **在数据资源库/评论/交付物场景中有一致的预览体验�
   - [x] 5.1 新增 `ThumbnailService` 单元测试（via FileStorageService tests）
   - [x] 5.2 新增 `/api/files/:id/thumbnail` 接口测试
   - [x] 5.3 验证现有 lint/test 不回归（168/168 tests pass）
+
+- [x] **Review Follow-ups (AI)** - Code Review 2026-01-22
+  - [x] [AI-Review][HIGH] 提交所有未提交的代码变更 (7 files uncommitted)
+  - [x] [AI-Review][HIGH] 为 `ThumbnailService` 创建独立单元测试 `thumbnail.service.spec.ts`
+  - [x] [AI-Review][HIGH] 为 `FileResponseDto` 添加 Swagger `@ApiProperty()` 装饰器
+  - [ ] [AI-Review][MEDIUM] 扩展 `file-storage.controller.spec.ts` 覆盖所有端点 - Deferred (thumbnail tests added)
+  - [x] [AI-Review][MEDIUM] 更新 Story Change Log 中的 commit hash 为最新值
+  - [x] [AI-Review][LOW] 移除 `thumbnail.service.ts` 中冗余的独立函数导出
 
 ---
 
@@ -345,14 +353,15 @@ Antigravity (Google DeepMind) - 2026-01-22
 ### Debug Log References
 
 - ESLint: 0 errors, 25 warnings (pre-existing)
-- Jest: 168/168 tests passed (20 in file-storage module: +7 thumbnail tests)
+- Jest: 171/171 tests passed (FileStorage module: service + controller tests)
 
 ### Completion Notes List
 
 - ✅ Task 1: Installed `sharp` v0.34.5, created `ThumbnailService` with 200x200 webp generation
 - ✅ Task 2: Added `GET /api/files/:id/thumbnail` endpoint with Cache-Control: max-age=86400
-- ✅ Task 3: Added `thumbnailUrl` to `FileMetadataDto`, returns `/api/files/{id}/thumbnail` when thumbnail exists
-- ✅ Task 5: Added 7 new tests for thumbnail generation and getThumbnail() functionality
+- ✅ Task 3: Added `thumbnailUrl` to `FileMetadataDto`, returns `/api/files/{id}/thumbnail` for image types
+- ✅ Task 5: Added thumbnail tests (service + controller) and verified no test regressions
+- ✅ Code Review Fixes: Ensure file delete cleans up thumbnail; FileResponseDto includes `thumbnailUrl`; story File List synced with git reality
 - ⏳ Task 4 (Frontend): Deferred - requires separate frontend implementation
 
 ### File List
@@ -360,12 +369,16 @@ Antigravity (Google DeepMind) - 2026-01-22
 | File | Action |
 |------|--------|
 | `apps/api/src/modules/file-storage/thumbnail.service.ts` | New - ThumbnailService with sharp integration |
-| `apps/api/src/modules/file-storage/file-storage.service.ts` | Modified - Added thumbnail generation in upload(), getThumbnail(), thumbnailUrl in DTO |
+| `apps/api/src/modules/file-storage/file-storage.service.ts` | Modified - Added thumbnail generation in upload(), getThumbnail(), thumbnailUrl in DTO (always for images) |
 | `apps/api/src/modules/file-storage/file-storage.controller.ts` | Modified - Added `GET /api/files/:id/thumbnail` endpoint |
 | `apps/api/src/modules/file-storage/file-storage.module.ts` | Modified - Registered ThumbnailService |
-| `apps/api/src/modules/file-storage/__tests__/file-storage.service.spec.ts` | Modified - Added 7 thumbnail tests, ThumbnailService mock |
-| `apps/api/package.json` | Modified - Added sharp@^0.34.5, @types/sharp@^0.32.0 |
-| `docs/sprint-artifacts/sprint-status.yaml` | Modified - Status: in-progress → review |
+| `apps/api/src/modules/file-storage/dto/file-response.dto.ts` | Modified - Expose `thumbnailUrl` in API response DTO |
+| `apps/api/src/modules/file-storage/__tests__/file-storage.service.spec.ts` | Modified - Added thumbnail + delete cleanup tests |
+| `apps/api/src/modules/file-storage/__tests__/file-storage.controller.spec.ts` | New - `/api/files/:id/thumbnail` controller tests |
+| `apps/api/src/modules/file-storage/__tests__/thumbnail.service.spec.ts` | New - Code Review: ThumbnailService unit tests |
+| `apps/api/package.json` | Modified - Added sharp@^0.34.5, @types/sharp@^0.32.0, @nestjs/swagger@^11.2.5 |
+| `pnpm-lock.yaml` | Modified - Updated lockfile for deps |
+| `docs/sprint-artifacts/sprint-status.yaml` | Modified - Status: in-progress → review → done |
 | `docs/sprint-artifacts/10-6-thumbnail-preview-enhancement.md` | Modified - Story document with task completion |
 
 ---
@@ -374,4 +387,6 @@ Antigravity (Google DeepMind) - 2026-01-22
 
 | Date | Change |
 |------|--------|
-| 2026-01-22 | Story 10.6 backend implementation complete: ThumbnailService, thumbnail endpoint, FileMetadataDto.thumbnailUrl (`82b70c4`) |
+| 2026-01-22 | Story 10.6 backend implementation complete: ThumbnailService, thumbnail endpoint, FileMetadataDto.thumbnailUrl (`8df7a9c`) |
+| 2026-01-22 | Code review fixes applied: thumbnailUrl for images, delete cleans up thumbnail, controller tests + DTO update |
+| 2026-01-22 | Code Review Round 2: Added `thumbnail.service.spec.ts`, Swagger decorators to DTO, removed redundant exports, installed `@nestjs/swagger` (`8bae69a`) |

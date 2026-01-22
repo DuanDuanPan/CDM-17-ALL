@@ -101,8 +101,9 @@ export class FileStorageService {
             previewable: record.previewable,
             createdAt: record.createdAt,
         };
-        // Include thumbnailUrl if thumbnail exists
-        if (record.thumbnailPath) {
+        const isImage = record.mimeType?.startsWith('image/');
+        // Include thumbnailUrl for images (even if thumbnail isn't generated yet)
+        if (isImage || record.thumbnailPath) {
             dto.thumbnailUrl = this.buildThumbnailUrl(record.id);
         }
         return dto;
@@ -287,6 +288,13 @@ export class FileStorageService {
         await this.repository.softDelete(fileId);
         try {
             await this.storageAdapter.delete(record.storagePath);
+            if (record.thumbnailPath) {
+                try {
+                    await this.storageAdapter.delete(record.thumbnailPath);
+                } catch (error) {
+                    this.logger.warn(`Failed to delete thumbnail for ${fileId}: ${String(error)}`);
+                }
+            }
         } catch (error) {
             await this.repository.update(fileId, { deletedAt: null });
             throw error;
