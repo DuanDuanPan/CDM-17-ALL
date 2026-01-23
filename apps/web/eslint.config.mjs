@@ -6,6 +6,7 @@ export default [
         ignores: [
             '.next/**',
             'node_modules/**',
+            '.playwright-browsers/**',
             'playwright-report/**',
             'test-results/**',
             'public/libs/**',

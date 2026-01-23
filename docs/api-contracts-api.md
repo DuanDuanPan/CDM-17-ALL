@@ -52,10 +52,13 @@
 ### Controller: `files`
 | 方法 | 路径 | Handler | 参数提示 | 源文件 |
 |---|---|---|---|---|
-| DELETE | `/api/files/:fileId` | `file.controller#deleteFile` | param:fileId | `apps/api/src/modules/file/file.controller.ts` |
-| GET | `/api/files/:fileId` | `file.controller#downloadFile` | param:fileId,fileId | `apps/api/src/modules/file/file.controller.ts` |
-| GET | `/api/files/:fileId/metadata` | `file.controller#getFileMetadata` | param:fileId,fileId | `apps/api/src/modules/file/file.controller.ts` |
-| POST | `/api/files/upload` | `file.controller#uploadFile` |  | `apps/api/src/modules/file/file.controller.ts` |
+| POST | `/api/files/upload` | `file-storage.controller#upload` | query:graphId,ownerType,ownerId；header:x-user-id | `apps/api/src/modules/file-storage/file-storage.controller.ts` |
+| GET | `/api/files/:id` | `file-storage.controller#downloadCompat` | param:id | `apps/api/src/modules/file-storage/file-storage.controller.ts` |
+| GET | `/api/files/:id/download` | `file-storage.controller#download` | param:id | `apps/api/src/modules/file-storage/file-storage.controller.ts` |
+| GET | `/api/files/:id/preview` | `file-storage.controller#preview` | param:id | `apps/api/src/modules/file-storage/file-storage.controller.ts` |
+| GET | `/api/files/:id/thumbnail` | `file-storage.controller#thumbnail` | param:id | `apps/api/src/modules/file-storage/file-storage.controller.ts` |
+| GET | `/api/files/:id/metadata` | `file-storage.controller#getMetadata` | param:id | `apps/api/src/modules/file-storage/file-storage.controller.ts` |
+| DELETE | `/api/files/:id` | `file-storage.controller#deleteFile` | param:id；header:x-user-id | `apps/api/src/modules/file-storage/file-storage.controller.ts` |
 
 ### Controller: `graphs`
 | 方法 | 路径 | Handler | 参数提示 | 源文件 |

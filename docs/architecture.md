@@ -856,3 +856,74 @@ async onDeliverableUploaded(payload: { nodeId: string; attachment: Attachment })
 | 帆板网格模型   | MESH    | 仿真验证 |
 | 热控系统温度场 | CONTOUR | 仿真验证 |
 | 结构应力分析   | CONTOUR | 仿真验证 |
+
+---
+
+## 统一文件存储模块 (Unified File Storage Module)
+
+> Story 10.4-10.6 引入了统一的文件存储基础设施，Story 10.9 完成旧模块清理。
+
+### 1. 架构概述
+
+**FileStorageModule** (`apps/api/src/modules/file-storage/`) 提供统一的文件上传/下载/预览/缩略图能力：
+
+- 使用 Repository 模式访问 `FileRecord` 数据模型
+- 支持 StorageAdapter 接口扩展（LocalDisk → S3/MinIO）
+- 所有业务模块（审批/数据资源/评论）统一使用此服务
+
+### 2. 目录结构
+
+```
+apps/api/src/modules/file-storage/
+├── __tests__/                    # 单元测试
+│   ├── file-storage.service.spec.ts
+│   ├── file-storage.controller.spec.ts
+│   └── thumbnail.service.spec.ts
+├── adapters/                     # 存储适配器
+│   ├── local-disk.adapter.ts     # 本地磁盘存储
+│   └── storage-adapter.interface.ts
+├── guards/
+│   └── file-storage-auth.guard.ts
+├── dto/
+│   └── *.ts
+├── file-storage.controller.ts    # /api/files/* 路由
+├── file-storage.module.ts        # 模块定义
+├── file-storage.repository.ts    # 数据访问层
+├── file-storage.service.ts       # 核心服务
+└── thumbnail.service.ts          # 缩略图生成
+```
+
+### 3. 统一 API 路由
+
+| 功能     | 路由                           | 方法   |
+| -------- | ------------------------------ | ------ |
+| 上传         | `/api/files/upload`            | POST   |
+| 下载（兼容） | `/api/files/:id`               | GET    |
+| 下载         | `/api/files/:id/download`      | GET    |
+| 预览         | `/api/files/:id/preview`       | GET    |
+| 缩略图       | `/api/files/:id/thumbnail`     | GET    |
+| 元数据       | `/api/files/:id/metadata`      | GET    |
+| 删除         | `/api/files/:id`               | DELETE |
+
+### 4. 插件集成
+
+插件通过 DI token 注入 `FileStorageService`：
+
+```typescript
+// 在 app.module.ts 中注册
+CommentsServerModule.forRoot({
+  imports: [FileStorageModule],
+  fileStorageServiceClass: FileStorageService,
+});
+
+DataLibraryServerModule.forRoot({
+  imports: [FileStorageModule],
+  fileStorageServiceClass: FileStorageService,
+});
+```
+
+### 5. 历史迁移说明
+
+- **旧模块**: `apps/api/src/modules/file/` (FileService) - **已删除** (Story 10.9)
+- **新模块**: `apps/api/src/modules/file-storage/` (FileStorageService) - 统一入口
+- 无需迁移历史数据（上线前清空 uploads + 相关表/目录）

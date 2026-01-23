@@ -39,12 +39,20 @@ const createMockGraph = (
     // First pass: create nodes (so edges can reference targets)
     nodes.forEach((nodeData) => {
         const data: Record<string, unknown> = {};
+        let visible = true;
+        const show = vi.fn(() => {
+            visible = true;
+        });
+        const hide = vi.fn(() => {
+            visible = false;
+        });
         const mockNode = {
             id: nodeData.id,
             isNode: () => true,
             isEdge: () => false,
-            show: vi.fn(),
-            hide: vi.fn(),
+            isVisible: () => visible,
+            show,
+            hide,
             getData: () => data,
             setData: vi.fn((next: Record<string, unknown>) => Object.assign(data, next)),
         } as unknown as Node;
@@ -57,21 +65,32 @@ const createMockGraph = (
     nodes.forEach((nodeData) => {
         if (!nodeData.outEdges) return;
 
-        const edges = nodeData.outEdges.map((e, idx) => ({
-            id: `${nodeData.id}-${e.targetId}-${idx}`,
-            isEdge: () => true,
-            isNode: () => false,
-            getData: () => ({
-                metadata: {
-                    kind: e.edgeType === 'dependency' ? 'dependency' : 'hierarchical',
-                },
-            }),
-            getTargetCell: () => nodeMap.get(e.targetId) || null,
-            getSourceCellId: () => nodeData.id,
-            getTargetCellId: () => e.targetId,
-            show: vi.fn(),
-            hide: vi.fn(),
-        }));
+        const edges = nodeData.outEdges.map((e, idx) => {
+            let visible = true;
+            const show = vi.fn(() => {
+                visible = true;
+            });
+            const hide = vi.fn(() => {
+                visible = false;
+            });
+
+            return {
+                id: `${nodeData.id}-${e.targetId}-${idx}`,
+                isEdge: () => true,
+                isNode: () => false,
+                isVisible: () => visible,
+                getData: () => ({
+                    metadata: {
+                        kind: e.edgeType === 'dependency' ? 'dependency' : 'hierarchical',
+                    },
+                }),
+                getTargetCell: () => nodeMap.get(e.targetId) || null,
+                getSourceCellId: () => nodeData.id,
+                getTargetCellId: () => e.targetId,
+                show,
+                hide,
+            };
+        });
         edgeMap.set(nodeData.id, edges as unknown as Edge[]);
 
         // Story 8.10: Hierarchy derives from node.data.parentId (not edges)

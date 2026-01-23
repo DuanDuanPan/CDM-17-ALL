@@ -22,7 +22,7 @@
 | [/] | **审批工作流**<br>状态流转 (Review 中) | `apps/api/src/modules/approval` | 1,441 | 7 |
 | [ ] | **智能通知**<br>(代办 / 仅脚手架) | `apps/web/components/notifications`<br>`apps/api/src/modules/notification` | 854 | 9 |
 | [ ] | **关注与订阅**<br>(准备开发 / 仅脚手架) | `apps/api/src/modules/subscriptions` | 614 | 5 |
-| [x] | **应用节点 & 文件 I/O**<br>执行逻辑、文件管理 | `apps/web/components/App`<br>`apps/api/src/modules/app-library`<br>`apps/api/src/modules/file` | 2,708 | 20 |
+| [x] | **应用节点 & 文件 I/O**<br>执行逻辑、文件管理 | `apps/web/components/App`<br>`apps/api/src/modules/app-library`<br>`apps/api/src/modules/file-storage` | 2,708 | 20 |
 | [x] | **用户与鉴权** | `apps/web/components/UserSelector`<br>`apps/api/src/modules/users` | 518 | 6 |
 
 ## 详细代码统计
@@ -226,5 +226,4 @@
     - 分组显示 (评论/审批/任务变动)
     - 标记已读/未读
     - 点击跳转到对应节点
-
 

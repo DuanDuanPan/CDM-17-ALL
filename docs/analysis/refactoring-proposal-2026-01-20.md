@@ -429,7 +429,7 @@ Week 1                    Week 2                    Week 3
 - [ ] `subscriptions` 模块成功迁移为插件
 - [ ] `data-management` 模块成功迁移为插件
 - [ ] 插件可独立禁用不影响系统运行
-- [ ] 文档更新完成
+- [x] 文档更新完成
 
 ### 8.4 预期收益
 
@@ -468,3 +468,38 @@ Week 1                    Week 2                    Week 3
 _文档版本: v2.0_  
 _日期: 2026-01-20_  
 _作者: CDM-17 架构组_
+
+---
+
+## 9. 执行完成状态 (Completion Status)
+
+> **最后更新**: 2026-01-23
+
+### 9.1 Epic 10 执行进度
+
+| Story | 描述 | 状态 | 完成日期 |
+|-------|------|------|----------|
+| 10.1 | GraphsService Repository 收敛 | ✅ done | - |
+| 10.2 | UsersService Repository 收敛 | ✅ done | - |
+| 10.3 | ESLint 规则收紧 + 技术债清理 | ✅ done | - |
+| 10.4 | 统一文件存储基础设施 | ✅ done | - |
+| 10.5 | 迁移现有文件使用方到 FileStorageService | ✅ done | - |
+| 10.6 | 文件预览增强（缩略图） | ✅ done | - |
+| 10.7 | subscriptions 插件化迁移 | ✅ done | - |
+| 10.8 | data-management 插件化迁移 | ✅ done | - |
+| 10.9 | 删除冗余文件实现 + 文档更新 | ✅ done | 2026-01-23 |
+
+### 9.2 主要成果
+
+**已删除模块**:
+- `apps/api/src/modules/file/` 目录（4 个文件，~325 行代码）
+
+**验证结果**:
+- @cdm/api 构建成功
+- 12 test suites / 111 tests 全部通过
+- 无编译错误或回归
+
+**文档更新**:
+- `docs/project-context.md` - 添加 FileStorageService 使用说明
+- `docs/architecture.md` - 添加统一文件存储模块描述
+- `docs/analysis/refactoring-proposal-2026-01-20.md` - 本节完成状态

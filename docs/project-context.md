@@ -1,7 +1,7 @@
 ---
 project_name: 'CDM-17-Gemini'
 user_name: 'Enjoyjavapan'
-date: '2025-12-22'
+date: '2026-01-23'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules']
 ---
 
@@ -195,6 +195,33 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **开发分支**: `dev` (开发中功能)
 - **功能分支**: `feature/<story-id>-<description>`
 - **修复分支**: `fix/<issue-id>-<description>`
+
+---
+
+### 文件存储规则 (File Storage Rules)
+
+#### 统一文件存储服务
+- **禁止**: 使用旧的 `FileService`（已删除，Epic 10.9）
+- **必须**: 使用 `FileStorageService` 进行所有文件操作
+- **API 入口**: `/api/files/*`
+- **插件使用**: 通过 `FILE_STORAGE_SERVICE` token 注入
+
+#### 上传规则
+- 所有上传必须提供 `graphId`
+- 文件按 `graphId` 分层存储
+- 缩略图自动生成（图片类型）
+- 最大文件大小限制: 10MB
+
+#### 存储架构
+```
+apps/api/src/modules/file-storage/
+├── adapters/                    # 存储适配器
+│   ├── local-disk.adapter.ts    # 本地磁盘存储
+│   └── storage-adapter.interface.ts
+├── file-storage.service.ts      # 核心服务
+├── file-storage.repository.ts   # 数据访问层
+└── thumbnail.service.ts         # 缩略图生成
+```
 
 ---
 

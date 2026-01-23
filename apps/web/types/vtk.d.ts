@@ -14,3 +14,8 @@ declare module '@kitware/vtk.js/IO/Legacy/PolyDataReader' {
 
   export default vtkPolyDataReader;
 }
+
+declare module '@kitware/vtk.js/Rendering/Profiles/Geometry' {
+  const vtkGeometryProfile: unknown;
+  export default vtkGeometryProfile;
+}
