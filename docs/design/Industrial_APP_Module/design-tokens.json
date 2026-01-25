@@ -1,0 +1,128 @@
+{
+  "meta": {
+    "project": "Industrial APP Module",
+    "date": "2026-01-24",
+    "themes": ["dark", "light"],
+    "iconSystem": "lucide"
+  },
+  "typography": {
+    "fontFamily": {
+      "ui": "'IBM Plex Sans','Noto Sans SC','PingFang SC','Microsoft YaHei',system-ui,-apple-system,'Segoe UI',sans-serif",
+      "display": "'IBM Plex Sans Condensed','IBM Plex Sans','Noto Sans SC','PingFang SC','Microsoft YaHei',system-ui,sans-serif",
+      "mono": "'JetBrains Mono','IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace"
+    },
+    "fontSize": {
+      "display": 48,
+      "h1": 32,
+      "h2": 24,
+      "h3": 20,
+      "h4": 18,
+      "bodyLg": 16,
+      "body": 14,
+      "bodySm": 12,
+      "caption": 12
+    },
+    "lineHeight": {
+      "display": 56,
+      "h1": 40,
+      "h2": 32,
+      "h3": 28,
+      "h4": 26,
+      "bodyLg": 24,
+      "body": 22,
+      "bodySm": 20,
+      "caption": 18
+    },
+    "fontWeight": {
+      "regular": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700
+    }
+  },
+  "spacing": {
+    "base": 4,
+    "scale": [4, 8, 12, 16, 20, 24, 32, 40, 48, 64]
+  },
+  "radius": {
+    "sm": 2,
+    "md": 4,
+    "lg": 8
+  },
+  "shadow": {
+    "sm": "0 2px 4px rgba(0,0,0,0.4)",
+    "md": "0 4px 8px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3)",
+    "lg": "0 8px 16px rgba(0,0,0,0.6), 0 4px 8px rgba(0,0,0,0.4)",
+    "xl": "0 16px 32px rgba(0,0,0,0.7), 0 8px 16px rgba(0,0,0,0.5)"
+  },
+  "themes": {
+    "dark": {
+      "color": {
+        "background": "#0D0D0D",
+        "surface": { "1": "#141414", "2": "#1A1A1A", "3": "#262626" },
+        "border": "#3F3F3F",
+        "text": { "primary": "#E6E6E6", "strong": "#FFFFFF", "muted": "#8C8C8C" },
+        "brand": {
+          "primary": "#00D9FF",
+          "primaryHover": "#00B8E6",
+          "primaryPressed": "#0099CC",
+          "secondary": "#FF6B00",
+          "secondaryHover": "#E65C00",
+          "secondaryPressed": "#CC5200",
+          "liveness": "#00FF88"
+        },
+        "semantic": { "success": "#52C41A", "warning": "#FAAD14", "error": "#FF4D4F", "info": "#1890FF" },
+        "canvas": { "grid": "#1A1A1A", "nodeBg": "#1F1F1F", "nodeBgSelected": "#2A2A2A" }
+      },
+      "antd": {
+        "token": {
+          "colorPrimary": "#00D9FF",
+          "colorInfo": "#00D9FF",
+          "colorSuccess": "#52C41A",
+          "colorWarning": "#FAAD14",
+          "colorError": "#FF4D4F",
+          "colorTextBase": "#E6E6E6",
+          "colorBgBase": "#0D0D0D",
+          "colorBgContainer": "#1A1A1A",
+          "colorBorder": "#3F3F3F",
+          "borderRadius": 4
+        },
+        "note": "AntD v5 token overrides for dark theme."
+      }
+    },
+    "light": {
+      "color": {
+        "background": "#F7F8FA",
+        "surface": { "1": "#FFFFFF", "2": "#F2F4F7", "3": "#E4E7EC" },
+        "border": "#D0D5DD",
+        "text": { "primary": "#0B0F14", "strong": "#000000", "muted": "#667085" },
+        "brand": {
+          "primary": "#00D9FF",
+          "primaryHover": "#00B8E6",
+          "primaryPressed": "#0099CC",
+          "secondary": "#FF6B00",
+          "secondaryHover": "#E65C00",
+          "secondaryPressed": "#CC5200",
+          "liveness": "#00FF88"
+        },
+        "semantic": { "success": "#52C41A", "warning": "#FAAD14", "error": "#FF4D4F", "info": "#1890FF" },
+        "canvas": { "grid": "#E6E8EC", "nodeBg": "#FFFFFF", "nodeBgSelected": "#F2F4F7" }
+      },
+      "antd": {
+        "token": {
+          "colorPrimary": "#00D9FF",
+          "colorInfo": "#00D9FF",
+          "colorSuccess": "#52C41A",
+          "colorWarning": "#FAAD14",
+          "colorError": "#FF4D4F",
+          "colorTextBase": "#0B0F14",
+          "colorBgBase": "#F7F8FA",
+          "colorBgContainer": "#FFFFFF",
+          "colorBorder": "#D0D5DD",
+          "borderRadius": 4
+        },
+        "note": "AntD v5 token overrides for light theme."
+      }
+    }
+  }
+}

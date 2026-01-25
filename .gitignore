@@ -55,3 +55,7 @@ apps/api/uploads
 
 # Testing
 coverage
+
+# Gemini Internal
+.gemini
+.gemini-clipboard
